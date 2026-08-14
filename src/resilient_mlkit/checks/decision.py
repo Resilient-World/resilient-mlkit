@@ -12,7 +12,7 @@ can invalidate a model before a single GPU-hour is bought.
 from __future__ import annotations
 
 from ..core.repo import BindingError, Repo
-from ..core.result import CheckResult
+from ..core.result import CheckResult, CredentialRequired
 from . import RunContext, check
 
 PHASE = "decision"
@@ -46,6 +46,8 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
         )
     try:
         out = dict(fn())
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("D2", PHASE, f"placebo_test raised {type(exc).__name__}: {exc}")
 
@@ -108,6 +110,8 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
         )
     try:
         out = dict(fn())
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("D3", PHASE, f"coverage raised {type(exc).__name__}: {exc}")
 

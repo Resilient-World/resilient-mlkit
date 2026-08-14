@@ -14,11 +14,13 @@ GLYPH = {
     Status.PASS: "P",
     Status.FAIL: "F",
     Status.NA: "-",
+    Status.DEFERRED: "K",
     Status.STALE: "S",
     Status.ESCALATED: "E",
 }
 
-LEGEND = "P=pass  F=fail  -=NA(reason given)  S=stale(SHA moved)  E=escalated(human sign-off)"
+LEGEND = ("P=pass  F=fail  -=NA(reason given)  K=deferred(wired, awaiting a key)  "
+          "S=stale(SHA moved)  E=escalated(human sign-off)")
 
 
 def render(rows: list[list[str]], headers: list[str]) -> str:

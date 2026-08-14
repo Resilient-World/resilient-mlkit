@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from ..core import policy
 from ..core.repo import BindingError, Repo
-from ..core.result import CheckResult
+from ..core.result import CheckResult, CredentialRequired
 from . import RunContext, check
 
 PHASE = "triage"
@@ -28,6 +28,8 @@ def t1_batch_load(repo: Repo, ctx: RunContext) -> CheckResult:
 
     try:
         batch = fn()
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001 - the failure IS the finding
         return CheckResult.failed(
             "T1",
@@ -52,6 +54,8 @@ def t2_overfit_one_batch(repo: Repo, ctx: RunContext) -> CheckResult:
 
     try:
         losses = list(fn())
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed(
             "T2", PHASE, f"overfit binding raised {type(exc).__name__}: {exc}"
@@ -98,6 +102,8 @@ def t3_weights_status(repo: Repo, ctx: RunContext) -> CheckResult:
 
     try:
         statuses = dict(fn())
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed(
             "T3", PHASE, f"checkpoint_status binding raised {type(exc).__name__}: {exc}"
@@ -133,6 +139,8 @@ def t4_label_counts(repo: Repo, ctx: RunContext) -> CheckResult:
 
     try:
         counts = dict(fn())
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed(
             "T4", PHASE, f"label_counts binding raised {type(exc).__name__}: {exc}"

@@ -19,7 +19,7 @@ import yaml
 
 from ..core import policy
 from ..core.repo import BindingError, Repo
-from ..core.result import CheckResult, Status
+from ..core.result import CheckResult, CredentialRequired, Status
 from . import RunContext, check
 
 PHASE = "readiness"
@@ -129,6 +129,8 @@ def r1_checkpoint_provenance(repo: Repo, ctx: RunContext) -> CheckResult:
         return CheckResult.na("R1", PHASE, str(exc))
     try:
         records = dict(fn())
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed(
             "R1", PHASE, f"checkpoint_provenance raised {type(exc).__name__}: {exc}"
@@ -171,6 +173,8 @@ def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
         return CheckResult.na("R3", PHASE, str(exc))
     try:
         splits = {str(k): set(map(str, v)) for k, v in dict(fn()).items()}
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("R3", PHASE, f"splits raised {type(exc).__name__}: {exc}")
 
@@ -207,6 +211,8 @@ def r4_metric_known_answer(repo: Repo, ctx: RunContext) -> CheckResult:
         return CheckResult.na("R4", PHASE, str(exc))
     try:
         cases = list(fn())
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("R4", PHASE, f"metric_known_answer raised {type(exc).__name__}: {exc}")
     if not cases:
@@ -246,6 +252,8 @@ def r5_data_provenance(repo: Repo, ctx: RunContext) -> CheckResult:
         return CheckResult.na("R5", PHASE, str(exc))
     try:
         prov = {str(k): dict(v) for k, v in dict(fn()).items()}
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("R5", PHASE, f"provenance raised {type(exc).__name__}: {exc}")
 
@@ -290,6 +298,8 @@ def r6_determinism(repo: Repo, ctx: RunContext) -> CheckResult:
     try:
         first = fn(seed=1234)
         second = fn(seed=1234)
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("R6", PHASE, f"deterministic_run raised {type(exc).__name__}: {exc}")
 

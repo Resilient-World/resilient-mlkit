@@ -19,7 +19,7 @@ from .checks import PHASE_ORDER, PHASES, RunContext, for_phase
 from .core import nonce as nonce_mod
 from .core import policy, store
 from .core.repo import PORTFOLIO, Repo, discover, find_root
-from .core.result import CheckResult, Status
+from .core.result import CheckResult, CredentialRequired, Status
 from .core.table import phase_table
 from .portfolio import render_portfolio, resolve
 
@@ -60,6 +60,13 @@ def _run_phase(repo: Repo, phase: str, ctx: RunContext) -> list[CheckResult]:
     for spec in for_phase(phase):
         try:
             result = spec.fn(repo, ctx)
+        except CredentialRequired as exc:
+            # A binding that got all the way to the credential boundary has
+            # told us something real. Record it as DEFERRED rather than
+            # letting the generic handler bury it as a crash.
+            result = CheckResult.deferred(
+                spec.check_id, phase, exc.credential, exc.detail, exc.evidence
+            )
         except Exception:  # noqa: BLE001 - a crashing check is a failing check
             result = CheckResult.failed(
                 spec.check_id,
@@ -150,10 +157,15 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     # Exit codes exist so CI can gate on this. R9 is spec'd to fail the build,
     # so a FAIL must be non-zero; an incomplete run must not be green either.
+    # DEFERRED is separated from NA on purpose: waiting on a key the signatory
+    # will paste in is not the same failure mode as a loader that does not run,
+    # and CI should be able to tell them apart without reading the table.
     if agg.get(Status.FAIL.value):
         return 1
-    if agg.get(Status.NA.value) or agg.get(Status.STALE.value) or agg.get(Status.ESCALATED.value):
+    if agg.get(Status.NA.value) or agg.get(Status.STALE.value):
         return 3
+    if agg.get(Status.DEFERRED.value) or agg.get(Status.ESCALATED.value):
+        return 4
     return 0
 
 
@@ -206,6 +218,40 @@ def cmd_notice(args: argparse.Namespace) -> int:
         state = "signed" if allowlist.signed else "UNSIGNED (provisional)"
         print(f"{repo.name}: wrote NOTICE.md from {state} allowlist "
               f"({len(allowlist.attributions())} attribution obligation(s))")
+    return 0
+
+
+def cmd_keys(args: argparse.Namespace) -> int:
+    """List every credential the portfolio is waiting on.
+
+    The point of this command is to turn "seven repos are somehow blocked" into
+    a short shopping list. Everything here is a path that has already been
+    wired and exercised up to the credential boundary, so each entry is one
+    paste away from producing real data.
+    """
+    root = Path(args.root).resolve() if args.root else find_root()
+    repos = _select_repos(args, root)
+    wanted: dict[str, list[str]] = {}
+    for repo in repos:
+        for result in store.load_all(repo, PHASES).values():
+            if result.status is Status.DEFERRED:
+                cred = str(result.evidence.get("credential", "?"))
+                wanted.setdefault(cred, []).append(f"{repo.name}:{result.check_id}")
+
+    if not wanted:
+        print("No deferred credentials. Nothing in the portfolio is waiting on a key.")
+        return 0
+
+    print(f"{len(wanted)} credential(s) would unblock already-wired code paths:\n")
+    from .core.table import render
+
+    rows = [
+        [cred, str(len(users)), ", ".join(sorted(users)[:6])]
+        for cred, users in sorted(wanted.items())
+    ]
+    print(render(rows, ["CREDENTIAL", "CHECKS", "WAITING ON IT"]))
+    print("\nEach of these is wired and exercised; supplying the value is the only")
+    print("remaining step for those checks.")
     return 0
 
 
@@ -263,6 +309,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="overwrite an existing NOTICE.md even when the allowlist is empty",
     )
     p_notice.set_defaults(func=cmd_notice)
+
+    p_keys = sub.add_parser("keys", help="list credentials the portfolio is waiting on")
+    common(p_keys)
+    p_keys.set_defaults(func=cmd_keys)
 
     p_allow = sub.add_parser("allowlist", help="verify allowlist structure and signature")
     common(p_allow)

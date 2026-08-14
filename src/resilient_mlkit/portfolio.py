@@ -32,6 +32,10 @@ from .core.result import CheckResult, Status
 from .core.table import compact
 
 READY = "READY-TO-TRAIN"
+#: Everything measurable passes; what is left is a key someone must paste in.
+#: Distinguished from IN-PROGRESS because the remaining work is procurement,
+#: not engineering, and from READY-TO-TRAIN because the run cannot start yet.
+READY_PENDING_KEYS = "READY-PENDING-KEYS"
 BLOCKED = "BLOCKED"
 AWAITING = "AWAITING-SIGNOFF"
 IN_PROGRESS = "IN-PROGRESS"
@@ -89,6 +93,9 @@ def resolve(repo: Repo, results: dict[str, CheckResult]) -> RepoState:
         results[c] for c in all_ids if c in results and results[c].status is Status.ESCALATED
     ]
     na = [results[c] for c in all_ids if c in results and results[c].status is Status.NA]
+    deferred = [
+        results[c] for c in all_ids if c in results and results[c].status is Status.DEFERRED
+    ]
 
     # NA means "could not be measured here". If a check could not be measured
     # and nobody has escalated it, the repo is still mid-flight -- calling that
@@ -107,9 +114,22 @@ def resolve(repo: Repo, results: dict[str, CheckResult]) -> RepoState:
         elif missing:
             detail = f"; not yet run: {', '.join(missing[:5])}"
         suffix = f", {len(escalated)} also await sign-off" if escalated else ""
+        keys = f", {len(deferred)} wired awaiting keys" if deferred else ""
         return RepoState(
             repo, results, IN_PROGRESS,
-            f"{outstanding} of {len(all_ids)} check(s) unmeasured{detail}{suffix}",
+            f"{outstanding} of {len(all_ids)} check(s) unmeasured{detail}{suffix}{keys}",
+        )
+
+    # Nothing failed, nothing is unmeasured. What remains is a credential the
+    # signatory will supply, a signature, or both. A repo here is materially
+    # ready: its code paths run end to end and stop only at a boundary that is
+    # a procurement step rather than an engineering one.
+    if deferred:
+        creds = sorted({str(d.evidence.get("credential", "?")) for d in deferred})
+        sign = f"; {len(escalated)} also await sign-off" if escalated else ""
+        return RepoState(
+            repo, results, READY_PENDING_KEYS,
+            f"{len(deferred)} check(s) wired and awaiting: {', '.join(creds)}{sign}",
         )
 
     if escalated:

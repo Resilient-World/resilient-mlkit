@@ -30,12 +30,35 @@ a rule and a deadline disagree, the rule wins.
    holdout to make a check pass.** Fix the root cause in `src/`. A gate you
    edited to go green measures nothing.
 
+## Credentials are not blockers
+
+7. **A missing API key does not stop the work.** If a source is commercially
+   open and permissive, wire the ingest path properly, exercise it as far as
+   the credential boundary, and raise
+   `resilient_mlkit.CredentialRequired(name, detail, evidence)` from the
+   binding. `mlkit` records that as **DEFERRED**, not NA — the path is built
+   and one paste away from real data. `mlkit keys` lists everything the
+   portfolio is waiting on.
+
+   This is a real distinction, not a softer word for "unfinished": "the loader
+   raises ImportError" and "the loader runs, reaches the API, and needs a key"
+   are different distances from a productive training run, and a gate that
+   renders them identically cannot tell you which repo to work on next.
+
+8. **Raise `CredentialRequired` only at the genuine boundary.** After the
+   import succeeds and the request is built. Using it to dodge a check that
+   would have failed for another reason converts a defect into apparent
+   progress, which is the one thing this status must never do.
+
+9. **DEFERRED is never a pass.** It cannot reach READY-TO-TRAIN. It reaches
+   READY-PENDING-KEYS, which says exactly what it means.
+
 ## Scope
 
-7. **Import `resilient-mlkit`; never reimplement it.** Eight local copies of a
-   gate is eight different definitions of "ready", which is the same as none.
-8. **Escalate rather than guess.** Append to `docs/ESCALATIONS.md`, mark the
-   repo AWAITING-SIGNOFF, and move on to other work.
+10. **Import `resilient-mlkit`; never reimplement it.** Eight local copies of a
+    gate is eight different definitions of "ready", which is the same as none.
+11. **Escalate rather than guess.** Append to `docs/ESCALATIONS.md`, mark the
+    repo AWAITING-SIGNOFF, and move on to other work.
 9. **Triage diagnoses; it does not repair.** Phase 1 records what is broken. It
    does not fix it.
 10. **Finish a phase across all unblocked repos before starting the next.**

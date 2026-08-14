@@ -14,7 +14,7 @@ an I/O problem is the most common way a credit allocation evaporates.
 from __future__ import annotations
 
 from ..core.repo import BindingError, Repo
-from ..core.result import CheckResult
+from ..core.result import CheckResult, CredentialRequired
 from . import RunContext, check
 
 PHASE = "economics"
@@ -38,6 +38,8 @@ def e1_scaling_probe(repo: Repo, ctx: RunContext) -> CheckResult:
         )
     try:
         curve = {float(k): float(v) for k, v in dict(fn()).items()}
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("E1", PHASE, f"scaling_probe raised {type(exc).__name__}: {exc}")
 
@@ -75,6 +77,8 @@ def e2_hparam_sanity(repo: Repo, ctx: RunContext) -> CheckResult:
         )
     try:
         out = dict(fn())
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("E2", PHASE, f"hparam_sanity raised {type(exc).__name__}: {exc}")
 
@@ -108,6 +112,8 @@ def e3_efficiency_floor(repo: Repo, ctx: RunContext) -> CheckResult:
         )
     try:
         out = dict(fn())
+    except CredentialRequired:
+        raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("E3", PHASE, f"efficiency raised {type(exc).__name__}: {exc}")
 

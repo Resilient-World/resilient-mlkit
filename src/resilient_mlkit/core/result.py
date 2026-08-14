@@ -51,17 +51,26 @@ def redact(text: str) -> str:
 
 
 class Status(str, Enum):
-    """The five terminal statuses a check may report.
+    """The six terminal statuses a check may report.
 
     There is deliberately no ``SKIP`` and no ``WARN``. A check either measured
     something and formed a verdict (PASS/FAIL), could not measure and says why
-    (NA), measured against a different tree than the one checked out (STALE),
-    or is reserved to a human signatory (ESCALATED).
+    (NA), was wired and exercised but stops at a credential the signatory will
+    supply (DEFERRED), measured against a different tree than the one checked
+    out (STALE), or is reserved to a human signatory (ESCALATED).
+
+    DEFERRED exists because collapsing it into NA makes the portfolio lie in
+    the expensive direction. "The dataloader raises ImportError" and "the
+    dataloader runs, reaches the API, and needs a key" are not the same
+    distance from a productive training run, and a table that renders them
+    identically cannot answer the only question that matters: how close is
+    this repo to a real run.
     """
 
     PASS = "PASS"
     FAIL = "FAIL"
     NA = "NA"
+    DEFERRED = "DEFERRED"
     STALE = "STALE"
     ESCALATED = "ESCALATED"
 
@@ -71,11 +80,40 @@ class Status(str, Enum):
 
 #: Statuses that must carry a human-readable reason. A bare "NA" is worse than
 #: no check at all: it looks like coverage and carries no information.
-_REASON_REQUIRED = {Status.FAIL, Status.NA, Status.STALE, Status.ESCALATED}
+_REASON_REQUIRED = {
+    Status.FAIL, Status.NA, Status.DEFERRED, Status.STALE, Status.ESCALATED,
+}
 
 
 class FabricationError(RuntimeError):
     """Raised when a check tries to report a value it did not measure."""
+
+
+class CredentialRequired(RuntimeError):
+    """Raised by a repo binding whose only remaining obstacle is a credential.
+
+    A binding raises this ONLY after it has done everything it can without the
+    key: imported cleanly, built its request, and reached the point where the
+    credential is consumed. Raising it earlier -- to dodge a check that would
+    have failed for some other reason -- converts a real defect into apparent
+    progress, which is the exact failure this status was added to avoid.
+
+    Args:
+        credential: the environment variable or secret name, e.g. "CDSAPI_KEY".
+        detail: what was attempted, and what will happen once the key exists.
+        evidence: measurements taken before the credential boundary was hit.
+    """
+
+    def __init__(
+        self,
+        credential: str,
+        detail: str = "",
+        evidence: dict[str, Any] | None = None,
+    ) -> None:
+        self.credential = credential
+        self.detail = detail
+        self.evidence = evidence or {}
+        super().__init__(f"{credential} required: {detail}" if detail else f"{credential} required")
 
 
 @dataclass
@@ -151,6 +189,33 @@ class CheckResult:
         correct output for "the check would have failed".
         """
         return cls(check_id, phase, Status.NA, reason, evidence or {})
+
+    @classmethod
+    def deferred(
+        cls,
+        check_id: str,
+        phase: str,
+        credential: str,
+        detail: str,
+        evidence: dict[str, Any] | None = None,
+    ) -> "CheckResult":
+        """Wired and exercised; stops at a credential the signatory will supply.
+
+        Not a pass, and never counted as one. What it asserts is narrow and
+        checkable: this code path runs, and the only thing between it and real
+        data is a key. ``evidence`` must record what was exercised, so that a
+        DEFERRED cannot be used as a silent skip.
+        """
+        evidence = dict(evidence or {})
+        evidence.setdefault("credential", credential)
+        evidence["deferred"] = True
+        return cls(
+            check_id,
+            phase,
+            Status.DEFERRED,
+            f"wired; awaiting {credential} — {detail}" if detail else f"wired; awaiting {credential}",
+            evidence,
+        )
 
     @classmethod
     def escalated(
