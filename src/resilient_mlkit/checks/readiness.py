@@ -26,6 +26,11 @@ PHASE = "readiness"
 
 REQUIRED_REGION = "us-west-2"
 
+#: The loosest tolerance R4 will accept, whatever a binding asks for. A
+#: known-answer test compares against an analytic value, so anything beyond
+#: floating-point noise means the metric is wrong, not imprecise.
+MAX_METRIC_TOL = 1e-6
+
 #: Region tokens that are a defect if they appear in training-plane config.
 _FOREIGN_REGIONS = (
     "us-east-1", "us-east-2", "us-west-1", "eu-west-1", "eu-west-2",
@@ -58,6 +63,15 @@ def r9_licence_gate(repo: Repo, ctx: RunContext) -> CheckResult:
     sources, err = policy.manifest_sources(repo)
     if err:
         return CheckResult.na("R9", PHASE, err)
+    if not sources:
+        # An empty manifest satisfies every "no unlisted source" test
+        # vacuously. Passing the licence gate by declaring no data is the one
+        # way to make R9 meaningless, so it is explicitly not a pass.
+        return CheckResult.na(
+            "R9", PHASE,
+            "manifest resolved to zero sources; a licence gate over an empty "
+            "manifest measures nothing",
+        )
 
     unlisted = [s for s in sources if allowlist.verdict(s) is None]
     eval_only = [s for s in sources if allowlist.verdict(s) == "EVAL-ONLY"]
@@ -201,8 +215,18 @@ def r4_metric_known_answer(repo: Repo, ctx: RunContext) -> CheckResult:
     failures: list[str] = []
     for case in cases:
         name = str(case.get("name", "<unnamed>"))
-        got, want = float(case.get("computed")), float(case.get("expected"))
-        tol = float(case.get("tol", 1e-9))
+        if case.get("computed") is None or case.get("expected") is None:
+            failures.append(f"{name}: case is missing 'computed' or 'expected'")
+            continue
+        try:
+            got, want = float(case["computed"]), float(case["expected"])
+        except (TypeError, ValueError):
+            failures.append(f"{name}: 'computed'/'expected' are not numeric")
+            continue
+        # The binding may be stricter than mlkit but never looser. A subject
+        # that supplies its own tolerance can pass any check by widening it,
+        # which is loosening a threshold with extra steps.
+        tol = min(float(case.get("tol", MAX_METRIC_TOL)), MAX_METRIC_TOL)
         if abs(got - want) > tol:
             failures.append(f"{name}: got {got:.6g}, expected {want:.6g} (tol {tol:g})")
 
@@ -281,10 +305,30 @@ def r6_determinism(repo: Repo, ctx: RunContext) -> CheckResult:
 
 @check("R7", PHASE, "REMOTE_PARITY — us-west-2, pinned image, one entrypoint")
 def r7_remote_parity(repo: Repo, ctx: RunContext) -> CheckResult:
+    # Scan FIRST. A config pointing at another region is a defect that is
+    # measurable right now, and returning NA because [remote] is undeclared
+    # would report a present, found defect as unmeasurable.
+    strays = _scan_foreign_regions(repo.path)
     remote = repo.config().get("remote") or {}
+    evidence: dict[str, object] = {
+        "stray_region_refs": len(strays),
+        "strays": [f"{p}:{r}" for p, r in strays[:8]],
+    }
+
+    if strays:
+        return CheckResult.failed(
+            "R7", PHASE,
+            f"{len(strays)} config file(s) reference a region other than "
+            f"{REQUIRED_REGION}: " + ", ".join(f"{p}→{r}" for p, r in strays[:4]),
+            evidence,
+        )
+
     if not remote:
         return CheckResult.na(
-            "R7", PHASE, "no [remote] section in .mlkit/repo.toml; region and image are undeclared"
+            "R7", PHASE,
+            "no [remote] section in .mlkit/repo.toml; region and image are undeclared "
+            "(no foreign-region config found, but parity itself is unmeasured)",
+            evidence,
         )
 
     problems: list[str] = []
@@ -300,15 +344,7 @@ def r7_remote_parity(repo: Repo, ctx: RunContext) -> CheckResult:
     elif f".{REQUIRED_REGION}.amazonaws.com" not in image:
         problems.append(f"image {image!r} is not in an {REQUIRED_REGION} registry")
 
-    # A declared region means nothing if configs elsewhere point somewhere else.
-    strays = _scan_foreign_regions(repo.path)
-    if strays:
-        problems.append(
-            "config references other regions: "
-            + ", ".join(f"{p}:{r}" for p, r in strays[:4])
-        )
-
-    evidence = {"region": region, "image": image, "stray_region_refs": len(strays)}
+    evidence.update({"region": region, "image": image})
     if problems:
         return CheckResult.failed("R7", PHASE, "; ".join(problems), evidence)
     return CheckResult.passed("R7", PHASE, evidence)

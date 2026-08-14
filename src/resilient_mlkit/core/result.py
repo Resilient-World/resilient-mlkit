@@ -9,9 +9,45 @@ convention, because convention is exactly what fails under deadline pressure.
 from __future__ import annotations
 
 import datetime as _dt
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+
+#: Longest reason we will print. Reasons land in tables that get pasted into
+#: transcripts and PRs, and an untruncated traceback sets the column width for
+#: the whole table.
+MAX_REASON = 400
+
+#: Patterns whose *values* must never reach a transcript. Checks interpolate
+#: raw exception text into reasons, and cloud SDK errors routinely quote the
+#: failing request -- presigned URLs carry X-Amz-Security-Token, and an
+#: HTTP 401 body can echo an Authorization header. CLAUDE.md rule 13 makes a
+#: secret in a transcript a stopping point, so redaction is structural here
+#: rather than left to each call site to remember.
+_SECRET_PATTERNS = (
+    re.compile(r"(?i)\b(X-Amz-Security-Token|X-Amz-Signature|X-Amz-Credential)=([^\s&\"']+)"),
+    re.compile(r"(?i)\b(authorization|bearer|api[_-]?key|access[_-]?token|password|passwd|secret)"
+               r"([\"']?\s*[:=]\s*[\"']?)([^\s,&\"';]+)"),
+    re.compile(r"\b((?:AKIA|ASIA)[0-9A-Z]{16})\b"),
+    re.compile(r"(?i)\b(gh[pousr]_[A-Za-z0-9]{20,})\b"),
+)
+
+
+def redact(text: str) -> str:
+    """Strip anything that looks like a credential, then bound the length."""
+    for pattern in _SECRET_PATTERNS:
+        if pattern.groups >= 3:
+            text = pattern.sub(r"\1\2<redacted>", text)
+        else:
+            text = pattern.sub(
+                lambda m: f"{m.group(1)}=<redacted>" if m.lastindex and m.lastindex >= 2
+                else "<redacted>",
+                text,
+            )
+    if len(text) > MAX_REASON:
+        text = text[: MAX_REASON - 15].rstrip() + " …[truncated]"
+    return text
 
 
 class Status(str, Enum):
@@ -61,6 +97,9 @@ class CheckResult:
     def __post_init__(self) -> None:
         if isinstance(self.status, str):
             self.status = Status(self.status)
+        # Redact before anything else can read, print or persist this.
+        if self.reason:
+            self.reason = redact(self.reason)
         if self.status in _REASON_REQUIRED and not self.reason.strip():
             raise FabricationError(
                 f"{self.check_id}: status {self.status} requires a reason. "

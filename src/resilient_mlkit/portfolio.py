@@ -5,10 +5,15 @@ are the whole point of this module:
 
 * **BLOCKED** — something failed, or a hard stop fired. Needs a one-line reason
   in ``docs/BLOCKERS.md``.
-* **AWAITING-SIGNOFF** — nothing failed, but at least one check is reserved to
-  a human signatory or waits on one. Needs an open item in
+* **AWAITING-SIGNOFF** — nothing failed, nothing is unmeasured, and what remains
+  is reserved to a human signatory. Needs an open item in
   ``docs/ESCALATIONS.md``.
-* **READY-TO-TRAIN** — all 25 checks pass.
+* **READY-TO-TRAIN** — every gating check passes.
+
+The gating set is S1–S5, R1–R9, D1–D5, E1–E5: twenty-four checks. Triage
+(T1–T5) is deliberately outside it -- triage diagnoses and reorders the queue,
+it does not gate. A triage FAIL still blocks, because a measured failure blocks
+wherever it is found; it simply is not part of the "everything passes" test.
 
 Worth stating plainly, because it surprises people: READY-TO-TRAIN is not
 reachable by the agent. S5, D1, D4, D5, E4 and E5 are reserved to the human
@@ -44,16 +49,27 @@ class RepoState:
         return any(r.evidence.get("halt") for r in self.results.values())
 
 
+#: Phases whose checks gate READY-TO-TRAIN. Triage is diagnostic, not a gate.
+GATING_PHASES = ("selection", "readiness", "decision", "economics")
+
+
+def gating_ids() -> list[str]:
+    return [cid for phase in GATING_PHASES for cid in PHASE_ORDER[phase]]
+
+
 def resolve(repo: Repo, results: dict[str, CheckResult]) -> RepoState:
     """Decide a repo's terminal state from its measured results."""
-    all_ids = [cid for phase in PHASES for cid in PHASE_ORDER[phase]]
+    all_ids = gating_ids()
 
     halts = [r for r in results.values() if r.evidence.get("halt")]
     if halts:
         h = halts[0]
         return RepoState(repo, results, BLOCKED, f"{h.check_id} hard stop: {h.reason}")
 
-    fails = [results[c] for c in all_ids if c in results and results[c].status is Status.FAIL]
+    # Scan every result, not just the gating set: a measured failure blocks
+    # wherever it is found, and a triage FAIL is still a failure.
+    ordered = [cid for phase in PHASES for cid in PHASE_ORDER[phase]]
+    fails = [results[c] for c in ordered if c in results and results[c].status is Status.FAIL]
     if fails:
         return RepoState(
             repo, results, BLOCKED,
@@ -77,19 +93,24 @@ def resolve(repo: Repo, results: dict[str, CheckResult]) -> RepoState:
     # NA means "could not be measured here". If a check could not be measured
     # and nobody has escalated it, the repo is still mid-flight -- calling that
     # terminal would be the portfolio lying about its own coverage.
+    #
+    # Precedence matters here and is easy to get backwards. Six checks are
+    # human-only and ALWAYS report ESCALATED, so letting escalation win would
+    # make every repo read AWAITING-SIGNOFF -- "done, just needs a signature" --
+    # the moment it has run its phases, however little was actually measured.
+    # Unmeasured work outranks a pending signature.
     if missing or na:
-        blockers = len(missing) + len(na)
+        outstanding = len(missing) + len(na)
         detail = ""
         if na:
             detail = f"; first unmeasurable: {na[0].check_id} ({na[0].reason[:60]})"
         elif missing:
             detail = f"; not yet run: {', '.join(missing[:5])}"
-        if escalated:
-            return RepoState(
-                repo, results, AWAITING,
-                f"{len(escalated)} check(s) await sign-off, {blockers} not yet measured{detail}",
-            )
-        return RepoState(repo, results, IN_PROGRESS, f"{blockers} check(s) outstanding{detail}")
+        suffix = f", {len(escalated)} also await sign-off" if escalated else ""
+        return RepoState(
+            repo, results, IN_PROGRESS,
+            f"{outstanding} of {len(all_ids)} check(s) unmeasured{detail}{suffix}",
+        )
 
     if escalated:
         return RepoState(
@@ -98,7 +119,7 @@ def resolve(repo: Repo, results: dict[str, CheckResult]) -> RepoState:
             + ", ".join(e.check_id for e in escalated),
         )
 
-    return RepoState(repo, results, READY, "all 25 checks pass")
+    return RepoState(repo, results, READY, f"all {len(all_ids)} gating checks pass")
 
 
 def render_portfolio(states: list[RepoState], nonce: str) -> str:

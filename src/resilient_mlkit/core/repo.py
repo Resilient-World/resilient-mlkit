@@ -119,6 +119,8 @@ class Repo:
             if candidate.is_dir() and str(candidate) not in sys.path:
                 sys.path.insert(0, str(candidate))
                 added.append(str(candidate))
+
+        before = set(sys.modules)
         try:
             module = importlib.import_module(module_name)
         except Exception as exc:
@@ -128,10 +130,18 @@ class Repo:
             ) from exc
         finally:
             for entry in added:
-                # Leave sys.path as we found it; several repos may be probed in
-                # one process and their top-level packages collide.
                 if entry in sys.path:
                     sys.path.remove(entry)
+            # Restoring sys.path is NOT enough, and getting this wrong is the
+            # worst bug this package can have. Every repo names its adapter
+            # `mlkit_bindings`, so the second repo probed in one process would
+            # be served the FIRST repo's cached module and report its numbers
+            # as its own -- a confident PASS about a repo never opened. Evict
+            # anything newly imported from inside this repo so the next repo
+            # imports its own. Modules from site-packages (torch, pandas) are
+            # left cached, because they are genuinely shared and re-importing
+            # them per repo would be ruinous.
+            self._evict_repo_modules(before)
 
         fn = getattr(module, attr, None)
         if fn is None:
@@ -144,6 +154,23 @@ class Repo:
                 f"{self.name}: binding '{name}' resolved to a non-callable {type(fn).__name__}"
             )
         return fn
+
+    def _evict_repo_modules(self, before: set[str]) -> None:
+        """Drop newly-imported modules that live inside this repo."""
+        root = str(self.path.resolve())
+        for name in set(sys.modules) - before:
+            module = sys.modules.get(name)
+            origin = getattr(module, "__file__", None) or ""
+            if not origin:
+                # Namespace packages have no __file__ but can still shadow the
+                # next repo's package of the same name.
+                paths = list(getattr(module, "__path__", []) or [])
+                origin = paths[0] if paths else ""
+            try:
+                if origin and str(Path(origin).resolve()).startswith(root):
+                    del sys.modules[name]
+            except (OSError, ValueError):
+                continue
 
     # -- docs --------------------------------------------------------------
 

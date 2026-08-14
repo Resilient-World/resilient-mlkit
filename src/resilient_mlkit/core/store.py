@@ -45,31 +45,69 @@ def load(repo: Repo, phase: str) -> list[CheckResult]:
         return []
     try:
         payload = json.loads(path.read_text())
-    except json.JSONDecodeError:
-        return []
+    except json.JSONDecodeError as exc:
+        # A corrupt results file must not read as "not yet run". That would
+        # turn data loss into apparent absence of work, which is the quietest
+        # possible way to lose a failure.
+        return [
+            CheckResult.failed(
+                cid, phase,
+                f"stored results at {path.name} are unreadable ({exc}); re-run this phase",
+            )
+            for cid in _expected_ids(phase)
+        ]
 
     current = repo.git_sha
     out: list[CheckResult] = []
     for raw in (payload.get("results") or {}).values():
         result = CheckResult.from_dict(raw)
-        if result.status is Status.PASS and result.git_sha and current:
-            if result.git_sha != current:
-                result = CheckResult(
-                    check_id=result.check_id,
-                    phase=result.phase,
-                    status=Status.STALE,
-                    reason=(
-                        f"measured at {result.git_sha[:7]}, HEAD is now {current[:7]}; "
-                        "re-run to revalidate"
-                    ),
-                    evidence=result.evidence,
-                    repo=result.repo,
-                    git_sha=result.git_sha,
-                    nonce=result.nonce,
-                    measured_at=result.measured_at,
-                )
-        out.append(result)
+        out.append(_stale_if_moved(result, current))
     return out
+
+
+def _stale_if_moved(result: CheckResult, current: str) -> CheckResult:
+    """Mark a result STALE when it cannot be tied to the tree in front of us.
+
+    Two cases, and the second is the one that bites: an explicit SHA mismatch,
+    and a result with no SHA at all. The latter happens outside a git worktree
+    or when `git` fails, and treating it as valid lets a PASS survive arbitrary
+    changes to the code it supposedly measured.
+    """
+    # Only statuses that read as progress are staled. A FAIL from an older SHA
+    # is still a reason to look, and hiding it behind STALE would be worse.
+    if result.status not in (Status.PASS, Status.ESCALATED):
+        return result
+
+    if result.git_sha and current and result.git_sha == current:
+        return result
+
+    if not result.git_sha or not current:
+        reason = (
+            "result carries no git SHA (not a git worktree, or git failed), so it "
+            "cannot be tied to the tree being checked; re-run"
+        )
+    else:
+        reason = (
+            f"measured at {result.git_sha[:7]}, HEAD is now {current[:7]}; "
+            "re-run to revalidate"
+        )
+    return CheckResult(
+        check_id=result.check_id,
+        phase=result.phase,
+        status=Status.STALE,
+        reason=reason,
+        evidence=result.evidence,
+        repo=result.repo,
+        git_sha=result.git_sha,
+        nonce=result.nonce,
+        measured_at=result.measured_at,
+    )
+
+
+def _expected_ids(phase: str) -> list[str]:
+    from ..checks import PHASE_ORDER
+
+    return PHASE_ORDER.get(phase, [])
 
 
 def load_all(repo: Repo, phases: tuple[str, ...]) -> dict[str, CheckResult]:

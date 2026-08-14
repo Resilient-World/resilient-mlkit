@@ -17,6 +17,13 @@ from . import RunContext, check
 
 PHASE = "decision"
 
+#: Loosest coverage tolerance D3 accepts, whatever a binding asks for.
+MAX_COVERAGE_TOL = 0.05
+
+#: Below this, the binomial standard error alone exceeds the tolerance, so the
+#: measurement cannot support the verdict either way.
+MIN_COVERAGE_N = 100
+
 
 @check("D1", PHASE, "COUNTERFACTUAL_SPEC — human sign-off", human_only=True)
 def d1_counterfactual_spec(repo: Repo, ctx: RunContext) -> CheckResult:
@@ -59,6 +66,33 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
             "HARD STOP — do not tune, do not scale, do not schedule a training run.",
             {**evidence, "halt": True},
         )
+
+    # Containing zero is necessary but nowhere near sufficient. An interval
+    # wide enough to contain everything contains zero too, and would sail
+    # through the package's self-described strongest check while proving
+    # nothing. Passing requires enough power to have detected the effect the
+    # real run claims -- otherwise this is a null result and a no-power result
+    # wearing the same face.
+    reference = out.get("reference_effect")
+    if reference is None:
+        return CheckResult.na(
+            "D2", PHASE,
+            "placebo interval contains zero, but no reference_effect was reported, "
+            "so a true null cannot be told apart from a test with no power. "
+            "Report the real-run effect size this placebo must be able to detect.",
+            evidence,
+        )
+    reference = abs(float(reference))
+    half_width = (hi - lo) / 2.0
+    evidence.update({"reference_effect": reference, "ci_half_width": half_width})
+    if reference == 0 or half_width >= reference:
+        return CheckResult.failed(
+            "D2", PHASE,
+            f"placebo CI half-width {half_width:.6g} is not smaller than the reference "
+            f"effect {reference:.6g}; the test could not have detected the real effect, "
+            "so containing zero is uninformative",
+            evidence,
+        )
     return CheckResult.passed("D2", PHASE, evidence)
 
 
@@ -82,8 +116,18 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
             return CheckResult.failed("D3", PHASE, f"coverage did not report {field}")
 
     nominal, empirical, n = float(out["nominal"]), float(out["empirical"]), int(out["n"])
-    tol = float(out.get("tol", 0.05))
+    # mlkit owns this tolerance. A binding may ask for something stricter but
+    # never looser -- a subject that sets its own pass mark sets no pass mark.
+    tol = min(float(out.get("tol", MAX_COVERAGE_TOL)), MAX_COVERAGE_TOL)
     evidence = {"nominal": nominal, "empirical": empirical, "n": n, "tol": tol}
+
+    if n < MIN_COVERAGE_N:
+        return CheckResult.na(
+            "D3", PHASE,
+            f"n={n} is too small to measure coverage to ±{tol:.2f}; "
+            f"need at least {MIN_COVERAGE_N} held-out points",
+            evidence,
+        )
 
     if abs(empirical - nominal) > tol:
         return CheckResult.failed(

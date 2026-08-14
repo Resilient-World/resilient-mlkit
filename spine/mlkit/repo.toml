@@ -1,0 +1,50 @@
+# .mlkit/repo.toml — this repo's binding declaration for `mlkit`.
+#
+# mlkit does not introspect a repo's internals. Eight repos grew separately and
+# none of them agree on where a dataloader lives, so generic introspection
+# would either be wrong or would quietly degrade into a check that passes
+# because it found nothing to test.
+#
+# Instead this file points at callables in this repo's own source tree. mlkit
+# imports them inside this repo's environment and judges what they return.
+#
+# A binding that is absent makes its check NA with a reason. That is the
+# correct outcome for "not wired up yet" -- it is never a pass.
+
+[repo]
+name = "REPLACE_ME"
+
+# ── Bindings ────────────────────────────────────────────────────────────────
+# Each value is "module.path:callable", resolved against this repo root and
+# ./src. Contracts:
+#
+#   batch()                -> one real batch (dict/tuple of shaped arrays)
+#   overfit_one_batch()    -> iterable of loss values, one per step
+#   checkpoint_status()    -> {name: "LOADED_PRETRAINED" | "RANDOM_INIT" | "MISSING"}
+#   label_counts()         -> {label: count}, counted from real data
+#   manifest()             -> [source_id, ...] currently in the pipeline
+#   checkpoint_provenance()-> {name: {uri, sha256, licence_url}}
+#   splits()               -> {"train": [group_id], "val": [...], "test": [...]}
+#   metric_known_answer()  -> [{name, computed, expected, tol}]
+#   provenance()           -> {"train": {"real": n, "synthetic": n, ...}, "val": ..., "test": ...}
+#   deterministic_run(seed)-> any repr-comparable result
+#   placebo_test()         -> {estimate, ci_low, ci_high, run_id}
+#   coverage()             -> {nominal, empirical, n, tol}
+#   scaling_probe()        -> {0.01: metric, 0.10: metric, 0.25: metric}  (larger is better)
+#   hparam_sanity()        -> {lr_range, throughput_curve, winning_config, mlflow_run_id}
+#   efficiency()           -> {gpu_util, profiler_trace, dataloader_bound}
+
+[bindings]
+# Uncomment and point at real callables as they are wired up.
+# batch = "mlkit_bindings:batch"
+
+[manifest]
+# Alternative to a manifest() binding: a YAML file with a `sources:` list.
+# path = "config/manifest.yaml"
+
+# ── Remote parity (R7) ──────────────────────────────────────────────────────
+# Populated once Loop 0 has been performed by the signatory. Region must be
+# us-west-2 and the image must be pinned by digest.
+[remote]
+# region = "us-west-2"
+# image  = "<acct>.dkr.ecr.us-west-2.amazonaws.com/resilient-training@sha256:..."

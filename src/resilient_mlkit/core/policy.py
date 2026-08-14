@@ -16,9 +16,11 @@ defensible position if you recorded when you looked.
 from __future__ import annotations
 
 import datetime as _dt
+import hashlib
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import yaml
 
@@ -73,6 +75,10 @@ class Allowlist:
     signed: bool = False
     signed_by: str = ""
     signed_at: str = ""
+    #: SHA-256 the signatory recorded over the entries. Mismatch voids signing.
+    entries_sha256: str = ""
+    #: `git log -1` on the allowlist. Provenance evidence, not proof of identity.
+    last_commit: str = ""
     entries: dict[str, Entry] = field(default_factory=dict)
     parse_error: str = ""
 
@@ -110,15 +116,10 @@ def load(repo: Repo) -> Allowlist:
         return allowlist
 
     signature = raw.get("signature") or {}
-    allowlist.signed = bool(signature.get("signed"))
+    claimed = bool(signature.get("signed"))
     allowlist.signed_by = str(signature.get("signed_by") or "")
     allowlist.signed_at = str(signature.get("signed_at") or "")
-
-    # A signature block that claims signed:true without naming a signatory is
-    # not a signature. Treat it as unsigned rather than trusting the flag.
-    if allowlist.signed and not allowlist.signed_by:
-        allowlist.signed = False
-        allowlist.parse_error = "signature.signed is true but signature.signed_by is empty"
+    allowlist.entries_sha256 = str(signature.get("entries_sha256") or "")
 
     for item in raw.get("entries") or []:
         if not isinstance(item, dict) or "id" not in item:
@@ -133,7 +134,68 @@ def load(repo: Repo) -> Allowlist:
             note=str(item.get("note") or ""),
         )
         allowlist.entries[entry.id] = entry
+
+    # A boolean in a file an agent can write is not a signature. Treat the
+    # claim as true only if it also survives an integrity check, so that
+    # editing entries after signing revokes the signature automatically.
+    allowlist.signed = _verify_signature(allowlist, claimed, repo)
     return allowlist
+
+
+def entries_digest(entries: dict[str, Entry]) -> str:
+    """Stable SHA-256 over the determinations, independent of YAML formatting."""
+    canonical = json.dumps(
+        [
+            [e.id, e.kind, e.status, e.licence_url, e.retrieval_date, e.attribution]
+            for e in sorted(entries.values(), key=lambda x: x.id)
+        ],
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _verify_signature(allowlist: "Allowlist", claimed: bool, repo: Repo) -> bool:
+    """Decide whether a claimed signature holds up.
+
+    What this can prove: that the entries are byte-for-byte the ones the
+    signatory hashed, and who last committed the file. What it cannot prove
+    without a key: that the signatory personally authored that commit. The
+    honest position is to verify integrity, record provenance as evidence, and
+    never silently upgrade a bare boolean into a determination.
+    """
+    if not claimed:
+        return False
+    if not allowlist.signed_by:
+        allowlist.parse_error = "signature.signed is true but signature.signed_by is empty"
+        return False
+    if not allowlist.entries_sha256:
+        allowlist.parse_error = (
+            "signature.signed is true but signature.entries_sha256 is absent; "
+            "a signature that does not cover the entries protects nothing"
+        )
+        return False
+
+    actual = entries_digest(allowlist.entries)
+    if actual != allowlist.entries_sha256:
+        allowlist.parse_error = (
+            f"signature.entries_sha256 does not match the entries it covers "
+            f"(recorded {allowlist.entries_sha256[:12]}…, computed {actual[:12]}…). "
+            "The entries changed after signing; the signature is void."
+        )
+        return False
+
+    # Provenance, as evidence rather than as proof.
+    allowlist.last_commit = repo._git(
+        "log", "-1", "--format=%h %an <%ae> %G?", "--", ALLOWLIST_RELPATH
+    )
+    if repo._git("status", "--porcelain", "--", ALLOWLIST_RELPATH):
+        allowlist.parse_error = (
+            "allowlist has uncommitted changes; a signature is only meaningful "
+            "against a committed file"
+        )
+        return False
+    return True
 
 
 def manifest_sources(repo: Repo) -> tuple[list[str], str]:
@@ -180,10 +242,10 @@ def manifest_sources(repo: Repo) -> tuple[list[str], str]:
 def render_notice(repo: Repo, allowlist: Allowlist) -> str:
     """Generate NOTICE.md content from attribution obligations.
 
-    Copernicus requires an attribution notice on distribution, and for a company
-    selling to banks and insurers this file is a due-diligence deliverable
-    rather than housekeeping. It is generated, never hand-edited, so that it
-    cannot drift away from the allowlist it is supposed to reflect.
+    Content comes solely from the ``attribution`` field of signed allowlist
+    entries -- this function asserts nothing about any licence itself. It is
+    generated rather than hand-edited so that it cannot drift away from the
+    allowlist it is supposed to reflect, which is what R9 checks.
     """
     lines = [
         f"# NOTICE — resilient-{repo.name}",

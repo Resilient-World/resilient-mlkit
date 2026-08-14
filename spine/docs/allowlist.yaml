@@ -1,0 +1,42 @@
+# docs/allowlist.yaml — THE SIGNED LICENCE ALLOWLIST
+#
+# ─────────────────────────────────────────────────────────────────────────────
+#  THIS FILE IS SIGNED BY A HUMAN. AGENTS MAY NOT ADD, EDIT OR REMOVE ENTRIES.
+#
+#  An agent that believes a source belongs here proposes it in
+#  docs/ESCALATIONS.md, with the licence URL and the date the licence page was
+#  actually read. The signatory verifies it and moves it here in a human commit.
+#
+#  This is a legal exposure decision, not a code change. Same structure as S5,
+#  for the same reason.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# `mlkit` treats this file as follows:
+#   * absent            -> T5/R9 ESCALATED (nobody has signed anything yet)
+#   * present, unsigned -> T5/R9 ESCALATED (a proposal is not a determination)
+#   * present, signed   -> T5/R9 measured against the entries below
+#
+# An entry is structurally invalid, and fails R9, unless it carries all of:
+#   id, kind (data|weights), status (ALLOWED|BLOCKED|EVAL-ONLY),
+#   licence_url (resolvable http/https), retrieval_date (ISO-8601 YYYY-MM-DD)
+
+version: 1
+
+signature:
+  # Set signed: true only when you have personally verified every entry below
+  # against its own live licence page on the retrieval_date recorded there.
+  signed: false
+  signed_by: null
+  signed_at: null
+
+# Entry template — copy, fill, verify, then sign.
+#
+#   - id: copernicus-sentinel-2-l2a
+#     kind: data                      # data | weights
+#     status: ALLOWED                 # ALLOWED | BLOCKED | EVAL-ONLY
+#     licence_url: "https://..."      # the authority's own licence page
+#     retrieval_date: "2026-08-14"    # the day you read that page
+#     attribution: "..."              # verbatim text required on distribution
+#     note: "..."                     # scope limits, per-product caveats
+
+entries: []
