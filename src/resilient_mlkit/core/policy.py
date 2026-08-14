@@ -223,17 +223,29 @@ def manifest_sources(repo: Repo) -> tuple[list[str], str]:
         path = repo.path / declared
         if not path.is_file():
             return [], f"declared manifest {declared} does not exist"
+        # YAML is a superset of JSON, so one parser covers both the .yaml
+        # manifests and the config/commercial_sources.json catalogues that
+        # four of the repos already keep as their source of record.
         try:
             data = yaml.safe_load(path.read_text()) or {}
         except yaml.YAMLError as exc:
-            return [], f"manifest {declared} is malformed YAML: {exc}"
+            return [], f"manifest {declared} is malformed: {exc}"
+        if not isinstance(data, dict):
+            return [], f"manifest {declared} top level is not a mapping"
         sources = data.get("sources") or data.get("data_sources") or []
         ids: list[str] = []
         for item in sources:
             if isinstance(item, str):
                 ids.append(item)
-            elif isinstance(item, dict) and "id" in item:
-                ids.append(str(item["id"]))
+            elif isinstance(item, dict):
+                key = item.get("source_id") or item.get("id")
+                if key:
+                    ids.append(str(key))
+        if not ids and sources:
+            return [], (
+                f"manifest {declared} lists {len(sources)} source(s) but none carries "
+                "a 'source_id' or 'id'"
+            )
         return ids, ""
 
     return [], "no 'manifest' binding and no [manifest] path declared in .mlkit/repo.toml"
