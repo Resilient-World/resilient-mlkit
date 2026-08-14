@@ -13,11 +13,12 @@ reason -- never a pass.
 
 from __future__ import annotations
 
+import functools
 import importlib
 import subprocess
 import sys
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
@@ -44,6 +45,9 @@ class Repo:
 
     name: str
     path: Path
+    #: Modules imported from inside this repo, accumulated across binding
+    #: imports and binding calls, evicted together in release().
+    _imported: set[str] = field(default_factory=set, repr=False, compare=False)
 
     # -- git ---------------------------------------------------------------
 
@@ -132,16 +136,7 @@ class Repo:
             for entry in added:
                 if entry in sys.path:
                     sys.path.remove(entry)
-            # Restoring sys.path is NOT enough, and getting this wrong is the
-            # worst bug this package can have. Every repo names its adapter
-            # `mlkit_bindings`, so the second repo probed in one process would
-            # be served the FIRST repo's cached module and report its numbers
-            # as its own -- a confident PASS about a repo never opened. Evict
-            # anything newly imported from inside this repo so the next repo
-            # imports its own. Modules from site-packages (torch, pandas) are
-            # left cached, because they are genuinely shared and re-importing
-            # them per repo would be ruinous.
-            self._evict_repo_modules(before)
+        self._imported |= set(sys.modules) - before
 
         fn = getattr(module, attr, None)
         if fn is None:
@@ -153,7 +148,49 @@ class Repo:
             raise BindingError(
                 f"{self.name}: binding '{name}' resolved to a non-callable {type(fn).__name__}"
             )
-        return fn
+
+        # Bindings import their repo LAZILY, inside the function body -- that is
+        # the pattern .mlkit/repo.toml documents, and it is right, because it
+        # keeps a repo's heavy training stack out of the import path of checks
+        # that do not need it. But it means sys.path must be live when the
+        # binding is CALLED, not merely when its module was imported. Tearing
+        # the path down at import time made every lazily-importing binding fail
+        # with ModuleNotFoundError against its own package.
+        return self._with_import_path(fn)
+
+    def _with_import_path(self, fn: Callable[..., Any]) -> Callable[..., Any]:
+        """Wrap a binding so this repo is importable for the duration of the call."""
+
+        @functools.wraps(fn)
+        def wrapper(*a: Any, **kw: Any) -> Any:
+            added = []
+            for candidate in (self.path, self.path / "src"):
+                if candidate.is_dir() and str(candidate) not in sys.path:
+                    sys.path.insert(0, str(candidate))
+                    added.append(str(candidate))
+            before = set(sys.modules)
+            try:
+                return fn(*a, **kw)
+            finally:
+                self._imported |= set(sys.modules) - before
+                for entry in added:
+                    if entry in sys.path:
+                        sys.path.remove(entry)
+
+        return wrapper
+
+    def release(self) -> None:
+        """Evict this repo's modules once we are finished with it.
+
+        Every repo names its adapter ``mlkit_bindings``, so without this the
+        second repo probed in one process would be served the FIRST repo's
+        cached module and report its numbers as its own -- a confident PASS
+        about a repo never opened. Eviction has to happen at the repo boundary
+        rather than after each import, because bindings import lazily and their
+        modules are not all loaded until the last binding has run.
+        """
+        self._evict_repo_modules(set(sys.modules) - self._imported)
+        self._imported.clear()
 
     #: Path fragments marking installed dependencies rather than repo source.
     #: Several repos keep their virtualenv inside the checkout, so "lives under

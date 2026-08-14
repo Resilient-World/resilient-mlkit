@@ -110,7 +110,13 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     for repo in repos:
         ctx = RunContext(nonce=run_nonce, root=root, offline=offline, timeout=args.timeout)
-        results = _run_phase(repo, phase, ctx)
+        try:
+            results = _run_phase(repo, phase, ctx)
+        finally:
+            # Drop this repo's modules before touching the next one. Every repo
+            # names its adapter `mlkit_bindings`, so skipping this would serve
+            # repo A's cached module to repo B and report A's numbers as B's.
+            repo.release()
         store.save(repo, phase, results)
 
         print(f"--- resilient-{repo.name}  sha={repo.short_sha}  branch={repo.branch}"
