@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resilient-mlkit"
+version = "0.1.0"
+description = "The single measurement and gating tool for the Resilient avoided-loss model portfolio"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Resilient World" }]
+
+# Deliberately minimal. mlkit is installed into every model repo's own
+# environment so that phase-1/phase-3 checks can import that repo's real
+# dataloaders and models. Every dependency added here is a dependency forced
+# on all 8 repos, so the bar is high. Heavy ML deps belong to the repos.
+dependencies = [
+    "PyYAML>=6.0",
+]
+
+[project.scripts]
+mlkit = "resilient_mlkit.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+resilient_mlkit = ["py.typed"]
