@@ -109,7 +109,7 @@ def sync_repo(
                 existing + suffix + "\n# mlkit local measurement state (SHA-bound)\n.mlkit/results/\n"
             )
 
-    return written, skipped, collisions
+    return written, skipped, seeded, collisions
 
 
 def main(argv: list[str] | None = None) -> int:

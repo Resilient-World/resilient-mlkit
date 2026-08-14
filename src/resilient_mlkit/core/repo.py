@@ -155,8 +155,15 @@ class Repo:
             )
         return fn
 
+    #: Path fragments marking installed dependencies rather than repo source.
+    #: Several repos keep their virtualenv inside the checkout, so "lives under
+    #: the repo root" alone would also match torch and numpy -- and evicting a
+    #: C-extension module makes re-import fail outright with "cannot load module
+    #: more than once per process".
+    _VENDOR_MARKERS = ("site-packages", "dist-packages", "/.venv/", "/venv/")
+
     def _evict_repo_modules(self, before: set[str]) -> None:
-        """Drop newly-imported modules that live inside this repo."""
+        """Drop newly-imported modules that are this repo's own source."""
         root = str(self.path.resolve())
         for name in set(sys.modules) - before:
             module = sys.modules.get(name)
@@ -166,11 +173,17 @@ class Repo:
                 # next repo's package of the same name.
                 paths = list(getattr(module, "__path__", []) or [])
                 origin = paths[0] if paths else ""
+            if not origin:
+                continue
             try:
-                if origin and str(Path(origin).resolve()).startswith(root):
-                    del sys.modules[name]
+                resolved = str(Path(origin).resolve())
             except (OSError, ValueError):
                 continue
+            if not resolved.startswith(root):
+                continue
+            if any(marker in resolved for marker in self._VENDOR_MARKERS):
+                continue
+            del sys.modules[name]
 
     # -- docs --------------------------------------------------------------
 
