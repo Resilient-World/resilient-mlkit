@@ -31,6 +31,13 @@ REQUIRED_REGION = "us-west-2"
 #: floating-point noise means the metric is wrong, not imprecise.
 MAX_METRIC_TOL = 1e-6
 
+#: Fewest groups an evaluation split may contain and still be a blocked split.
+#: Two is the absolute floor -- with one group there is no contrast at all, and
+#: any spatial claim reduces to a claim about that single site. This is a floor,
+#: not a target: two groups is thin, and R3 passing at two says only that the
+#: split is structurally blocked, never that the holdout is adequately powered.
+MIN_HOLDOUT_GROUPS = 2
+
 #: Region tokens that are a defect if they appear in training-plane config.
 _FOREIGN_REGIONS = (
     "us-east-1", "us-east-2", "us-west-1", "eu-west-1", "eu-west-2",
@@ -200,6 +207,22 @@ def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
         )
     if any(len(splits[s]) == 0 for s in names):
         return CheckResult.failed("R3", PHASE, "a split is empty", evidence)
+
+    # Disjointness alone is not a blocked split. A holdout containing ONE group
+    # is trivially disjoint and measures nothing: it cannot separate "this model
+    # generalises across sites" from "the single held-out site happens to be
+    # easy". Without this, the cheapest way to turn an R3 FAIL into a PASS is to
+    # shrink the holdout until only one group remains -- which is holdout
+    # narrowing, the thing CLAUDE.md rule 6 forbids, arriving as a green check.
+    thin = {s: len(splits[s]) for s in ("val", "test") if len(splits[s]) < MIN_HOLDOUT_GROUPS}
+    if thin:
+        return CheckResult.failed(
+            "R3", PHASE,
+            "holdout too thin to be a blocked split: "
+            + ", ".join(f"{k} has {v} group(s), need >= {MIN_HOLDOUT_GROUPS}" for k, v in thin.items())
+            + "; a single-group holdout is disjoint but uninformative",
+            {**evidence, "min_holdout_groups": MIN_HOLDOUT_GROUPS},
+        )
     return CheckResult.passed("R3", PHASE, evidence)
 
 
