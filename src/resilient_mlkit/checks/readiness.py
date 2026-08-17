@@ -4,22 +4,29 @@ Run order is set in ``PHASE_ORDER`` and is not numerical: R9 first, because the
 licence gate is the cheapest check here and the most decisive. Everything after
 it is ordered cheapest-and-most-decisive-first.
 
-Two checks in this phase are the ones that actually catch fabricated science.
+Three checks in this phase are the ones that actually catch fabricated science.
 R5 refuses any synthetic, simulated or formula-derived row in val or test, and
 R4 refuses a metric that cannot reproduce an analytically known answer. Between
 them they catch the failure mode where a model scores beautifully against a
 target it computed from its own inputs.
+
+R10 catches the failure mode neither of them can reach. R3, R4 and R5 all work
+through declared bindings, which means they only ever see the label panel and
+the metric implementations a repo chose to expose. An adversarial sweep in
+August 2026 found seventeen defects of one shape -- a measured quantity given a
+plausible numeric default that then satisfied the gate consuming it -- and
+every one of them lived in code no readiness check reached. R10 walks the
+declared source tree with ``ast`` instead of importing anything, so it sees the
+trainer's own feature path.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
-
-from ..core import policy
+from ..core import fabrication, policy
 from ..core.repo import BindingError, Repo
-from ..core.result import CheckResult, CredentialRequired, Status
+from ..core.result import CheckResult, CredentialRequired
 from . import RunContext, check
 
 PHASE = "readiness"
@@ -381,6 +388,131 @@ def r7_remote_parity(repo: Repo, ctx: RunContext) -> CheckResult:
     if problems:
         return CheckResult.failed("R7", PHASE, "; ".join(problems), evidence)
     return CheckResult.passed("R7", PHASE, evidence)
+
+
+#: Most findings printed into a FAIL reason. The rest live in the evidence and
+#: in the written report; a reason that runs to fifty lines sets the column
+#: width for the whole portfolio table and gets skimmed instead of read.
+R10_REASON_FINDINGS = 4
+
+#: Where R10 writes the full finding list, relative to the repo root.
+R10_REPORT_RELPATH = "reports/fabricated_defaults.md"
+
+
+@check("R10", PHASE, "FABRICATED_DEFAULTS — no measured quantity takes a plausible default")
+def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
+    """Walk the declared source tree for fabricated defaults.
+
+    The defect: a measured quantity is given a plausible numeric default when
+    its real input is absent, and that default then satisfies the gate that
+    consumes it. The gate reports PASS having measured nothing.
+
+    This check imports nothing from the repo. It parses, which means it works
+    on code no binding exposes -- including the trainer's feature path, where
+    every defect of this class found in August 2026 was living precisely
+    because R3 and R5 only ever see the label panel.
+
+    NA, not PASS, when the repo declares no source tree. A check that walks
+    nothing and reports green is the same defect it was written to catch.
+    """
+    source = repo.config().get("source") or {}
+    declared = [str(t).strip() for t in (source.get("trees") or []) if str(t).strip()]
+    if not declared:
+        return CheckResult.na(
+            "R10", PHASE,
+            "no [source] trees declared in .mlkit/repo.toml; there is nothing to walk, "
+            "so the absence of fabricated defaults is unmeasured (add e.g. "
+            'trees = ["src", "scripts"])',
+        )
+
+    roots, absent = [], []
+    for tree in declared:
+        candidate = repo.path / tree
+        (roots if candidate.is_dir() else absent).append(candidate if candidate.is_dir() else tree)
+    if not roots:
+        return CheckResult.na(
+            "R10", PHASE,
+            f"declared source tree(s) {', '.join(declared)} do not exist under {repo.path}",
+        )
+
+    findings = fabrication.scan_tree(roots, base=repo.path)
+    files = sum(1 for _ in fabrication.iter_python_files(roots))
+
+    satisfying = [f for f in findings if f.severity == "SATISFIES_GATE"]
+    publishing = [f for f in findings if f.severity != "SATISFIES_GATE"]
+
+    report_path = repo.path / R10_REPORT_RELPATH
+    _write_r10_report(report_path, repo, ctx, findings, files, declared)
+
+    evidence = {
+        "trees": declared,
+        "files_walked": files,
+        "findings": len(findings),
+        "satisfies_gate": len(satisfying),
+        "publishes_unmeasured": len(publishing),
+        "report": str(report_path.relative_to(repo.path)),
+        "top": [f.to_dict() for f in (satisfying or publishing)[:R10_REASON_FINDINGS]],
+    }
+    if absent:
+        evidence["declared_but_absent"] = [str(a) for a in absent]
+
+    if not files:
+        return CheckResult.na(
+            "R10", PHASE,
+            f"declared tree(s) {', '.join(declared)} contain no Python source to walk",
+            evidence,
+        )
+
+    if findings:
+        head = (satisfying or publishing)[:R10_REASON_FINDINGS]
+        detail = "; ".join(
+            f"{f.path}:{f.line} {f.symbol}={f.literal} ({f.shape} → {f.sink})" for f in head
+        )
+        more = len(findings) - len(head)
+        return CheckResult.failed(
+            "R10", PHASE,
+            f"{len(findings)} fabricated default(s) reach a gate, metric or report "
+            f"({len(satisfying)} of them satisfy the gate that consumes them): {detail}"
+            + (f"; +{more} more in {R10_REPORT_RELPATH}" if more > 0 else ""),
+            evidence,
+        )
+    return CheckResult.passed("R10", PHASE, evidence)
+
+
+def _write_r10_report(
+    path: Path,
+    repo: Repo,
+    ctx: RunContext,
+    findings: list[fabrication.Finding],
+    files: int,
+    trees: list[str],
+) -> None:
+    """Write every finding out, because a truncated reason is not evidence."""
+    lines = [
+        f"# Fabricated defaults (R10) — resilient-{repo.name}",
+        "",
+        f"- run nonce: `{ctx.nonce}`",
+        f"- git SHA: `{repo.git_sha}`",
+        f"- trees walked: {', '.join(f'`{t}`' for t in trees)} ({files} file(s))",
+        f"- findings: {len(findings)}",
+        "",
+        "`SATISFIES_GATE` marks a default that is the value which would PASS the",
+        "gate consuming it. `PUBLISHES_UNMEASURED` marks one that would fail its",
+        "gate but is still emitted as though it were a measurement.",
+        "",
+        "| severity | file:line | symbol | value | shape | sink |",
+        "|---|---|---|---|---|---|",
+    ]
+    for f in findings:
+        lines.append(
+            f"| {f.severity} | `{f.path}:{f.line}` | `{f.symbol}` | `{f.literal}` | "
+            f"{f.shape} | {f.sink} |"
+        )
+    if not findings:
+        lines.append("| — | — | — | — | — | (none) |")
+    lines.append("")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines))
 
 
 @check("R8", PHASE, "REPORT — readiness report generated from measured results")
