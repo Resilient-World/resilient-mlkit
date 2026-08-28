@@ -435,10 +435,14 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
             'trees = ["src", "scripts"])',
         )
 
-    roots, absent = [], []
+    roots: list[Path] = []
+    absent: list[str] = []
     for tree in declared:
         candidate = repo.path / tree
-        (roots if candidate.is_dir() else absent).append(candidate if candidate.is_dir() else tree)
+        if candidate.is_dir():
+            roots.append(candidate)
+        else:
+            absent.append(tree)
     if not roots:
         return CheckResult.na(
             "R10", PHASE,

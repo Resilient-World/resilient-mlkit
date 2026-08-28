@@ -9,7 +9,10 @@ and claims are what this whole apparatus exists to stop.
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
+import json
 import socket
+import subprocess
 import sys
 import traceback
 from pathlib import Path
@@ -134,13 +137,13 @@ def cmd_check(args: argparse.Namespace) -> int:
         if phase == "selection":
             by_id = {r.check_id: r for r in results}
             for cid, label in (("S3", "RESOLVED"), ("S4", "LICENCE-VERDICTED")):
-                r = by_id.get(cid)
-                if r and r.status is Status.PASS:
-                    n = r.evidence.get("resolved", r.evidence.get("n_sources", 0))
-                    d = r.evidence.get("total", r.evidence.get("n_sources", 0))
-                elif r and r.status is Status.FAIL:
-                    n = r.evidence.get("resolved", 0)
-                    d = r.evidence.get("total", r.evidence.get("n_sources", 0))
+                found = by_id.get(cid)
+                if found and found.status is Status.PASS:
+                    n = found.evidence.get("resolved", found.evidence.get("n_sources", 0))
+                    d = found.evidence.get("total", found.evidence.get("n_sources", 0))
+                elif found and found.status is Status.FAIL:
+                    n = found.evidence.get("resolved", 0)
+                    d = found.evidence.get("total", found.evidence.get("n_sources", 0))
                 else:
                     n = d = 0
                 print(f"{cid}: {n}/{d} {label}")
@@ -188,6 +191,210 @@ def _cmd_portfolio(repos: list[Repo], run_nonce: str, root: Path) -> int:
     for repo in repos:
         print(f"HEAD resilient-{repo.name}: {repo.git_sha or '<not a git worktree>'}")
     return 0
+
+
+def cmd_fleet(args: argparse.Namespace) -> int:
+    """Regenerate the MEASURED columns of the fleet verdict table.
+
+    ``portfolio/MODEL_QUALITY.md`` is the adjudication of record and stays
+    hand-written: its last column is a judgement, and a judgement is not a field
+    lookup. Every OTHER column in it is a number that exists in exactly one
+    other place -- an artifact in a model repo -- and was retyped into the table
+    by hand. This command reads those artifacts instead, so a wrong digit stops
+    being invisible.
+
+    Not to be confused with ``mlkit check --portfolio``, which reports each
+    repo's terminal readiness state. This one reports model quality.
+    """
+    from .core import fleet
+    from .fleet_adapters import ADAPTERS
+
+    root = Path(args.root).resolve() if args.root else find_root()
+    run_nonce = nonce_mod.from_env_or_mint()
+    repos = {r.name: r for r in _select_repos(args, root)}
+    if not repos:
+        print(f"no portfolio repos found under {root}", file=sys.stderr)
+        return 2
+
+    rows: list[fleet.FleetRow] = []
+    missing_repos: list[str] = []
+    for adapter in ADAPTERS:
+        repo = repos.get(adapter.repo)
+        if repo is None:
+            if args.repo is None and adapter.repo not in missing_repos:
+                missing_repos.append(adapter.repo)
+            continue
+        rows.append(fleet.read_row(repo, adapter))
+
+    stats = fleet.counts(rows)
+    generated_at = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
+    payload = {
+        "artifact_schema": "resilient-mlkit/fleet-verdicts/1",
+        "generated_by": "mlkit portfolio",
+        "mlkit_version": __version__,
+        "generated_at_utc": generated_at,
+        "run_nonce": run_nonce,
+        "root": str(root),
+        "mlkit_git_sha": _self_sha(),
+        "repos_read": {
+            name: {"git_sha": r.git_sha, "branch": r.branch, "dirty": r.is_dirty}
+            for name, r in sorted(repos.items())
+        },
+        "repos_not_found_under_root": missing_repos,
+        "counts": stats,
+        "rows": [r.to_dict() for r in rows],
+    }
+
+    md = _render_fleet_markdown(payload, rows, missing_repos)
+
+    if args.json:
+        print(json.dumps(payload, indent=1, sort_keys=False))
+    else:
+        print(f"mlkit {__version__}  portfolio  nonce={run_nonce}")
+        print(f"root={root}")
+        print()
+        print(md)
+
+    if args.out:
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(md)
+        json_path = out.with_suffix(".json")
+        json_path.write_text(json.dumps(payload, indent=1) + "\n")
+        print(f"\nwrote {out} and {json_path}", file=sys.stderr)
+
+    # NA is not a failure -- an NA with a reason is a result. A row whose MAIN
+    # artifact could not be found at all is different: the adapter points at
+    # something that is not there, and that IS a defect in this tool.
+    broken = [r.key for r in rows if r.main is not None and not r.main.found]
+    if broken:
+        print(f"\n{len(broken)} row(s) whose declared main artifact did not resolve: "
+              f"{', '.join(broken)}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _self_sha() -> str:
+    out = subprocess.run(
+        ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=False,
+    )
+    return out.stdout.strip() if out.returncode == 0 else ""
+
+
+def _render_fleet_markdown(
+    payload: dict, rows: list, missing_repos: list[str]
+) -> str:
+    from .core import fleet
+
+    stats = payload["counts"]
+    lines = [
+        "# Fleet verdicts, machine-read",
+        "",
+        "**Generated by `mlkit portfolio`. Do not hand-edit — the next run overwrites it.**",
+        "",
+        "Every figure below was read out of a committed artifact in a model repo by",
+        "the adapter declared for that repo in `src/resilient_mlkit/fleet_adapters.py`.",
+        "Nothing here was retyped, and nothing here is a default: a column this repo's",
+        "artifacts do not carry reports `NA` with the reason, listed in full further down.",
+        "",
+        "This file does NOT replace `portfolio/MODEL_QUALITY.md`. That document carries",
+        "the adjudication and the refutation checks — judgement, which is not a field",
+        "lookup. This one carries the arithmetic, so the two can disagree in public.",
+        "",
+        f"- generated: `{payload['generated_at_utc']}`",
+        f"- run nonce: `{payload['run_nonce']}`",
+        f"- mlkit: `{payload['mlkit_version']}` at `{payload['mlkit_git_sha'] or 'NA (not a git worktree)'}`",
+        f"- rows: **{stats['rows']}**, cells measured: **{stats['cells_measured']}**, "
+        f"cells NA-with-reason: **{stats['cells_na']}**",
+        "",
+    ]
+    if missing_repos:
+        lines += [
+            f"- repos declared but not found under the root: "
+            f"{', '.join(f'`{m}`' for m in missing_repos)}",
+            "",
+        ]
+    lines += [
+        "## Repos as they were read",
+        "",
+        "| repo | branch | HEAD | working tree |",
+        "|---|---|---|---|",
+    ]
+    for name, info in payload["repos_read"].items():
+        lines.append(
+            f"| {name} | `{info['branch'] or 'NA'}` | `{(info['git_sha'] or 'NA')[:12]}` | "
+            f"{'DIRTY' if info['dirty'] else 'clean'} |"
+        )
+    lines += [
+        "",
+        "## Verdicts",
+        "",
+        fleet.markdown_table(rows),
+        "",
+        "`beats bar?` is read from the artifact where the artifact records it, and",
+        "otherwise derived from the two scores above it; the row's `beats` source",
+        "field in the JSON says which. `test arm` is whatever that repo records about",
+        "its holdout reads — a boolean, a count, a timestamp or a sentence — quoted",
+        "as it stands rather than normalised into a shape no repo actually uses.",
+        "",
+        "## Where each figure came from",
+        "",
+        fleet.provenance_block(rows),
+        "",
+    ]
+
+    # An artifact that is not in git is not reproducible from the repository,
+    # whatever it says. That is a stronger finding than any NA in the table
+    # above, so it gets its own section rather than one column in a wide row.
+    def _flag(pred):
+        return [
+            (r.key, alias, ref)
+            for r in rows
+            for alias, ref in r.artifacts.items()
+            if ref.found and pred(ref)
+        ]
+
+    uncommitted = _flag(lambda ref: not ref.committed_at_head)
+    dirty = _flag(lambda ref: ref.dirty)
+    off = _flag(lambda ref: ref.off_checkout)
+    lines += ["## Artifacts that are not where a reader would look for them", ""]
+    if not (uncommitted or dirty or off):
+        lines.append(
+            "- none: every artifact above is committed at its tree's HEAD, matches the "
+            "committed blob, and is on the branch that tree has checked out."
+        )
+    for key, alias, ref in uncommitted:
+        lines.append(
+            f"- **NOT COMMITTED — {key} / {alias}**: `{ref.relpath}` exists on disk "
+            f"(sha256 `{ref.sha256[:16]}…`) but git has no such path at `{ref.branch}` "
+            f"`{ref.git_sha[:12]}`. Any figure this table takes from it cannot be "
+            "reproduced from the repository by anyone else."
+        )
+    for key, alias, ref in dirty:
+        lines.append(
+            f"- **DIRTY — {key} / {alias}**: `{ref.relpath}` on disk differs from the "
+            f"blob committed at `{ref.git_sha[:12]}`. The figures above are the "
+            "working-tree bytes, which no reviewer can see."
+        )
+    for key, alias, ref in off:
+        lines.append(
+            f"- **OFF CHECKOUT — {key} / {alias}**: read from the linked worktree "
+            f"`{ref.worktree}` on branch `{ref.branch}`, not from the branch the repo "
+            "root has checked out. It is evidence about that worktree."
+        )
+    lines.append("")
+
+    notes = [(r.key, r.note) for r in rows if r.note]
+    if notes:
+        lines += ["## Row notes", ""]
+        lines += [f"- **{key}** — {note}" for key, note in notes]
+        lines.append("")
+    na = fleet.na_summary(rows)
+    lines += ["## Every NA in this table, and why", ""]
+    lines += na or ["- none: every declared column resolved."]
+    lines.append("")
+    return "\n".join(lines)
 
 
 def cmd_notice(args: argparse.Namespace) -> int:
@@ -361,6 +568,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="assert no network; skips reachability probing",
     )
     p_check.set_defaults(func=cmd_check)
+
+    p_fleet = sub.add_parser(
+        "portfolio",
+        help="regenerate the measured columns of the fleet verdict table from artifacts",
+    )
+    common(p_fleet)
+    p_fleet.add_argument("--out", help="write the table (and its .json twin) here")
+    p_fleet.add_argument("--json", action="store_true", help="print the machine artifact instead")
+    p_fleet.set_defaults(func=cmd_fleet)
 
     p_notice = sub.add_parser("notice", help="regenerate NOTICE.md from the allowlist")
     common(p_notice)

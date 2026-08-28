@@ -50,6 +50,14 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+#: The two AST nodes that carry a signature. Several scanners need
+#: ``.args``/``.body``/a docstring, which ``ast.AST`` does not promise, and
+#: annotating them as bare AST hid that from the type checker.
+_FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
+#: Statements ``_scan_guarded_statement`` is dispatched for, from ``scan()``.
+_StatementNode = ast.Assign | ast.AnnAssign | ast.Return
+
+
 # ---------------------------------------------------------------------------
 # Vocabulary
 # ---------------------------------------------------------------------------
@@ -981,7 +989,7 @@ class _ModuleScanner:
             config_context=_reads_config(producer) or self.at_module_level(node),
         ))
 
-    def _scan_param_defaults(self, fn: ast.AST) -> None:
+    def _scan_param_defaults(self, fn: _FunctionNode) -> None:
         """``def gate(champion_mape=0.20, challenger_mape=0.15)``.
 
         A caller omitting the argument gets a figure nobody measured, and the
@@ -1000,9 +1008,11 @@ class _ModuleScanner:
         if args.defaults:
             for arg, default in zip(positional[len(positional) - len(args.defaults):], args.defaults):
                 pairs.append((arg, default))
-        for arg, default in zip(args.kwonlyargs, args.kw_defaults):
-            if default is not None:
-                pairs.append((arg, default))
+        for arg, kw_default in zip(args.kwonlyargs, args.kw_defaults):
+            # kw_defaults holds None for keyword-only args with no default --
+            # a hole in the list, not a `None` literal default.
+            if kw_default is not None:
+                pairs.append((arg, kw_default))
         if not pairs or not fn.body:
             return
         sinks = self._build_sinks(fn)
@@ -1031,7 +1041,7 @@ class _ModuleScanner:
                 literal=literal, sink=sink, snippet=self.snippet(arg),
             ))
 
-    def _scan_metric_literal_return(self, fn: ast.AST) -> None:
+    def _scan_metric_literal_return(self, fn: _FunctionNode) -> None:
         """``def compute_csi(...): ... return 1.0``.
 
         Four independent CSI implementations in this portfolio returned a
@@ -1076,7 +1086,7 @@ class _ModuleScanner:
             ))
 
     @staticmethod
-    def _docstring_names_a_metric(fn: ast.AST) -> bool:
+    def _docstring_names_a_metric(fn: _FunctionNode) -> bool:
         """``def _critical_success_index(...): '''... (CSI) = TP/(TP+FN+FP)'''``.
 
         Some metric implementations spell the quantity out in the name and
@@ -1192,7 +1202,7 @@ class _ModuleScanner:
             return [target.slice.value]
         return []
 
-    def _scan_guarded_statement(self, node: ast.AST) -> None:
+    def _scan_guarded_statement(self, node: _StatementNode) -> None:
         """Literals assigned or returned where no measurement happened.
 
         Fires only inside an ``except`` handler or a branch guarded by an
@@ -1204,8 +1214,10 @@ class _ModuleScanner:
             return
         shape = f"{guard}-branch literal"
 
+        value: ast.expr | None
+        targets: list[ast.expr]
         if isinstance(node, ast.Assign):
-            value, targets = node.value, node.targets
+            value, targets = node.value, list(node.targets)
         elif isinstance(node, ast.AnnAssign):
             value, targets = node.value, [node.target]
         else:

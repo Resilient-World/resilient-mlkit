@@ -49,3 +49,12 @@ addopts = ["-ra", "--strict-markers"]
 #: here for three minutes is wedged, not working.
 timeout = 180
 timeout_method = "thread"
+
+# mlkit deliberately has no numpy dependency: it is installed into eight repos
+# and every dependency added here is forced on all of them. `core.derivation`
+# imports numpy inside a probe that reports NA when the import fails, which is
+# the correct behaviour and not a missing stub. Declaring that here is a
+# statement of fact about the dependency set, not a silenced type error.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+ignore_missing_imports = true
