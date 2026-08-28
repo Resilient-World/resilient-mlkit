@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "resilient-mlkit"
-version = "0.1.0"
+version = "0.2.0"
 description = "The single measurement and gating tool for the Resilient avoided-loss model portfolio"
 readme = "README.md"
 requires-python = ">=3.11"
