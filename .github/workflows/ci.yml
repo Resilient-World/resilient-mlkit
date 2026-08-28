@@ -1,0 +1,107 @@
+# CI for resilient-mlkit.
+#
+# UNVERIFIED AS COMMITTED. GitHub Actions is failing account-wide on billing at
+# the time of writing (2026-08-28), so this workflow has never executed and no
+# run of it is being claimed. It is committed now so that it starts working the
+# moment billing is restored, rather than being written after the next
+# regression it would have caught.
+#
+# What HAS been run, locally, on the commit that added this file:
+#
+#   ruff check src tests scripts                  -> all checks passed
+#   python -m mypy src/resilient_mlkit            -> no issues, 25 source files
+#   python -m pytest tests/ ... (focused)         -> see the PR body; the full
+#                                                    suite has NOT been run here
+#
+# Those local runs are what the jobs below reproduce. They are not evidence
+# that the workflow file itself is correct -- only a run is.
+#
+# Scope note: `mlkit portfolio` and `mlkit spine` deliberately have NO job here.
+# Both read the eight model repos as sibling checkouts, which do not exist on a
+# runner. A job that ran them would find no repos and exit clean, which is a
+# green tick for having measured nothing -- the exact defect this package was
+# written to detect.
+
+name: CI
+
+on:
+  push:
+    branches: [main, feat/**]
+  pull_request:
+
+# A second push should cancel the first run rather than queue behind it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install ruff
+        run: python -m pip install --upgrade pip "ruff>=0.4"
+      # No config file: mlkit runs ruff at its defaults, so what CI checks is
+      # exactly what a contributor gets from a bare `ruff check`. Adding a
+      # config to widen what passes would make this job agree with nothing.
+      - run: ruff check src tests scripts
+
+  typecheck:
+    name: mypy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package and type checker
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "."
+          pip install "mypy>=1.9" "types-PyYAML>=6.0"
+      # Deliberately NOT --ignore-missing-imports. mlkit has exactly one
+      # optional third-party import (numpy, inside a probe that reports NA when
+      # it fails) and that one is declared in pyproject.toml. A blanket ignore
+      # would also silence a genuinely missing first-party module.
+      - run: python -m mypy src/resilient_mlkit
+
+  tests:
+    name: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the floor declared in pyproject; 3.12 is what the model repos
+        # run. Both, because a package installed into eight environments must
+        # not depend on the interpreter that happened to be handy.
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install package and test extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+      - name: pytest-timeout must be ACTIVE, not merely declared
+        # `timeout` is an ini key pytest does not know: without the plugin
+        # registered, pytest ignores it silently and pyproject.toml reads as
+        # though a limit is in force. Fail the job here, before the suite runs,
+        # rather than discovering it from a job that hung for six hours.
+        run: python -c "import pytest_timeout; print(pytest_timeout.__file__)"
+      - name: Unit tests
+        run: python -m pytest tests -q

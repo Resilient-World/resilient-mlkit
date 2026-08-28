@@ -40,6 +40,14 @@ resilient_mlkit = ["py.typed"]
 test = [
     "pytest>=8.0",
     "pytest-timeout>=2.3",
+    # A TEST dependency, not a runtime one. `core.derivation` imports numpy
+    # inside a probe that reports NA when the import fails -- that is correct
+    # behaviour and stays correct in the eight repos, whose own environments
+    # supply numpy. But tests/test_derivation.py builds real arrays to exercise
+    # the probe, so the suite cannot run without it. Declared here so `pip
+    # install -e ".[test]"` gives a working suite; the eight repos install
+    # mlkit without this extra and are unaffected.
+    "numpy>=1.24",
 ]
 
 [tool.pytest.ini_options]
