@@ -27,3 +27,25 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 resilient_mlkit = ["py.typed"]
+
+# Test-time dependencies. Declared here so the environment is reproducible from
+# the manifest rather than from whoever last ran pip by hand.
+#
+# pytest-timeout is not optional comfort. `timeout` below is an ini key pytest
+# does not know: without the plugin registered, pytest silently ignores it and
+# the declaration bounds nothing while reading as though it does. That is the
+# same defect class as a config key no stage consumes, and it is only
+# detectable by execution -- see tests/test_pytest_timeout_active.py.
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-timeout>=2.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers"]
+#: Seconds. No check in this package is a long-running job; anything that sits
+#: here for three minutes is wedged, not working.
+timeout = 180
+timeout_method = "thread"
