@@ -312,6 +312,13 @@ class Finding:
     split: str = ""
     snippet: str = ""
     severity: str = TARGET_FABRICATED
+    #: How many of the record's data fields carry a draw, and how many it has.
+    #: One finding is emitted per record rather than one per field -- eight
+    #: findings for one row would bury seven other rows -- so this pair is
+    #: what tells a reader whether the record is lightly jittered or is noise
+    #: all the way down.
+    tainted_fields: int = 1
+    data_fields: int = 1
 
     def render(self) -> str:
         extra = f"; corroborated by {', '.join(self.corroborating)}" if self.corroborating else ""
@@ -319,7 +326,8 @@ class Finding:
         return (
             f"{self.path}:{self.line}  {self.field} <- {self.origin_symbol} "
             f"({self.origin_call} at line {self.origin_line}) stamped "
-            f'{self.claim_field}="{self.claim_value}" [{self.severity}{split}{extra}]'
+            f'{self.claim_field}="{self.claim_value}" [{self.severity}{split}; '
+            f"{self.tainted_fields}/{self.data_fields} data fields drawn{extra}]"
             f"\n      {self.snippet}"
         )
 
@@ -337,6 +345,8 @@ class Finding:
             "split": self.split,
             "snippet": self.snippet,
             "severity": self.severity,
+            "tainted_fields": self.tainted_fields,
+            "data_fields": self.data_fields,
         }
 
 
@@ -498,13 +508,9 @@ class _ModuleScanner:
                 pairs: list[tuple[list[str], ast.AST | None]] = []
                 if isinstance(sub, ast.Assign):
                     pairs = [(self._target_names(t), sub.value) for t in sub.targets]
-                elif isinstance(sub, (ast.AnnAssign, ast.AugAssign)):
+                elif isinstance(sub, (ast.AnnAssign, ast.AugAssign, ast.NamedExpr)):
                     pairs = [(self._target_names(sub.target), sub.value)]
-                elif isinstance(sub, ast.NamedExpr):
-                    pairs = [(self._target_names(sub.target), sub.value)]
-                elif isinstance(sub, (ast.For, ast.AsyncFor)):
-                    pairs = [(self._target_names(sub.target), sub.iter)]
-                elif isinstance(sub, ast.comprehension):
+                elif isinstance(sub, (ast.For, ast.AsyncFor, ast.comprehension)):
                     pairs = [(self._target_names(sub.target), sub.iter)]
                 elif isinstance(sub, ast.withitem) and sub.optional_vars is not None:
                     pairs = [(self._target_names(sub.optional_vars), sub.context_expr)]
@@ -688,10 +694,15 @@ class _ModuleScanner:
         if not hits:
             return
 
+        # One finding per RECORD, not per field. A row whose every column is
+        # drawn would otherwise emit a dozen findings and bury eleven other
+        # rows; the counts carried on the finding say how deep it goes.
         # Report the target field when one is tainted, because that is the
         # aggravated form and the one a reader must see first; otherwise the
         # first tainted input field.
         hits.sort(key=lambda h: (not is_target_field(h[0]), h[0]))
+        data_fields = sum(1 for name, _ in record.data if not is_config_field(name)) \
+            + len(record.carried)
         claim = claims[0]
         for name, origin in hits[:1]:
             key = (record.line, name, claim.field)
@@ -712,6 +723,8 @@ class _ModuleScanner:
                     split=split,
                     snippet=self.snippet(record.node),
                     severity=TARGET_FABRICATED if is_target_field(name) else INPUT_FABRICATED,
+                    tainted_fields=len(hits),
+                    data_fields=max(data_fields, len(hits)),
                 )
             )
 

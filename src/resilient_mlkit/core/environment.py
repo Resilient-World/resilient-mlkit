@@ -41,6 +41,30 @@ interpreter's problem. ``src.data`` is, so its absence is the repo's. Nothing
 here needs a hardcoded list of "real" packages, which is what keeps the rule
 from rotting.
 
+TWO PROBES, BECAUSE ONE OF THEM HAS A HOLE
+------------------------------------------
+``probe()`` imports the declared bindings and is available BEFORE any check
+runs. It has a blind spot, and the blind spot is not hypothetical: bindings in
+this portfolio import their repo LAZILY, inside the function body, because
+that is the pattern ``.mlkit/repo.toml`` documents and it is right -- it keeps
+a repo's heavy training stack out of the import path of checks that do not
+need it. A lazily-importing binding module imports perfectly from an
+interpreter with no numpy, and only fails when it is CALLED.
+
+Measured, 2026-08-28, running ``mlkit env`` from a python 3.14.6 with no
+numpy: seven of the eight repos reported UNMEASURABLE on the import probe and
+resilient-surge reported MEASURABLE, 11 of 11 bindings imported -- from the
+very interpreter that cannot run any of them. The import probe alone would
+have left surge's report unguarded.
+
+``from_results()`` closes it, using evidence that costs nothing extra: the
+check results already produced in this run. A check whose reason carries
+``No module named 'X'`` for an X that is not this repo's own source is a
+binding that was called and could not run. That is stronger evidence than the
+import probe, because it is what actually happened rather than what might.
+``assess()`` runs both and takes the worse verdict; no binding is ever called
+just to find out.
+
 WHAT A VERDICT DOES AND DOES NOT AUTHORISE
 ------------------------------------------
 UNMEASURABLE stops a binding-dependent report from being written. It does not
@@ -52,10 +76,16 @@ a property of the run, and it belongs in the run's own record.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from .repo import BindingError, Repo
+
+#: Python's own wording for a module it could not find, and the only thing
+#: ``from_results`` keys on. It is stable across every version this tool runs
+#: on and it survives being wrapped in mlkit's own "binding raised ..." text.
+_MISSING_MODULE = re.compile(r"No module named ['\"]([A-Za-z_][\w.]*)['\"]")
 
 #: The environment imported every binding the repo declares.
 MEASURABLE = "MEASURABLE"
@@ -130,7 +160,7 @@ def probe(repo: Repo) -> EnvironmentProbe:
 
     python = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     try:
-        declared = dict((repo.config().get("bindings") or {}))
+        declared = dict(repo.config().get("bindings") or {})
     except BindingError as exc:
         return EnvironmentProbe(
             UNDECLARED, f"cannot read binding declarations: {exc}", python=python
@@ -189,4 +219,85 @@ def probe(repo: Repo) -> EnvironmentProbe:
         (),
         tuple(defects),
         python,
+    )
+
+
+def from_results(repo: Repo, results: Mapping[str, object]) -> EnvironmentProbe:
+    """Read the environment's verdict off the checks that already ran.
+
+    The import probe cannot see a lazily-importing binding fail, because such a
+    binding imports fine and only breaks when called. This one does not need to
+    call anything: a check that already ran and reported ``No module named
+    'numpy'`` has performed the experiment.
+
+    The same discriminator applies -- a missing module that resolves inside the
+    repo is the REPO's defect and leaves the environment MEASURABLE. Without
+    that, an ordinary ``from src.models import x`` typo would suppress the
+    report it should have turned red.
+    """
+    import sys
+
+    python = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    missing: list[str] = []
+    culprits: dict[str, str] = {}
+    local: list[str] = []
+    for check_id, result in results.items():
+        reason = getattr(result, "reason", "") or ""
+        for module in _MISSING_MODULE.findall(reason):
+            if _is_repo_local(repo, module):
+                if check_id not in local:
+                    local.append(str(check_id))
+                continue
+            if module not in missing:
+                missing.append(module)
+            culprits.setdefault(f"{check_id} (called)", f"missing:{module}")
+
+    if missing:
+        return EnvironmentProbe(
+            UNMEASURABLE,
+            f"this interpreter (python {python}) ran {len(culprits)} check(s) that "
+            f"failed for want of " + ", ".join(missing[:5])
+            + ", which is not this repo's own source; the checks were called and "
+            "could not run, so what they reported is a fact about the interpreter",
+            culprits,
+            tuple(missing),
+            tuple(local),
+            python,
+        )
+    return EnvironmentProbe(
+        UNDECLARED,
+        f"no check in this run failed for a missing third-party module "
+        f"({len(results)} result(s) read)",
+        {},
+        (),
+        tuple(local),
+        python,
+    )
+
+
+def assess(repo: Repo, results: Mapping[str, object] | None = None) -> EnvironmentProbe:
+    """The environment verdict for a run: both probes, worse verdict wins.
+
+    UNMEASURABLE from either is UNMEASURABLE. The import probe answers before
+    anything has run; the results probe sees what a lazily-importing binding
+    did when it was actually called. Neither calls a binding to find out.
+    """
+    imported = probe(repo)
+    if imported.verdict == UNMEASURABLE or not results:
+        return imported
+    observed = from_results(repo, results)
+    if observed.verdict != UNMEASURABLE:
+        return imported
+    merged = dict(imported.bindings)
+    merged.update(observed.bindings)
+    return EnvironmentProbe(
+        UNMEASURABLE,
+        observed.reason
+        + f" (every declared binding IMPORTED cleanly here, which is why the "
+        f"import probe alone said {imported.verdict}: these bindings import "
+        "their repo lazily and fail only when called)",
+        merged,
+        observed.missing_modules,
+        tuple(dict.fromkeys(imported.repo_defects + observed.repo_defects)),
+        observed.python,
     )

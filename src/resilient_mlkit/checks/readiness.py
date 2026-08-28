@@ -637,18 +637,19 @@ def _write_r11_report(
         "predict. `INPUT_FABRICATED` marks one reaching another data field of the",
         "same stamped record.",
         "",
-        "| severity | record | field | drawn at | claim | split | corroborating |",
-        "|---|---|---|---|---|---|---|",
+        "| severity | record | field | drawn at | claim | split | drawn fields | corroborating |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for f in findings:
         corroborating = ", ".join(f"`{c}`" for c in f.corroborating) or "—"
         lines.append(
             f"| {f.severity} | `{f.path}:{f.line}` | `{f.field}` | "
             f"`{f.origin_symbol}` = `{f.origin_call}` (line {f.origin_line}) | "
-            f'`{f.claim_field}="{f.claim_value}"` | {f.split or "—"} | {corroborating} |'
+            f'`{f.claim_field}="{f.claim_value}"` | {f.split or "—"} | '
+            f"{f.tainted_fields}/{f.data_fields} | {corroborating} |"
         )
     if not findings:
-        lines.append("| — | — | — | — | — | — | (none) |")
+        lines.append("| — | — | — | — | — | — | — | (none) |")
     lines.append("")
     # Unguarded: static analysis, no repo imports. See core/report.py.
     report.guarded_write(
@@ -671,7 +672,14 @@ def r8_report(repo: Repo, ctx: RunContext) -> CheckResult:
     # did fail to run -- and the aggregate was still a lie, because the
     # composite reads as a statement about the repo when it is a statement
     # about the shell.
-    probe = environment.probe(repo)
+    #
+    # assess(), not probe(): the import probe alone misses a lazily-importing
+    # binding, which imports cleanly from a broken interpreter and fails only
+    # when called. Measured 2026-08-28 from a numpy-less python 3.14.6,
+    # resilient-surge reported MEASURABLE on 11 of 11 bindings from an
+    # interpreter that cannot run any of them. The results this run already
+    # produced are the stronger evidence, and they cost nothing extra.
+    probe = environment.assess(repo, prior)
 
     lines = [
         f"# Readiness report — resilient-{repo.name}",

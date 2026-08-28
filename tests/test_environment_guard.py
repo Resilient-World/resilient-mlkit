@@ -345,3 +345,108 @@ def test_r8_writes_when_the_environment_is_measurable(tmp_path):
     assert "R5" in out.read_text()
     assert out.read_text() != MEASURED_REPORT
     assert (tmp_path / "reports" / "readiness.UNMEASURABLE.md").exists() is False
+
+
+# ---------------------------------------------------------------------------
+# The lazy-import hole, and its closure
+# ---------------------------------------------------------------------------
+
+
+def test_positive_a_lazily_importing_binding_is_caught_by_the_results_probe(tmp_path):
+    """POSITIVE. The hole the import probe cannot see, closed by evidence.
+
+    Bindings in this portfolio import their repo LAZILY, inside the function
+    body -- the pattern .mlkit/repo.toml documents, and the right one, since it
+    keeps a repo's training stack out of the import path of checks that do not
+    need it. Such a binding imports perfectly from an interpreter with no
+    numpy and fails only when called.
+
+    This is not hypothetical. Measured 2026-08-28, `mlkit env` from a numpy-less
+    python 3.14.6: seven repos UNMEASURABLE, and resilient-surge MEASURABLE at
+    11 of 11 bindings imported -- from the very interpreter that cannot run any
+    of them. The import probe alone would have left surge's report unguarded.
+
+    ``assess`` therefore also reads the results this run already produced. No
+    binding is called to find out; the checks already performed the experiment.
+    """
+    repo = make_repo(
+        tmp_path, "mlkit_bindings_lazy",
+        """
+        def provenance():
+            import numpy_that_does_not_exist_xyz  # noqa: F401
+            return {}
+        """,
+    )
+    prior = {
+        "R5": CheckResultStub(
+            "provenance raised ModuleNotFoundError: "
+            "No module named 'numpy_that_does_not_exist_xyz'"
+        )
+    }
+    try:
+        # The import probe is fooled, exactly as it was on surge...
+        imported = environment.probe(repo)
+        assert imported.verdict == environment.MEASURABLE
+        assert imported.bindings == {"provenance": "ok"}
+        # ...and the combined assessment is not.
+        verdict = environment.assess(repo, prior)
+    finally:
+        repo.release()
+
+    assert verdict.verdict == environment.UNMEASURABLE
+    assert verdict.missing_modules == ("numpy_that_does_not_exist_xyz",)
+    assert "lazily" in verdict.reason
+
+
+def test_negative_a_repo_local_import_error_in_the_results_is_still_the_repo_s(tmp_path):
+    """NEGATIVE. The same discriminator, applied to the same evidence.
+
+    Without this, an ordinary ``from src.models import x`` typo would suppress
+    the report it should have turned red -- the guard protecting the repo from
+    itself instead of protecting the measurement from the interpreter.
+    """
+    (tmp_path / "src").mkdir()
+    repo = make_repo(
+        tmp_path, "mlkit_bindings_lazy_local",
+        """
+        def provenance():
+            from src import absent  # noqa: F401
+            return {}
+        """,
+    )
+    prior = {
+        "R5": CheckResultStub(
+            "provenance raised ModuleNotFoundError: No module named 'src.absent'"
+        )
+    }
+    try:
+        verdict = environment.assess(repo, prior)
+    finally:
+        repo.release()
+
+    assert verdict.verdict == environment.MEASURABLE
+    assert verdict.missing_modules == ()
+
+
+def test_negative_a_clean_run_leaves_the_import_verdict_alone(tmp_path):
+    """NEGATIVE. Nothing in the results says the interpreter is broken."""
+    repo = make_repo(
+        tmp_path, "mlkit_bindings_clean_run",
+        """
+        def provenance():
+            return {"train": {"real": 1}}
+        """,
+    )
+    try:
+        verdict = environment.assess(repo, {"R5": CheckResultStub("measured, 12 real rows")})
+    finally:
+        repo.release()
+    assert verdict.verdict == environment.MEASURABLE
+
+
+class CheckResultStub:
+    """Just the one field ``from_results`` reads. Deliberately not a
+    CheckResult: the probe must depend on the reason text and nothing else."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
