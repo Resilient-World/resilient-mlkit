@@ -822,3 +822,93 @@ from a committed artifact.
 7. **Carried forward, unchanged**: arabica's run-B GRU weights still live only in a
    stale worktree; surge's route-level integration (E-040); choco's FAOSTAT serving
    posture (E-045); fray's DVC stage for the extension checkpoint.
+
+---
+
+# Machine-read reconciliation (2026-08-28, round six)
+
+
+Everything above this line is the hand-written adjudication and is unchanged.
+This section is appended, not substituted: the judgement column above is a
+judgement and cannot be regenerated. The measured columns can be, and now are.
+
+`mlkit portfolio` reads each repo's committed artifacts through a declared
+adapter (`src/resilient_mlkit/fleet_adapters.py`) and writes
+[`portfolio/FLEET_VERDICTS.md`](FLEET_VERDICTS.md) with its `.json` twin. Every
+figure there carries the artifact path, its sha256, and whether git has those
+bytes at HEAD.
+
+- generated: `2026-08-28T20:54:40+00:00`, run nonce `mlkit-20260828T205434Z-e5ab199ea393`
+- mlkit `0.2.0` at `44e7c64ac4d3fd75a0a026aaffed624911ce8e2d`
+- 12 rows over 8 repos; **99** cells
+  measured, **9** NA-with-reason, **0** fabricated
+
+## Does the machine agree with the hand transcription?
+
+Yes, everywhere the two overlap. Of 23 numeric
+figures the generated table carries, **18** appear verbatim in the text
+above at four or more decimal places and **4** at three; **zero**
+contradict it. The hand transcription of this table was arithmetically correct.
+
+| figure | measured, full precision | appears above as |
+|---|---|---|
+| `choco/—` score | `2.689773` | `2.6898` |
+| `choco/—` baseline score | `0.227719` | `0.227719` |
+| `arabica/—` score | `1.05676` | `1.05676` |
+| `arabica/—` baseline score | `1.084686` | `1.084686` |
+| `torrent/melstm-10ep-n8-val` score | `0.2225867683526302` | `0.2226` |
+| `torrent/melstm-10ep-n8-val` baseline score | `0.26484161185831745` | `0.26484` |
+| `torrent/ridge-vs-melstm-val` score | `0.23206894549246004` | `0.23207` |
+| `torrent/ridge-vs-melstm-val` baseline score | `0.4520685140972679` | `0.45206851` |
+| `chokepoint/level-head` score | `0.2594909570948433` | `0.2595` |
+| `chokepoint/direction-head` score | `0.6984126984126984` | `0.6984` |
+| `surge/—` score | `0.175095` | `0.175095` |
+| `surge/—` baseline score | `0.163736` | `0.163736` |
+| `triage/—` score | `173.40814487545612` | `173.40814` |
+| `triage/—` baseline score | `183.42262422319413` | `183.42262` |
+| `blackout/vs-planning-anchor` score | `0.6776159815675701` | `0.67762` |
+| `blackout/vs-planning-anchor` baseline score | `0.6411684390728368` | `0.64117` |
+| `blackout/vs-persistence` score | `0.6802774287447294` | `0.68028` |
+| `blackout/vs-persistence` baseline score | `0.689877078726717` | `0.68988` |
+| `fray/spatial_infill` score | `71.35922343344701` | `71.359` |
+| `fray/spatial_infill` baseline score | `113.06701205090663` | `113.067` |
+| `fray/forecast_available` score | `82.75377957333798` | `82.754` |
+| `fray/forecast_available` baseline score | `113.06701205090663` | `113.067` |
+| `chokepoint/direction-head` baseline score | `0.3482142857142857` | not quoted above |
+
+## What the hand-written table could not show
+
+The arithmetic was right. Provenance is where the transcribed table was blind,
+because a retyped figure carries no record of where it came from:
+
+1. **choco's candidate figure is not in git.**
+   `models/observed_production_head.meta.json` — the artifact carrying the retired
+   climate head's same-rows test RMSE — is gitignored (`.gitignore:82`, `/models/*`)
+   and has never been committed on any branch. The number above is correct about a
+   file on one machine and cannot be reproduced from the repository by anyone else.
+   The served predictor's sidecar, by contrast, IS committed.
+
+2. **surge's registry is on a branch surge does not have checked out.**
+   `data/model_registry/`, `per_lead_anchor_ols/model.json` and
+   `reports/holdout_reads.jsonl` resolve only in the linked worktree
+   `.worktrees/pr55`, on `feat/surgeistm-lora-finetune`. The figures are real and
+   they are evidence about that worktree.
+
+3. **torrent and blackout have no committed artifact declaring a model of record.**
+   Both are named as such in prose (ESCALATIONS, CHANGELOG, decision docs) and
+   nowhere that a reader — or a gate — can resolve as a field. The other six repos
+   have one; these two are the exception, and the generated table reports NA with
+   that reason rather than repeating the prose.
+
+4. **blackout's two comparisons are on different row sets, and the table above
+   places them side by side.** The model scores 0.6776 on all 101,424 test rows;
+   persistence scores 0.689877 on the 89,774 it can score at all. The like-for-like
+   figure is the model's 0.680277 on that same subset, which is where the −0.0096
+   the text quotes actually comes from. The generated table keeps them as two rows
+   so the frames cannot be read across.
+
+Regenerate with:
+
+```
+mlkit portfolio --out portfolio/FLEET_VERDICTS.md
+```

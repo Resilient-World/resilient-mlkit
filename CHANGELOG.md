@@ -12,6 +12,49 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## Unreleased
+
+Two new read-only surfaces. Neither changes any check's verdict, so a repo that
+upgrades sees no gate move.
+
+### `mlkit portfolio`
+
+Regenerates the measured columns of `portfolio/MODEL_QUALITY.md` by reading each
+repo's committed artifacts through a declared adapter, rather than by hand. A
+figure that exists in exactly one other place has no error detection; a wrong
+digit is indistinguishable from a right one. The generated table carries, for
+every cell, the artifact path, its sha256, whether git has those bytes at HEAD,
+and — where the artifact does not carry the column — `NA` with the reason.
+
+Repos do not share an artifact schema and are not made to. Each declares its own
+pointers in `fleet_adapters.py`. Labels (metric, split) are corroborated
+mechanically against the pointer they are declared for, so a label that drifts
+from the quantity it names reports NA instead of mislabelling a real number.
+
+### `mlkit spine`
+
+Reports canonical-spine drift per repo, with five verdicts that are kept
+distinct on purpose: `IN-SYNC`, `DRIFTED` (banner present, bytes moved — the
+next sync reverts it), `ABSENT`, `UNCLAIMED` (a file WITHOUT the banner on a
+canonical filename, which the syncer will not touch, so it diverges
+permanently), and `NO-SPINE-SOURCE`. **Report-only: it never writes into a model
+repo.** `scripts/sync_spine.py` remains the only writer and now imports its
+declaration of "canonical" from `core.spine`, so the two cannot disagree.
+
+### Also
+
+* `pytest-timeout` declared and a 180s `timeout` set in
+  `[tool.pytest.ini_options]`, with `tests/test_pytest_timeout_active.py`
+  proving by execution that it is enforced rather than inert.
+* `pytest` and `numpy` declared in a `test` extra. Neither is a runtime
+  dependency and neither reaches the eight repos, which install mlkit without
+  the extra.
+* `.github/workflows/ci.yml` — ruff, mypy, and pytest on 3.11 and 3.12.
+  **Unverified: GitHub Actions is failing account-wide on billing and this
+  workflow has never run.**
+* mypy is now clean over the package (25 files) and ruff passes at its
+  defaults; four pre-existing type errors and one unused import were fixed.
+
 ## v0.2.0 — 2026-08-28
 
 Two blind spots, both proven by real incidents, both closed.
