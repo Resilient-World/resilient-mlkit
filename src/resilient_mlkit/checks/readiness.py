@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..core import fabricated_targets, fabrication, policy, report
+from ..core import environment, fabricated_targets, fabrication, policy, report
 from ..core.repo import BindingError, Repo
 from ..core.result import CheckResult, CredentialRequired
 from . import RunContext, check
@@ -663,6 +663,16 @@ def r8_report(repo: Repo, ctx: RunContext) -> CheckResult:
     if not prior:
         return CheckResult.na("R8", PHASE, "no R-check results in this run to report on")
 
+    # Ask, before composing anything, whether this interpreter could have
+    # measured any of it. A numpy-less python3.14 regenerated this exact file
+    # in at least four repos in August 2026, replacing measured PASSes with
+    # ModuleNotFoundError (resilient-chokepoint docs/ESCALATIONS.md E-019).
+    # Every one of those results was individually honest -- the check really
+    # did fail to run -- and the aggregate was still a lie, because the
+    # composite reads as a statement about the repo when it is a statement
+    # about the shell.
+    probe = environment.probe(repo)
+
     lines = [
         f"# Readiness report — resilient-{repo.name}",
         "",
@@ -684,15 +694,31 @@ def r8_report(repo: Repo, ctx: RunContext) -> CheckResult:
     lines.append("")
 
     out = repo.path / "reports" / "readiness.md"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("\n".join(lines))
+    written = report.guarded_write(
+        out, "\n".join(lines),
+        probe=probe, depends_on_bindings=True,
+        nonce=ctx.nonce, git_sha=repo.git_sha,
+    )
 
     counts: dict[str, int] = {}
     for r in prior.values():
         counts[r.status.value] = counts.get(r.status.value, 0) + 1
-    return CheckResult.passed(
-        "R8", PHASE, {"path": str(out.relative_to(repo.path)), "counts": counts}
-    )
+
+    evidence = {
+        "path": str(out.relative_to(repo.path)),
+        "counts": counts,
+        "environment": probe.to_dict(),
+        "write": written.to_dict(),
+    }
+
+    if not written.written:
+        # NA, never FAIL. "This environment cannot measure this repo" is not a
+        # verdict on the repo, and recording it as one would put a red mark on
+        # eight repos every time somebody ran mlkit from the wrong shell --
+        # which is how a gate stops being read.
+        return CheckResult.na("R8", PHASE, written.reason, evidence)
+
+    return CheckResult.passed("R8", PHASE, evidence)
 
 
 # -- helpers --------------------------------------------------------------
