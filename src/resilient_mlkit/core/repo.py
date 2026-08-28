@@ -200,15 +200,29 @@ class Repo:
     _VENDOR_MARKERS = ("site-packages", "dist-packages", "/.venv/", "/venv/")
 
     def _evict_repo_modules(self, before: set[str]) -> None:
-        """Drop newly-imported modules that are this repo's own source."""
+        """Drop newly-imported modules that are this repo's own source.
+
+        Origins are resolved for EVERY candidate before anything is deleted.
+        A namespace package (a repo subpackage with no ``__init__.py``, which
+        several of these repos have) carries a lazy ``_NamespacePath`` whose
+        ``__path__`` is recomputed from ``sys.modules[<parent>].__path__`` on
+        access. Deleting as we iterate can drop the parent first, and the next
+        child's ``__path__`` then raises ``KeyError`` on the parent's name --
+        which aborted the whole run inside ``release()``, before any results
+        were printed. Two passes make eviction order-independent.
+        """
         root = str(self.path.resolve())
+        victims: list[str] = []
         for name in set(sys.modules) - before:
             module = sys.modules.get(name)
             origin = getattr(module, "__file__", None) or ""
             if not origin:
                 # Namespace packages have no __file__ but can still shadow the
                 # next repo's package of the same name.
-                paths = list(getattr(module, "__path__", []) or [])
+                try:
+                    paths = list(getattr(module, "__path__", []) or [])
+                except Exception:  # noqa: BLE001 - an unreadable path is not a victim
+                    paths = []
                 origin = paths[0] if paths else ""
             if not origin:
                 continue
@@ -220,7 +234,10 @@ class Repo:
                 continue
             if any(marker in resolved for marker in self._VENDOR_MARKERS):
                 continue
-            del sys.modules[name]
+            victims.append(name)
+
+        for name in victims:
+            sys.modules.pop(name, None)
 
     # -- docs --------------------------------------------------------------
 

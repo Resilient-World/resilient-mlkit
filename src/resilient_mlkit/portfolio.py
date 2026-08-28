@@ -10,7 +10,7 @@ are the whole point of this module:
   ``docs/ESCALATIONS.md``.
 * **READY-TO-TRAIN** — every gating check passes.
 
-The gating set is S1–S5, R1–R9, D1–D5, E1–E5: twenty-four checks. Triage
+The gating set is S1–S5, R1–R10, D1–D5, E1–E5: twenty-five checks. Triage
 (T1–T5) is deliberately outside it -- triage diagnoses and reorders the queue,
 it does not gate. A triage FAIL still blocks, because a measured failure blocks
 wherever it is found; it simply is not part of the "everything passes" test.

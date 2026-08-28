@@ -1,6 +1,6 @@
 """The check registry.
 
-Twenty-five checks across five phases. The registry is the single place that
+Twenty-six checks across five phases. The registry is the single place that
 knows what exists, what phase it belongs to, and -- importantly -- what order
 it runs in, because for readiness that order is not numerical.
 """
@@ -55,10 +55,17 @@ PHASES = ("triage", "selection", "readiness", "decision", "economics")
 #: every downstream result moot, and it is the one class of defect that gets
 #: more expensive the longer you train. After that the order is
 #: cheapest-and-most-decisive-first as the readiness package prescribes.
+#:
+#: R10 runs second on the same reasoning. It is a pure AST walk -- no imports,
+#: no data, no network -- so it is the cheapest check after R9, and it is
+#: decisive in the widest sense: a fabricated default invalidates every figure
+#: downstream of it, including the ones the other readiness checks measure. It
+#: also runs before R1-R7 because those go through declared bindings and so
+#: cannot see the code R10 is looking at. R8 stays last: it reports.
 PHASE_ORDER: dict[str, list[str]] = {
     "triage": ["T1", "T2", "T3", "T4", "T5"],
     "selection": ["S1", "S2", "S3", "S4", "S5"],
-    "readiness": ["R9", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"],
+    "readiness": ["R9", "R10", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"],
     "decision": ["D1", "D2", "D3", "D4", "D5"],
     "economics": ["E1", "E2", "E3", "E4", "E5"],
 }
