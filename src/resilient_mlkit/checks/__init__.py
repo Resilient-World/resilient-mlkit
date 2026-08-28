@@ -1,6 +1,6 @@
 """The check registry.
 
-Twenty-six checks across five phases. The registry is the single place that
+Twenty-seven checks across five phases. The registry is the single place that
 knows what exists, what phase it belongs to, and -- importantly -- what order
 it runs in, because for readiness that order is not numerical.
 """
@@ -61,11 +61,20 @@ PHASES = ("triage", "selection", "readiness", "decision", "economics")
 #: decisive in the widest sense: a fabricated default invalidates every figure
 #: downstream of it, including the ones the other readiness checks measure. It
 #: also runs before R1-R7 because those go through declared bindings and so
-#: cannot see the code R10 is looking at. R8 stays last: it reports.
+#: cannot see the code R10 is looking at.
+#:
+#: R11 runs third, immediately after R10 and immediately before R5, and both
+#: placements are deliberate. It is the same kind of walk -- ast only, no
+#: imports -- so it is as cheap as R10. And it must precede R5, because when
+#: R11 fires, R5's own inputs are not to be believed: R5 counts rows by the
+#: provenance field that R11 has just shown to be false, so an R5 PASS
+#: recorded after an R11 FAIL is a pass counted with a broken ruler. Running
+#: it first means the readiness table reads in the order the defects
+#: compound. R8 stays last: it reports.
 PHASE_ORDER: dict[str, list[str]] = {
     "triage": ["T1", "T2", "T3", "T4", "T5"],
     "selection": ["S1", "S2", "S3", "S4", "S5"],
-    "readiness": ["R9", "R10", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"],
+    "readiness": ["R9", "R10", "R11", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"],
     "decision": ["D1", "D2", "D3", "D4", "D5"],
     "economics": ["E1", "E2", "E3", "E4", "E5"],
 }

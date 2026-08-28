@@ -1319,7 +1319,17 @@ SKIP_DIRS = frozenset(
 )
 
 
-def iter_python_files(roots: Iterable[Path]) -> Iterator[Path]:
+def iter_python_files(
+    roots: Iterable[Path], skip: Iterable[str] = SKIP_DIRS
+) -> Iterator[Path]:
+    """Walk Python files under ``roots``, skipping ``skip`` directories.
+
+    ``skip`` is a parameter rather than a constant read so that R11 can widen
+    the exclusion set for its repo-wide walk without changing what R10
+    measures on the trees a repo declares. Two walkers would be two
+    definitions of "this file is source".
+    """
+    skip = frozenset(skip)
     for root in roots:
         if root.is_file() and root.suffix == ".py":
             yield root
@@ -1327,7 +1337,7 @@ def iter_python_files(roots: Iterable[Path]) -> Iterator[Path]:
         if not root.is_dir():
             continue
         for path in sorted(root.rglob("*.py")):
-            if any(part in SKIP_DIRS for part in path.parts):
+            if any(part in skip for part in path.parts):
                 continue
             if path.name.startswith("test_") or path.name.endswith("_test.py"):
                 continue

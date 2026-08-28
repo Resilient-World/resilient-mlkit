@@ -10,7 +10,7 @@ are the whole point of this module:
   ``docs/ESCALATIONS.md``.
 * **READY-TO-TRAIN** — every gating check passes.
 
-The gating set is S1–S5, R1–R10, D1–D5, E1–E5: twenty-five checks. Triage
+The gating set is S1–S5, R1–R11, D1–D5, E1–E5: twenty-six checks. Triage
 (T1–T5) is deliberately outside it -- triage diagnoses and reorders the queue,
 it does not gate. A triage FAIL still blocks, because a measured failure blocks
 wherever it is found; it simply is not part of the "everything passes" test.
@@ -162,7 +162,7 @@ def render_portfolio(states: list[RepoState], nonce: str) -> str:
         )
     table = render(
         rows,
-        ["REPO", "SHA", "T1-5", "S1-5", "R(9,1-8)", "D1-5", "E1-5", "STATE"],
+        ["REPO", "SHA", "T1-5", "S1-5", "R(9,10,11,1-8)", "D1-5", "E1-5", "STATE"],
     )
 
     lines = [table, "", LEGEND, ""]

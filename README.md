@@ -9,7 +9,8 @@ that did not come out of a run of this CLI does not exist.
 
 ## Layout
 
-- `src/resilient_mlkit/` — the package. 25 checks across 5 phases.
+- `src/resilient_mlkit/` — the package. 26 gating checks across 5 phases,
+  plus 5 diagnostic triage checks.
 - `spine/` — the canonical docs and scaffolding synced into every model repo.
 - `scripts/sync_spine.py` — propagates `spine/`. Canonical files are
   overwritten; seed files (escalations, blockers, allowlist, repo.toml) are
@@ -25,7 +26,7 @@ that did not come out of a run of this CLI does not exist.
 | `STALE` | Measured at a different git SHA than the one checked out. |
 | `ESCALATED` | Reserved to the human signatory. |
 
-`READY-TO-TRAIN` requires all 25 checks to pass. Six of them (S5, D1, D4, D5,
+`READY-TO-TRAIN` requires all 26 gating checks to pass. Six of them (S5, D1, D4, D5,
 E4, E5) are human-only and always report `ESCALATED`, so **an agent cannot
 drive a repo to READY-TO-TRAIN**. That is deliberate: those six are legal and
 billing exposures, not code changes.
