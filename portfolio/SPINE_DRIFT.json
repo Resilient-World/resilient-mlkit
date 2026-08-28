@@ -1,0 +1,657 @@
+{
+ "artifact_schema": "resilient-mlkit/spine-drift/1",
+ "generated_by": "mlkit spine",
+ "mlkit_version": "0.2.0",
+ "generated_at_utc": "2026-08-28T20:59:13+00:00",
+ "run_nonce": "mlkit-20260828T205913Z-fc65ad0ad0c9",
+ "spine_root": "/Users/david/Downloads/Claude Code/resilient-mlkit/spine",
+ "mlkit_git_sha": "a04c60c1d9746afa3a3ea0dcd2e73945e1458c15",
+ "canonical_files": [
+  "CLAUDE.md",
+  "docs/DATA_POLICY.md",
+  "docs/SELECTION.md",
+  "docs/READINESS.md",
+  "docs/DECISION_VALIDITY.md",
+  "docs/RUN_ECONOMICS.md"
+ ],
+ "repos": {
+  "choco": {
+   "git_sha": "d0a0357b400cc6ea13a9fa5172a50e48463f2c0e",
+   "branch": "review/observed-labels-fixes",
+   "dirty": false
+  },
+  "arabica": {
+   "git_sha": "bb69ee283a3d9f336c4e72d9dc08bdc00f42a6bd",
+   "branch": "feat/observed-panel-and-fabrication-gates",
+   "dirty": false
+  },
+  "fray": {
+   "git_sha": "847bd7cfcc5735ffe3d80d222395bf2cc9a5355b",
+   "branch": "feat/r6-serving-and-uncertainty",
+   "dirty": false
+  },
+  "torrent": {
+   "git_sha": "ac52ab6676d2a4c49b3310f19640a2775da2436b",
+   "branch": "feat/r6-attributes-and-scale",
+   "dirty": true
+  },
+  "chokepoint": {
+   "git_sha": "6112f87f2b3ccc5cae0cd44f4c00a169a34d972c",
+   "branch": "feat/r6-horizon-ladder-and-uq",
+   "dirty": true
+  },
+  "surge": {
+   "git_sha": "9eab2fe801776d3fbad064900c204dac5d1e0f48",
+   "branch": "feat/observed-corpus-and-fabrication-gates",
+   "dirty": false
+  },
+  "triage": {
+   "git_sha": "f44430853eac04ade440f586a08a106cb2a870bf",
+   "branch": "e028-decision",
+   "dirty": false
+  },
+  "blackout": {
+   "git_sha": "ed80086937e1a4c02bb2ac1ce79a754ae8fecdcf",
+   "branch": "e021-decision",
+   "dirty": false
+  }
+ },
+ "counts": {
+  "DRIFTED": 16,
+  "IN-SYNC": 32
+ },
+ "files": [
+  {
+   "repo": "choco",
+   "relpath": "CLAUDE.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "8526df9dc9c454c2193329b87034ec6c7bf0fff8400ca3e5e804b32c023da0b9",
+   "deployed_sha256": "5aa52879d78cbcadae9ded79afeea95bd4044d08b884af3907a8a709987f7a4b",
+   "changed_lines": 31,
+   "sample": [
+    "-## Credentials are not blockers",
+    "-",
+    "-7. **A missing API key does not stop the work.** If a source is commercially",
+    "-   open and permissive, wire the ingest path properly, exercise it as far as",
+    "-   the credential boundary, and raise",
+    "-   `resilient_mlkit.CredentialRequired(name, detail, evidence)` from the"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 31 line(s) away from spine/CLAUDE.md; the next sync would revert it"
+  },
+  {
+   "repo": "choco",
+   "relpath": "docs/DATA_POLICY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "deployed_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "choco",
+   "relpath": "docs/SELECTION.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "deployed_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "choco",
+   "relpath": "docs/READINESS.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "aed512c6a0498f0e2d2d4118169e26c06dc6560bb623ad1f0b399f6ff03edd13",
+   "deployed_sha256": "00838426cbb8a011579687166a99963bc562e8d4e8dec713ba0136aa0c41795d",
+   "changed_lines": 66,
+   "sample": [
+    "-Eleven checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "+Nine checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "-| 2 | **R10** `FABRICATED_DEFAULTS` | A pure `ast` walk \u2014 no imports, no data, no network \u2014 so it is the cheapest check after R9, and decisive in the widest se",
+    "-| 3 | **R11** `FABRICATED_TARGETS` | The same kind of walk, so the same cost. It runs before **R5** specifically: R5 counts rows by the provenance field R11 ad",
+    "-| 4 | **R1** `CHECKPOINT_PROVENANCE` | Static. Answers \"do we know what these weights are\" before anything loads them. |",
+    "-| 5 | **R2** `OVERFIT_ONE_BATCH` | The cheapest check that can prove the model is wired up at all. A model that cannot overfit one batch has a defect no amount"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 66 line(s) away from spine/docs/READINESS.md; the next sync would revert it"
+  },
+  {
+   "repo": "choco",
+   "relpath": "docs/DECISION_VALIDITY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "deployed_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "choco",
+   "relpath": "docs/RUN_ECONOMICS.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "deployed_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "arabica",
+   "relpath": "CLAUDE.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "8526df9dc9c454c2193329b87034ec6c7bf0fff8400ca3e5e804b32c023da0b9",
+   "deployed_sha256": "5aa52879d78cbcadae9ded79afeea95bd4044d08b884af3907a8a709987f7a4b",
+   "changed_lines": 31,
+   "sample": [
+    "-## Credentials are not blockers",
+    "-",
+    "-7. **A missing API key does not stop the work.** If a source is commercially",
+    "-   open and permissive, wire the ingest path properly, exercise it as far as",
+    "-   the credential boundary, and raise",
+    "-   `resilient_mlkit.CredentialRequired(name, detail, evidence)` from the"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 31 line(s) away from spine/CLAUDE.md; the next sync would revert it"
+  },
+  {
+   "repo": "arabica",
+   "relpath": "docs/DATA_POLICY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "deployed_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "arabica",
+   "relpath": "docs/SELECTION.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "deployed_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "arabica",
+   "relpath": "docs/READINESS.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "aed512c6a0498f0e2d2d4118169e26c06dc6560bb623ad1f0b399f6ff03edd13",
+   "deployed_sha256": "00838426cbb8a011579687166a99963bc562e8d4e8dec713ba0136aa0c41795d",
+   "changed_lines": 66,
+   "sample": [
+    "-Eleven checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "+Nine checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "-| 2 | **R10** `FABRICATED_DEFAULTS` | A pure `ast` walk \u2014 no imports, no data, no network \u2014 so it is the cheapest check after R9, and decisive in the widest se",
+    "-| 3 | **R11** `FABRICATED_TARGETS` | The same kind of walk, so the same cost. It runs before **R5** specifically: R5 counts rows by the provenance field R11 ad",
+    "-| 4 | **R1** `CHECKPOINT_PROVENANCE` | Static. Answers \"do we know what these weights are\" before anything loads them. |",
+    "-| 5 | **R2** `OVERFIT_ONE_BATCH` | The cheapest check that can prove the model is wired up at all. A model that cannot overfit one batch has a defect no amount"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 66 line(s) away from spine/docs/READINESS.md; the next sync would revert it"
+  },
+  {
+   "repo": "arabica",
+   "relpath": "docs/DECISION_VALIDITY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "deployed_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "arabica",
+   "relpath": "docs/RUN_ECONOMICS.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "deployed_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "fray",
+   "relpath": "CLAUDE.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "8526df9dc9c454c2193329b87034ec6c7bf0fff8400ca3e5e804b32c023da0b9",
+   "deployed_sha256": "5aa52879d78cbcadae9ded79afeea95bd4044d08b884af3907a8a709987f7a4b",
+   "changed_lines": 31,
+   "sample": [
+    "-## Credentials are not blockers",
+    "-",
+    "-7. **A missing API key does not stop the work.** If a source is commercially",
+    "-   open and permissive, wire the ingest path properly, exercise it as far as",
+    "-   the credential boundary, and raise",
+    "-   `resilient_mlkit.CredentialRequired(name, detail, evidence)` from the"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 31 line(s) away from spine/CLAUDE.md; the next sync would revert it"
+  },
+  {
+   "repo": "fray",
+   "relpath": "docs/DATA_POLICY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "deployed_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "fray",
+   "relpath": "docs/SELECTION.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "deployed_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "fray",
+   "relpath": "docs/READINESS.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "aed512c6a0498f0e2d2d4118169e26c06dc6560bb623ad1f0b399f6ff03edd13",
+   "deployed_sha256": "00838426cbb8a011579687166a99963bc562e8d4e8dec713ba0136aa0c41795d",
+   "changed_lines": 66,
+   "sample": [
+    "-Eleven checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "+Nine checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "-| 2 | **R10** `FABRICATED_DEFAULTS` | A pure `ast` walk \u2014 no imports, no data, no network \u2014 so it is the cheapest check after R9, and decisive in the widest se",
+    "-| 3 | **R11** `FABRICATED_TARGETS` | The same kind of walk, so the same cost. It runs before **R5** specifically: R5 counts rows by the provenance field R11 ad",
+    "-| 4 | **R1** `CHECKPOINT_PROVENANCE` | Static. Answers \"do we know what these weights are\" before anything loads them. |",
+    "-| 5 | **R2** `OVERFIT_ONE_BATCH` | The cheapest check that can prove the model is wired up at all. A model that cannot overfit one batch has a defect no amount"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 66 line(s) away from spine/docs/READINESS.md; the next sync would revert it"
+  },
+  {
+   "repo": "fray",
+   "relpath": "docs/DECISION_VALIDITY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "deployed_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "fray",
+   "relpath": "docs/RUN_ECONOMICS.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "deployed_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "torrent",
+   "relpath": "CLAUDE.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "8526df9dc9c454c2193329b87034ec6c7bf0fff8400ca3e5e804b32c023da0b9",
+   "deployed_sha256": "5aa52879d78cbcadae9ded79afeea95bd4044d08b884af3907a8a709987f7a4b",
+   "changed_lines": 31,
+   "sample": [
+    "-## Credentials are not blockers",
+    "-",
+    "-7. **A missing API key does not stop the work.** If a source is commercially",
+    "-   open and permissive, wire the ingest path properly, exercise it as far as",
+    "-   the credential boundary, and raise",
+    "-   `resilient_mlkit.CredentialRequired(name, detail, evidence)` from the"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 31 line(s) away from spine/CLAUDE.md; the next sync would revert it"
+  },
+  {
+   "repo": "torrent",
+   "relpath": "docs/DATA_POLICY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "deployed_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "torrent",
+   "relpath": "docs/SELECTION.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "deployed_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "torrent",
+   "relpath": "docs/READINESS.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "aed512c6a0498f0e2d2d4118169e26c06dc6560bb623ad1f0b399f6ff03edd13",
+   "deployed_sha256": "00838426cbb8a011579687166a99963bc562e8d4e8dec713ba0136aa0c41795d",
+   "changed_lines": 66,
+   "sample": [
+    "-Eleven checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "+Nine checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "-| 2 | **R10** `FABRICATED_DEFAULTS` | A pure `ast` walk \u2014 no imports, no data, no network \u2014 so it is the cheapest check after R9, and decisive in the widest se",
+    "-| 3 | **R11** `FABRICATED_TARGETS` | The same kind of walk, so the same cost. It runs before **R5** specifically: R5 counts rows by the provenance field R11 ad",
+    "-| 4 | **R1** `CHECKPOINT_PROVENANCE` | Static. Answers \"do we know what these weights are\" before anything loads them. |",
+    "-| 5 | **R2** `OVERFIT_ONE_BATCH` | The cheapest check that can prove the model is wired up at all. A model that cannot overfit one batch has a defect no amount"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 66 line(s) away from spine/docs/READINESS.md; the next sync would revert it"
+  },
+  {
+   "repo": "torrent",
+   "relpath": "docs/DECISION_VALIDITY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "deployed_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "torrent",
+   "relpath": "docs/RUN_ECONOMICS.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "deployed_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "chokepoint",
+   "relpath": "CLAUDE.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "8526df9dc9c454c2193329b87034ec6c7bf0fff8400ca3e5e804b32c023da0b9",
+   "deployed_sha256": "5aa52879d78cbcadae9ded79afeea95bd4044d08b884af3907a8a709987f7a4b",
+   "changed_lines": 31,
+   "sample": [
+    "-## Credentials are not blockers",
+    "-",
+    "-7. **A missing API key does not stop the work.** If a source is commercially",
+    "-   open and permissive, wire the ingest path properly, exercise it as far as",
+    "-   the credential boundary, and raise",
+    "-   `resilient_mlkit.CredentialRequired(name, detail, evidence)` from the"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 31 line(s) away from spine/CLAUDE.md; the next sync would revert it"
+  },
+  {
+   "repo": "chokepoint",
+   "relpath": "docs/DATA_POLICY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "deployed_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "chokepoint",
+   "relpath": "docs/SELECTION.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "deployed_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "chokepoint",
+   "relpath": "docs/READINESS.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "aed512c6a0498f0e2d2d4118169e26c06dc6560bb623ad1f0b399f6ff03edd13",
+   "deployed_sha256": "00838426cbb8a011579687166a99963bc562e8d4e8dec713ba0136aa0c41795d",
+   "changed_lines": 66,
+   "sample": [
+    "-Eleven checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "+Nine checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "-| 2 | **R10** `FABRICATED_DEFAULTS` | A pure `ast` walk \u2014 no imports, no data, no network \u2014 so it is the cheapest check after R9, and decisive in the widest se",
+    "-| 3 | **R11** `FABRICATED_TARGETS` | The same kind of walk, so the same cost. It runs before **R5** specifically: R5 counts rows by the provenance field R11 ad",
+    "-| 4 | **R1** `CHECKPOINT_PROVENANCE` | Static. Answers \"do we know what these weights are\" before anything loads them. |",
+    "-| 5 | **R2** `OVERFIT_ONE_BATCH` | The cheapest check that can prove the model is wired up at all. A model that cannot overfit one batch has a defect no amount"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 66 line(s) away from spine/docs/READINESS.md; the next sync would revert it"
+  },
+  {
+   "repo": "chokepoint",
+   "relpath": "docs/DECISION_VALIDITY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "deployed_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "chokepoint",
+   "relpath": "docs/RUN_ECONOMICS.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "deployed_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "surge",
+   "relpath": "CLAUDE.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "8526df9dc9c454c2193329b87034ec6c7bf0fff8400ca3e5e804b32c023da0b9",
+   "deployed_sha256": "5aa52879d78cbcadae9ded79afeea95bd4044d08b884af3907a8a709987f7a4b",
+   "changed_lines": 31,
+   "sample": [
+    "-## Credentials are not blockers",
+    "-",
+    "-7. **A missing API key does not stop the work.** If a source is commercially",
+    "-   open and permissive, wire the ingest path properly, exercise it as far as",
+    "-   the credential boundary, and raise",
+    "-   `resilient_mlkit.CredentialRequired(name, detail, evidence)` from the"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 31 line(s) away from spine/CLAUDE.md; the next sync would revert it"
+  },
+  {
+   "repo": "surge",
+   "relpath": "docs/DATA_POLICY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "deployed_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "surge",
+   "relpath": "docs/SELECTION.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "deployed_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "surge",
+   "relpath": "docs/READINESS.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "aed512c6a0498f0e2d2d4118169e26c06dc6560bb623ad1f0b399f6ff03edd13",
+   "deployed_sha256": "00838426cbb8a011579687166a99963bc562e8d4e8dec713ba0136aa0c41795d",
+   "changed_lines": 66,
+   "sample": [
+    "-Eleven checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "+Nine checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "-| 2 | **R10** `FABRICATED_DEFAULTS` | A pure `ast` walk \u2014 no imports, no data, no network \u2014 so it is the cheapest check after R9, and decisive in the widest se",
+    "-| 3 | **R11** `FABRICATED_TARGETS` | The same kind of walk, so the same cost. It runs before **R5** specifically: R5 counts rows by the provenance field R11 ad",
+    "-| 4 | **R1** `CHECKPOINT_PROVENANCE` | Static. Answers \"do we know what these weights are\" before anything loads them. |",
+    "-| 5 | **R2** `OVERFIT_ONE_BATCH` | The cheapest check that can prove the model is wired up at all. A model that cannot overfit one batch has a defect no amount"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 66 line(s) away from spine/docs/READINESS.md; the next sync would revert it"
+  },
+  {
+   "repo": "surge",
+   "relpath": "docs/DECISION_VALIDITY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "deployed_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "surge",
+   "relpath": "docs/RUN_ECONOMICS.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "deployed_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "triage",
+   "relpath": "CLAUDE.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "8526df9dc9c454c2193329b87034ec6c7bf0fff8400ca3e5e804b32c023da0b9",
+   "deployed_sha256": "5aa52879d78cbcadae9ded79afeea95bd4044d08b884af3907a8a709987f7a4b",
+   "changed_lines": 31,
+   "sample": [
+    "-## Credentials are not blockers",
+    "-",
+    "-7. **A missing API key does not stop the work.** If a source is commercially",
+    "-   open and permissive, wire the ingest path properly, exercise it as far as",
+    "-   the credential boundary, and raise",
+    "-   `resilient_mlkit.CredentialRequired(name, detail, evidence)` from the"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 31 line(s) away from spine/CLAUDE.md; the next sync would revert it"
+  },
+  {
+   "repo": "triage",
+   "relpath": "docs/DATA_POLICY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "deployed_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "triage",
+   "relpath": "docs/SELECTION.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "deployed_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "triage",
+   "relpath": "docs/READINESS.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "aed512c6a0498f0e2d2d4118169e26c06dc6560bb623ad1f0b399f6ff03edd13",
+   "deployed_sha256": "00838426cbb8a011579687166a99963bc562e8d4e8dec713ba0136aa0c41795d",
+   "changed_lines": 66,
+   "sample": [
+    "-Eleven checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "+Nine checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "-| 2 | **R10** `FABRICATED_DEFAULTS` | A pure `ast` walk \u2014 no imports, no data, no network \u2014 so it is the cheapest check after R9, and decisive in the widest se",
+    "-| 3 | **R11** `FABRICATED_TARGETS` | The same kind of walk, so the same cost. It runs before **R5** specifically: R5 counts rows by the provenance field R11 ad",
+    "-| 4 | **R1** `CHECKPOINT_PROVENANCE` | Static. Answers \"do we know what these weights are\" before anything loads them. |",
+    "-| 5 | **R2** `OVERFIT_ONE_BATCH` | The cheapest check that can prove the model is wired up at all. A model that cannot overfit one batch has a defect no amount"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 66 line(s) away from spine/docs/READINESS.md; the next sync would revert it"
+  },
+  {
+   "repo": "triage",
+   "relpath": "docs/DECISION_VALIDITY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "deployed_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "triage",
+   "relpath": "docs/RUN_ECONOMICS.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "deployed_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "blackout",
+   "relpath": "CLAUDE.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "8526df9dc9c454c2193329b87034ec6c7bf0fff8400ca3e5e804b32c023da0b9",
+   "deployed_sha256": "5aa52879d78cbcadae9ded79afeea95bd4044d08b884af3907a8a709987f7a4b",
+   "changed_lines": 31,
+   "sample": [
+    "-## Credentials are not blockers",
+    "-",
+    "-7. **A missing API key does not stop the work.** If a source is commercially",
+    "-   open and permissive, wire the ingest path properly, exercise it as far as",
+    "-   the credential boundary, and raise",
+    "-   `resilient_mlkit.CredentialRequired(name, detail, evidence)` from the"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 31 line(s) away from spine/CLAUDE.md; the next sync would revert it"
+  },
+  {
+   "repo": "blackout",
+   "relpath": "docs/DATA_POLICY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "deployed_sha256": "74ce395017eb357bb2f0b1c0272309337d57f1085a1e6e396294ee434ee95aa1",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "blackout",
+   "relpath": "docs/SELECTION.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "deployed_sha256": "4aecbaf459e0fe5328067a852c3a2df86561f7f2bc8d1789ea80cee131eede82",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "blackout",
+   "relpath": "docs/READINESS.md",
+   "verdict": "DRIFTED",
+   "spine_sha256": "aed512c6a0498f0e2d2d4118169e26c06dc6560bb623ad1f0b399f6ff03edd13",
+   "deployed_sha256": "00838426cbb8a011579687166a99963bc562e8d4e8dec713ba0136aa0c41795d",
+   "changed_lines": 66,
+   "sample": [
+    "-Eleven checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "+Nine checks. `mlkit check --phase readiness` runs them **in the order below,",
+    "-| 2 | **R10** `FABRICATED_DEFAULTS` | A pure `ast` walk \u2014 no imports, no data, no network \u2014 so it is the cheapest check after R9, and decisive in the widest se",
+    "-| 3 | **R11** `FABRICATED_TARGETS` | The same kind of walk, so the same cost. It runs before **R5** specifically: R5 counts rows by the provenance field R11 ad",
+    "-| 4 | **R1** `CHECKPOINT_PROVENANCE` | Static. Answers \"do we know what these weights are\" before anything loads them. |",
+    "-| 5 | **R2** `OVERFIT_ONE_BATCH` | The cheapest check that can prove the model is wired up at all. A model that cannot overfit one batch has a defect no amount"
+   ],
+   "detail": "deployed copy carries the CANONICAL banner but has moved 66 line(s) away from spine/docs/READINESS.md; the next sync would revert it"
+  },
+  {
+   "repo": "blackout",
+   "relpath": "docs/DECISION_VALIDITY.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "deployed_sha256": "5682d12ca13515b0bc90a4481606a71808e5237f5f994bd77adf5ec67e742c0a",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  },
+  {
+   "repo": "blackout",
+   "relpath": "docs/RUN_ECONOMICS.md",
+   "verdict": "IN-SYNC",
+   "spine_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "deployed_sha256": "e5690b688886506c5b28d5c9a914c83e629b7ec7a814e593f198ff55a873597d",
+   "changed_lines": 0,
+   "sample": [],
+   "detail": null
+  }
+ ]
+}
