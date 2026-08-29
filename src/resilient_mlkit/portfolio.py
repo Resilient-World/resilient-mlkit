@@ -39,8 +39,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .checks import PHASE_ORDER, PHASES
+from .core.artifact import refuse_uncommitted
 from .core.repo import Repo
-from .core.result import CheckResult, Status
+from .core.result import ALLOW_DIRTY_KEY, CheckResult, Status
 from .core.table import compact
 
 READY = "READY-TO-TRAIN"
@@ -74,7 +75,26 @@ def gating_ids() -> list[str]:
 
 
 def resolve(repo: Repo, results: dict[str, CheckResult]) -> RepoState:
-    """Decide a repo's terminal state from its measured results."""
+    """Decide a repo's terminal state from its measured results.
+
+    Raises ``UncommittedRead`` if any result carries ``ALLOW_DIRTY_KEY`` --
+    evidence read from the working tree under ``core.artifact``'s diagnosis-only
+    escape hatch. A terminal state is the most consequential thing this package
+    emits, and it must not be computable from bytes that are in nobody's git
+    history. The refusal is here rather than at the call sites because every
+    caller that wants a state comes through this function, and a check placed in
+    one caller is a check the next caller forgets to make.
+
+    ``CheckResult.__post_init__`` already refuses a marked PASS, so this catches
+    the rest: a marked FAIL that would BLOCK a repo, or a marked NA whose reason
+    a reader would take as measured coverage. "Nobody could check this" and
+    "this was checked" must not resolve to the same table cell.
+    """
+    for cid in sorted(results):
+        refuse_uncommitted(
+            bool(results[cid].evidence.get(ALLOW_DIRTY_KEY)),
+            f"check {cid} of {repo.name}",
+        )
     all_ids = gating_ids()
 
     halts = [r for r in results.values() if r.evidence.get("halt")]

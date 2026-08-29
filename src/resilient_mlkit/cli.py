@@ -202,6 +202,12 @@ def cmd_fleet(args: argparse.Namespace) -> int:
     by hand. This command reads those artifacts instead, so a wrong digit stops
     being invisible.
 
+    Every figure is read from the repo's COMMITTED state (``HEAD:<relpath>``),
+    not from its working tree. An artifact that is on disk and on no ref reports
+    NA naming the file, which is what ``docs/ESCALATIONS.md`` E-M12 cost when it
+    did not. ``--allow-dirty`` reads the working tree for local diagnosis and
+    then refuses to emit anything, exiting 2.
+
     Not to be confused with ``mlkit check --portfolio``, which reports each
     repo's terminal readiness state. This one reports model quality.
     """
@@ -215,6 +221,7 @@ def cmd_fleet(args: argparse.Namespace) -> int:
         print(f"no portfolio repos found under {root}", file=sys.stderr)
         return 2
 
+    allow_dirty = bool(getattr(args, "allow_dirty", False))
     rows: list[fleet.FleetRow] = []
     missing_repos: list[str] = []
     for adapter in ADAPTERS:
@@ -223,7 +230,10 @@ def cmd_fleet(args: argparse.Namespace) -> int:
             if args.repo is None and adapter.repo not in missing_repos:
                 missing_repos.append(adapter.repo)
             continue
-        rows.append(fleet.read_row(repo, adapter))
+        rows.append(fleet.read_row(repo, adapter, allow_dirty=allow_dirty))
+
+    if allow_dirty:
+        return _fleet_diagnosis(rows)
 
     stats = fleet.counts(rows)
     generated_at = _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds")
@@ -271,6 +281,50 @@ def cmd_fleet(args: argparse.Namespace) -> int:
               f"{', '.join(broken)}", file=sys.stderr)
         return 1
     return 0
+
+
+def _fleet_diagnosis(rows: list) -> int:
+    """What `--allow-dirty` prints instead of a table, and why it exits 2.
+
+    The escape hatch exists so that someone mid-way through producing an
+    artifact can see what their pointers resolve to. It must not be a quieter
+    way of generating the same document, so this prints cells one per line --
+    deliberately NOT the table's shape, so that nothing here can be pasted
+    anywhere a table is expected -- and returns non-zero.
+
+    Same posture as `scripts/verify_served_hash_parity.py`, which exits 2 when
+    it found nothing to compare: a report that cannot be trusted must not exit
+    green, because exit status is what CI reads.
+    """
+    named = (
+        ("model of record", "model_of_record"), ("candidate", "candidate"),
+        ("metric", "metric"), ("split", "split"), ("score", "score"),
+        ("bar", "baseline_name"), ("bar score", "baseline_score"),
+        ("beats bar?", "beats"), ("test arm", "test_arm_spent"),
+    )
+    print("--allow-dirty: WORKING-TREE DIAGNOSIS. Not a verdict, not a table.\n")
+    dirty_rows = 0
+    for row in rows:
+        marks = [
+            f"{alias}={ref.read_from or 'not read'}"
+            for alias, ref in row.artifacts.items()
+        ]
+        flag = "  <-- WORKING TREE" if row.allow_dirty else ""
+        dirty_rows += 1 if row.allow_dirty else 0
+        print(f"{row.key}  [{', '.join(marks)}]{flag}")
+        for label, attr in named:
+            cell = getattr(row, attr)
+            print(f"    {label:<16} {cell.render()}")
+        print()
+    print(
+        f"{dirty_rows} of {len(rows)} row(s) carry a working-tree read.\n"
+        "No table, no --json payload and no --out file was written: a figure that "
+        "is in nobody's git history may be looked at and may not be quoted "
+        "(docs/ESCALATIONS.md E-M12). Commit the artifact and re-run without "
+        "--allow-dirty.",
+        file=sys.stderr,
+    )
+    return 2
 
 
 def _self_sha() -> str:
@@ -735,6 +789,16 @@ def build_parser() -> argparse.ArgumentParser:
     common(p_fleet)
     p_fleet.add_argument("--out", help="write the table (and its .json twin) here")
     p_fleet.add_argument("--json", action="store_true", help="print the machine artifact instead")
+    p_fleet.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help=(
+            "DIAGNOSIS ONLY: read artifacts from the working tree instead of from "
+            "HEAD. Prints what the pointers resolve to and then REFUSES to emit a "
+            "table, a --json payload or an --out file, and exits 2. Nothing read "
+            "this way can become a verdict"
+        ),
+    )
     p_fleet.set_defaults(func=cmd_fleet)
 
     p_spine = sub.add_parser(

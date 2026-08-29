@@ -39,6 +39,15 @@ measurement:
   names reports NA rather than mislabelling a real number.
 
 Everything that is a number comes off disk.
+
+WHICH DISK, THOUGH
+------------------
+Off the COMMITTED blob, since ``core.artifact`` began reading HEAD rather than
+the working tree. An artifact that is on disk and on no ref reports NA naming
+the file, and no cell resolves through it -- ``docs/ESCALATIONS.md`` E-M12 is
+the row that made that necessary. The diagnosis-only ``allow_dirty`` read marks
+every cell it produces, and ``markdown_table`` and ``FleetRow.to_dict`` raise on
+a marked row rather than printing it with a disclaimer.
 """
 
 from __future__ import annotations
@@ -46,7 +55,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from .artifact import ArtifactRef, Cell, load, resolve_pointer, unresolved
+from .artifact import (
+    ArtifactRef,
+    Cell,
+    load,
+    refuse_uncommitted,
+    resolve_pointer,
+    unresolved,
+)
 from .repo import Repo
 
 #: Alias every adapter must declare. Others are optional and referenced as
@@ -186,7 +202,27 @@ class FleetRow:
     def off_checkout(self) -> bool:
         return any(a.off_checkout for a in self.artifacts.values() if a.found)
 
+    @property
+    def cells(self) -> tuple[Cell, ...]:
+        return (
+            self.metric, self.model_of_record, self.candidate, self.score,
+            self.split, self.baseline_name, self.baseline_score, self.beats,
+            self.test_arm_spent,
+        )
+
+    @property
+    def allow_dirty(self) -> bool:
+        """True when any figure on this row came off an --allow-dirty read."""
+        return any(c.allow_dirty for c in self.cells) or any(
+            a.allow_dirty_read for a in self.artifacts.values()
+        )
+
     def to_dict(self) -> dict[str, Any]:
+        # The refusal is HERE and not in the caller. `mlkit portfolio --json`,
+        # `--out`, the markdown table and any future consumer all funnel through
+        # this method, and a check placed in one of them would be a check the
+        # next consumer forgets to make.
+        refuse_uncommitted(self.allow_dirty, f"the fleet verdict row {self.key}")
         return {
             "repo": self.repo,
             "entry": self.entry or None,
@@ -272,12 +308,24 @@ def _read(
         return Cell.missing(
             f"pointer '{pointer}' in {ref.relpath} resolves to null", spec.pointer
         )
-    return Cell.measured(value, f"{ref.relpath}#{pointer}")
+    return Cell.measured(
+        value, f"{ref.relpath}#{pointer}", allow_dirty=ref.allow_dirty_read
+    )
 
 
-def read_row(repo: Repo, adapter: Adapter) -> FleetRow:
-    """Open one repo's declared artifacts and fill one verdict row."""
-    refs = {alias: load(repo, rel) for alias, rel in adapter.artifacts.items()}
+def read_row(repo: Repo, adapter: Adapter, *, allow_dirty: bool = False) -> FleetRow:
+    """Open one repo's declared artifacts and fill one verdict row.
+
+    Artifacts are read from committed state. ``allow_dirty=True`` is the
+    diagnosis-only escape hatch: the row is filled from the working tree and
+    every cell that comes off a dirty read is marked, which makes the row
+    unprintable and unserialisable -- see ``markdown_table`` and
+    ``FleetRow.to_dict``.
+    """
+    refs = {
+        alias: load(repo, rel, allow_dirty=allow_dirty)
+        for alias, rel in adapter.artifacts.items()
+    }
 
     score = _read(adapter.score, refs, column="score")
     baseline_score = _read(adapter.baseline_score, refs, column="baseline_score")
@@ -348,7 +396,12 @@ def _compare(score: Cell, baseline: Cell, lower_is_better: bool) -> Cell:
     verdict = a < b if lower_is_better else a > b
     direction = "lower is better" if lower_is_better else "higher is better"
     return Cell.measured(
-        verdict, f"derived: {a!r} vs {b!r} ({direction}); both read from the artifacts above"
+        verdict,
+        f"derived: {a!r} vs {b!r} ({direction}); both read from the artifacts above",
+        # Arithmetic over an uncommitted figure is still an uncommitted figure.
+        # The marker has to survive derivation or the escape hatch leaks through
+        # the one column that is computed rather than read.
+        allow_dirty=score.allow_dirty or baseline.allow_dirty,
     )
 
 
@@ -397,6 +450,7 @@ def _corroborated_beats(
     return Cell.measured(
         asserted.value,
         f"{asserted.source}; corroborated by this row's own figures ({derived.source})",
+        allow_dirty=asserted.allow_dirty or derived.allow_dirty,
     )
 
 
@@ -432,9 +486,17 @@ def _num(cell: Cell) -> str:
 
 
 def markdown_table(rows: list[FleetRow]) -> str:
-    """The verdict table itself, every cell either a read value or an NA."""
+    """The verdict table itself, every cell either a read value or an NA.
+
+    Raises ``UncommittedRead`` rather than printing a row whose figures came off
+    an ``--allow-dirty`` read. A table is the artifact people quote from, so it
+    is the last place a working-tree number may be allowed to appear with a
+    disclaimer attached: the disclaimer is read second and the number first,
+    which is the E-M12 failure exactly.
+    """
     out = ["| " + " | ".join(COLUMNS) + " |", "|" + "---|" * len(COLUMNS)]
     for row in rows:
+        refuse_uncommitted(row.allow_dirty, f"the fleet verdict row {row.key}")
         out.append(
             "| "
             + " | ".join(
@@ -457,22 +519,34 @@ def markdown_table(rows: list[FleetRow]) -> str:
 
 
 def provenance_block(rows: list[FleetRow]) -> str:
-    """Which bytes each row came out of. This is the part that makes it checkable."""
+    """Which bytes each row came out of. This is the part that makes it checkable.
+
+    Refuses a marked row for the same reason ``markdown_table`` does. This block
+    emits a sha256 and a byte count, and a hash of working-tree bytes is the
+    most quotable unfetchable figure there is: it LOOKS like the thing that
+    makes a number checkable while naming bytes no reader can obtain. That the
+    CLI happens to return before reaching here under ``--allow-dirty`` is an
+    ordering, and an ordering is what the next caller changes.
+    """
+    for row in rows:
+        refuse_uncommitted(row.allow_dirty, f"the provenance block for row {row.key}")
     lines = [
-        "| row | artifact | sha256 | bytes | committed at HEAD | dirty | tree |",
-        "|---|---|---|---|---|---|---|",
+        "| row | artifact | sha256 | bytes | read from | committed at HEAD | dirty | tree |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for row in rows:
         for alias, ref in row.artifacts.items():
             if not ref.found:
                 lines.append(
-                    f"| {row.key} | `{ref.relpath}` ({alias}) | — | — | no | — | "
-                    f"NOT FOUND: {_short(ref.error, 120)} |"
+                    f"| {row.key} | `{ref.relpath}` ({alias}) | — | — | — | "
+                    f"{'yes' if ref.committed_at_head else 'no'} | — | "
+                    f"NOT READ: {_short(ref.error, 120)} |"
                 )
                 continue
             tree = "checkout" if not ref.worktree else f"worktree `{ref.worktree}`"
             lines.append(
                 f"| {row.key} | `{ref.relpath}` ({alias}) | `{ref.sha256}` | {ref.bytes_} | "
+                f"{ref.read_from or '—'} | "
                 f"{'yes' if ref.committed_at_head else 'NO'} | "
                 f"{'YES' if ref.dirty else 'no'} | {tree} @ `{ref.branch}` `{ref.git_sha[:12]}` |"
             )
@@ -502,9 +576,16 @@ def na_summary(rows: list[FleetRow]) -> list[str]:
 
 
 def counts(rows: list[FleetRow]) -> dict[str, int]:
-    """How much of the table is measured, and how much is NA-with-reason."""
+    """How much of the table is measured, and how much is NA-with-reason.
+
+    Refuses a marked row. ``cells_measured`` is rendered verbatim into the
+    generated document ("cells measured: **N**"), so it is an emitted figure and
+    not an internal tally: counting an uncommitted cell as measured is the
+    coverage claim E-M12 made in miniature.
+    """
     measured = na = 0
     for row in rows:
+        refuse_uncommitted(row.allow_dirty, f"the fleet counts for row {row.key}")
         for cell in (
             row.model_of_record, row.candidate, row.metric, row.split, row.score,
             row.baseline_name, row.baseline_score, row.beats, row.test_arm_spent,

@@ -3,24 +3,77 @@
 This module is the mechanical half of ``mlkit portfolio``. It does three things
 and deliberately nothing else:
 
-* locate a repo-relative artifact, hash it, and say whether the bytes it hashed
-  are the bytes git has at HEAD;
+* locate a repo-relative artifact IN GIT, hash the committed blob, and record
+  which tree and which HEAD answered;
 * resolve a declared pointer into the parsed document;
 * return, for every field, either a value that came out of that document or an
   NA carrying the reason it could not.
 
 THE INVARIANT
 -------------
-There is no code path here that produces a value from anything but a file on
-disk. A pointer that does not resolve yields ``Cell.missing(...)``, never a
-default, never a zero, never the previous repo's value. That is the whole point:
-``portfolio/MODEL_QUALITY.md`` was hand-transcribed, and a transcription error
-in a table of eight repos is invisible because nothing else in the tree carries
-the same number to disagree with it.
+There is no code path here that produces a value from anything but a blob git
+has at HEAD. A pointer that does not resolve yields ``Cell.missing(...)``,
+never a default, never a zero, never the previous repo's value. That is the
+whole point: ``portfolio/MODEL_QUALITY.md`` was hand-transcribed, and a
+transcription error in a table of eight repos is invisible because nothing else
+in the tree carries the same number to disagree with it.
+
+COMMITTED READS, AND WHY DISCLOSURE WAS NOT ENOUGH
+--------------------------------------------------
+This module used to ``path.read_bytes()`` from the working tree and then RECORD
+whether git agreed -- ``committed_at_head`` and ``dirty`` were computed, put on
+the ref, and rendered in ``fleet.provenance_block``'s own column. That is
+disclosure, and ``docs/ESCALATIONS.md`` E-M12 is what disclosure bought: the
+``choco`` row of ``portfolio/FLEET_VERDICTS.md`` -- candidate, score, split,
+baseline score, test-arm-spent -- was read out of
+``models/observed_production_head.meta.json``, a file committed on NO ref at all
+(``git log --all`` empty, ``.gitignore:82:/models/*``) and present only in that
+clone's working tree. The provenance column said ``NO`` and the score column
+said a number, and a reader who read left to right had already believed the
+number before reaching the qualification.
+
+So the bytes now come from ``git cat-file blob HEAD:<relpath>``, and the two
+recorded facts become the INPUT TO A REFUSAL rather than a footnote to a figure:
+
+1. committed at HEAD and clean -> the HEAD blob is hashed, parsed and served.
+   Byte-identical to what the old path returned for this, the ordinary case.
+2. present in the working tree but absent at HEAD, or present at HEAD and
+   differing from the working tree -> ``ArtifactRef.error`` names the defect
+   class and the file (``not committed at HEAD: <relpath>``), the document is
+   never parsed, and every cell downstream is an NA carrying that reason.
+
+The dirty case is refused rather than quietly served from HEAD. Serving HEAD
+there would be reproducible and wrong in a subtler way: the table would quote a
+figure that the operator generating it is, at that moment, editing away from.
+
+THE ESCAPE HATCH, AND WHY IT CANNOT ESCAPE
+------------------------------------------
+``load(repo, relpath, allow_dirty=True)`` reads the working tree, because
+diagnosing an artifact you have not committed yet is a real need and refusing it
+would just push people back to ``cat``. What it may not do is reach a verdict.
+The ref is marked ``allow_dirty_read`` and the mark propagates to every ``Cell``
+derived from it, surviving the one derived column (``fleet._compare``). Every
+path in ``fleet`` that EMITS -- ``markdown_table``, ``FleetRow.to_dict``,
+``provenance_block`` and ``counts`` -- raises ``UncommittedRead`` on a marked
+row. An allow-dirty number is usable in a terminal and structurally unable to
+land in a row.
+
+Two further refusals -- ``CheckResult.__post_init__`` for a marked PASS and
+``portfolio.resolve()`` -- are FORWARD GUARDS, and this comment used to overstate
+them by saying the mark "propagates to ``CheckResult.evidence``". It does not,
+and no code here makes it. Nothing under ``checks/`` imports this module: the
+fleet reader and the check pipeline are disjoint call graphs, so today no input
+can put ``ALLOW_DIRTY_KEY`` into a ``CheckResult``. Those two guards therefore
+fire only on evidence a caller constructs by hand, and their controls in
+``tests/test_committed_reads.py`` construct exactly that. They are kept because
+the first check that learns to read an artifact will need them and will not
+think to add them -- but a guard with no producer is not evidence that the
+verdict path is closed, and describing it as one is the disclosure-shaped error
+this module was rewritten to stop making.
 
 WORKTREES
 ---------
-Artifacts are looked for in the repo's own checkout first. Several repos in this
+Artifacts are looked for at the repo's own checkout's HEAD first. Several repos in this
 portfolio keep the branch that carries their measurements in a linked worktree
 (``git worktree list``) rather than at the root checkout -- resilient-surge's
 model registry lives on ``feat/surgeistm-lora-finetune`` under ``.worktrees/``,
@@ -29,6 +82,14 @@ those would be true of the checkout and misleading about the repo, so the
 resolver falls back to linked worktrees and records WHICH tree answered. A row
 sourced from a worktree is flagged; it is evidence about that worktree, not
 about the repo's checked-out branch.
+
+The search runs in two passes, and the order matters. The first pass asks every
+tree for a COMMITTED blob and takes the first that has one; only if no tree has
+it committed does the second pass look on disk, and everything the second pass
+finds is refused (or, under ``allow_dirty``, marked). Doing it in one pass would
+let an uncommitted file in the root checkout shadow a properly committed copy in
+a linked worktree -- refusing a figure that is in git because a stale copy of it
+is not.
 """
 
 from __future__ import annotations
@@ -41,10 +102,28 @@ from pathlib import Path
 from typing import Any
 
 from .repo import Repo
+from .result import ALLOW_DIRTY_KEY, UncommittedRead
+
+__all__ = [
+    "ALLOW_DIRTY_KEY",
+    "ArtifactRef",
+    "Cell",
+    "UncommittedRead",
+    "linked_worktrees",
+    "load",
+    "refuse_uncommitted",
+    "resolve_pointer",
+    "unresolved",
+]
 
 #: Marker for "this pointer did not resolve". Distinct from None, which is a
 #: legitimate JSON value a pointer may legitimately land on.
 _UNRESOLVED = object()
+
+#: The one phrase every refusal in this module contains. Callers and controls
+#: match on it, so it is a constant rather than five hand-typed strings that
+#: drift apart. It names the defect CLASS -- E-M12's -- not the incident.
+NOT_COMMITTED = "not committed at HEAD"
 
 
 @dataclass(frozen=True)
@@ -58,14 +137,19 @@ class Cell:
     value: Any = None
     na_reason: str = ""
     source: str = ""
+    #: True when this value descends from an ``allow_dirty`` read of the working
+    #: tree. Carried on the Cell rather than looked up from the ref, because by
+    #: the time a table is rendered the ref is three call frames away and the
+    #: thing being printed is this. Every verdict-emitting path refuses it.
+    allow_dirty: bool = False
 
     @property
     def present(self) -> bool:
         return not self.na_reason
 
     @classmethod
-    def measured(cls, value: Any, source: str) -> Cell:
-        return cls(value=value, source=source)
+    def measured(cls, value: Any, source: str, *, allow_dirty: bool = False) -> Cell:
+        return cls(value=value, source=source, allow_dirty=allow_dirty)
 
     @classmethod
     def missing(cls, reason: str, source: str = "") -> Cell:
@@ -92,6 +176,7 @@ class Cell:
             "value": self.value,
             "na_reason": self.na_reason or None,
             "source": self.source or None,
+            ALLOW_DIRTY_KEY: self.allow_dirty,
         }
 
 
@@ -101,7 +186,9 @@ class ArtifactRef:
 
     repo: str
     relpath: str
-    #: Absolute path actually read, or None when nothing was found anywhere.
+    #: Absolute path the bytes correspond to, or None when nothing was found
+    #: anywhere. Committed reads do not open it -- it is where a reader would
+    #: look, not where these bytes came from; ``read_from`` says that.
     path: Path | None = None
     #: sha256 of the bytes read. Empty when the file was not found.
     sha256: str = ""
@@ -115,7 +202,14 @@ class ArtifactRef:
     committed_at_head: bool = False
     #: True when the working-tree bytes differ from the HEAD blob.
     dirty: bool = False
-    #: Parse failure, or "artifact not found ..." when nothing was located.
+    #: "HEAD" when the bytes are a committed blob, "working tree" when they came
+    #: off disk under ``allow_dirty``, "" when nothing was read.
+    read_from: str = ""
+    #: True when these bytes came off disk under the ``allow_dirty`` escape
+    #: hatch. Structural: every verdict path refuses a ref carrying it.
+    allow_dirty_read: bool = False
+    #: Parse failure, the committed-read refusal, or "artifact not found ..."
+    #: when nothing was located in any tree.
     error: str = ""
     document: Any = field(default=None, repr=False)
 
@@ -139,6 +233,8 @@ class ArtifactRef:
             "git_sha": self.git_sha or None,
             "committed_at_head": self.committed_at_head,
             "dirty": self.dirty,
+            "read_from": self.read_from or None,
+            ALLOW_DIRTY_KEY: self.allow_dirty_read,
             "error": self.error or None,
         }
 
@@ -166,60 +262,117 @@ def linked_worktrees(repo: Repo) -> list[Path]:
     return found
 
 
-def _hash(path: Path) -> tuple[str, int]:
-    data = path.read_bytes()
+def _hash(data: bytes) -> tuple[str, int]:
     return hashlib.sha256(data).hexdigest(), len(data)
 
 
-def _git_standing(tree: Path, relpath: str, disk_sha: str) -> tuple[bool, bool, str, str]:
-    """(committed_at_head, dirty, branch, sha) for ``relpath`` inside ``tree``."""
-    _, branch = _git(tree, "rev-parse", "--abbrev-ref", "HEAD")
-    _, sha = _git(tree, "rev-parse", "HEAD")
-    code, blob = _git(tree, "rev-parse", f"HEAD:{relpath}")
+def _head_blob(tree: Path, relpath: str) -> bytes | None:
+    """The committed bytes of ``relpath`` at ``tree``'s HEAD, or None.
+
+    None means git has no such path at HEAD -- the E-M12 case. It does NOT mean
+    the file is absent from disk, and the two must not be conflated: a file that
+    is on disk and on no ref is precisely the shape this module now refuses.
+    """
+    code, blob = _git(tree, "rev-parse", "--verify", "--quiet", f"HEAD:{relpath}")
     if code != 0 or not blob:
-        return False, False, branch, sha
-    # Compare the committed blob's own sha256 against what we hashed on disk.
+        return None
     out = subprocess.run(
         ["git", "-C", str(tree), "cat-file", "blob", blob],
         capture_output=True,
         check=False,
     )
-    committed_sha = hashlib.sha256(out.stdout).hexdigest() if out.returncode == 0 else ""
-    return True, bool(committed_sha and committed_sha != disk_sha), branch, sha
+    return out.stdout if out.returncode == 0 else None
 
 
-def load(repo: Repo, relpath: str) -> ArtifactRef:
-    """Locate, hash and parse one repo-relative artifact.
+def _git_standing(tree: Path, relpath: str, head_bytes: bytes | None) -> tuple[bool, bool, str, str]:
+    """(committed_at_head, dirty, branch, sha) for ``relpath`` inside ``tree``.
 
-    The repo's own checkout is tried first; linked worktrees are tried only if
-    it is absent there, and the answering worktree is recorded on the result.
+    Retained verbatim in intent from before committed reads: the two booleans are
+    still measured the same way. What changed is what they are FOR. They used to
+    be disclosure printed beside a number that had already been served; they are
+    now the input to the decision of whether a number is served at all.
+    """
+    _, branch = _git(tree, "rev-parse", "--abbrev-ref", "HEAD")
+    _, sha = _git(tree, "rev-parse", "HEAD")
+    if head_bytes is None:
+        return False, False, branch, sha
+    path = tree / relpath
+    try:
+        disk = path.read_bytes()
+    except OSError:
+        # Committed but not checked out (sparse checkout, or deleted in the
+        # working tree). The commit is what we quote, so this is not dirty.
+        return True, False, branch, sha
+    return True, disk != head_bytes, branch, sha
+
+
+def load(repo: Repo, relpath: str, *, allow_dirty: bool = False) -> ArtifactRef:
+    """Locate, hash and parse one repo-relative artifact FROM COMMITTED STATE.
+
+    Two passes. The first asks each tree -- the repo's own checkout, then each
+    linked worktree -- for ``HEAD:<relpath>``, and the first tree that has it
+    committed answers. Only if no tree has it committed does the second pass
+    look on disk, and what it finds is refused with ``NOT_COMMITTED`` in the
+    reason unless ``allow_dirty`` is set.
+
+    ``allow_dirty=True`` reads the working tree for local diagnosis and marks
+    the ref ``allow_dirty_read``. Verdict paths refuse a marked ref; see this
+    module's docstring and ``core.result.UncommittedRead``.
     """
     ref = ArtifactRef(repo=repo.name, relpath=relpath)
     candidates: list[tuple[Path, str]] = [(repo.path, "")]
     candidates += [(w, str(w)) for w in linked_worktrees(repo)]
 
+    # -- pass 1: the committed answer, wherever it lives ------------------
+    for tree, marker in candidates:
+        head_bytes = _head_blob(tree, relpath)
+        if head_bytes is None:
+            continue
+        ref.path = tree / relpath
+        ref.worktree = marker
+        ref.read_from = "HEAD"
+        ref.committed_at_head, ref.dirty, ref.branch, ref.git_sha = _git_standing(
+            tree, relpath, head_bytes
+        )
+        if ref.dirty and not allow_dirty:
+            ref.error = (
+                f"{NOT_COMMITTED}: {relpath} — the working tree differs from the "
+                f"blob at {ref.branch} {ref.git_sha[:12]}, so there are two "
+                "candidate answers and this reader will not choose between them. "
+                "Commit the artifact, or pass --allow-dirty for a diagnosis that "
+                "cannot reach a verdict"
+            )
+            return ref
+        if ref.dirty and allow_dirty:
+            return _read_working_tree(ref, tree / relpath, relpath)
+        ref.sha256, ref.bytes_ = _hash(head_bytes)
+        try:
+            ref.document = _parse(head_bytes, relpath)
+        except Exception as exc:  # noqa: BLE001 - any parse failure is the same finding
+            ref.error = f"{type(exc).__name__}: {exc}"
+        return ref
+
+    # -- pass 2: on disk and on no ref. The E-M12 shape. -------------------
     for tree, marker in candidates:
         path = tree / relpath
         if not path.is_file():
             continue
-        try:
-            sha, size = _hash(path)
-        except OSError as exc:
-            ref.error = f"unreadable: {exc}"
-            ref.path = path
-            return ref
         ref.path = path
-        ref.sha256 = sha
-        ref.bytes_ = size
         ref.worktree = marker
-        ref.committed_at_head, ref.dirty, ref.branch, ref.git_sha = _git_standing(
-            tree, relpath, sha
-        )
-        try:
-            ref.document = _parse(path)
-        except Exception as exc:  # noqa: BLE001 - any parse failure is the same finding
-            ref.error = f"{type(exc).__name__}: {exc}"
-        return ref
+        ref.committed_at_head = False
+        ref.dirty = False
+        _, ref.branch = _git(tree, "rev-parse", "--abbrev-ref", "HEAD")
+        _, ref.git_sha = _git(tree, "rev-parse", "HEAD")
+        if not allow_dirty:
+            ref.error = (
+                f"{NOT_COMMITTED}: {relpath} — present in the working tree of "
+                f"{tree} ({path.stat().st_size} bytes) and absent from "
+                f"{ref.branch or 'HEAD'}. A figure read from it can be quoted and "
+                "cannot be fetched by the reader it is quoted to "
+                "(docs/ESCALATIONS.md E-M12)"
+            )
+            return ref
+        return _read_working_tree(ref, path, relpath)
 
     searched = ", ".join(str(t) for t, _ in candidates)
     ref.error = (
@@ -229,14 +382,52 @@ def load(repo: Repo, relpath: str) -> ArtifactRef:
     return ref
 
 
-def _parse(path: Path) -> Any:
+def _read_working_tree(ref: ArtifactRef, path: Path, relpath: str) -> ArtifactRef:
+    """The escape hatch's read. Marked at the point the bytes are taken."""
+    ref.read_from = "working tree"
+    ref.allow_dirty_read = True
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        ref.error = f"unreadable: {exc}"
+        return ref
+    ref.sha256, ref.bytes_ = _hash(data)
+    try:
+        ref.document = _parse(data, relpath)
+    except Exception as exc:  # noqa: BLE001 - any parse failure is the same finding
+        ref.error = f"{type(exc).__name__}: {exc}"
+    return ref
+
+
+def refuse_uncommitted(marked: bool, what: str) -> None:
+    """Raise if ``marked``. One sentence, one place, so every path says it alike.
+
+    ``what`` names the thing being refused, e.g. ``"check S3 of resilient-fray"``
+    or ``"the fleet verdict row choco"``. The precedent is
+    ``scripts/verify_served_hash_parity.py``, which exits non-zero when there was
+    nothing to verify: a green report over nothing is the defect, so the tool
+    refuses rather than reporting.
+    """
+    if not marked:
+        return
+    raise UncommittedRead(
+        f"{what} descends from an --allow-dirty read of the working tree. That "
+        "escape hatch exists for local diagnosis and may not reach a verdict: "
+        "the bytes behind this number are in nobody's git history, so no reader "
+        "can fetch what it claims. Commit the artifact and re-measure."
+    )
+
+
+def _parse(data: bytes, relpath: str) -> Any:
     """JSON, or a list of records for ``.jsonl``.
 
-    JSONL is here because two repos record their test-arm ledger that way, and
-    a ledger's value is entirely in its line count.
+    Takes BYTES rather than a path, because after committed reads the bytes are
+    a git blob and there may be no file on disk carrying them. JSONL is here
+    because two repos record their test-arm ledger that way, and a ledger's
+    value is entirely in its line count.
     """
-    text = path.read_text(errors="strict")
-    if path.suffix == ".jsonl":
+    text = data.decode("utf-8", errors="strict")
+    if relpath.endswith(".jsonl"):
         return [json.loads(line) for line in text.splitlines() if line.strip()]
     return json.loads(text)
 

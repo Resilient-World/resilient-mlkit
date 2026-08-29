@@ -42,6 +42,26 @@ untracked file. That is a different defect from branch dependence (there is no
 branch to name), it is not what ``BRANCH_ONLY_EVIDENCE`` encodes, and choco has
 an open colleague PR, so it is recorded here and escalated rather than
 "fixed" by inventing a note for it.
+
+COMMITTED READS
+---------------
+Every path below is resolved against a repo's COMMITTED state --
+``core.artifact.load`` reads ``HEAD:<relpath>`` rather than the working tree,
+and refuses rather than serving a figure git does not have. Two consequences
+for a reader of this file:
+
+* A declared path that is on disk and on no ref no longer yields a number. It
+  yields ``NA (not committed at HEAD: <relpath> …)``, in every column that
+  resolves through it. That is what the choco ``main:`` artifact does now, and
+  the row reading NA is the finding rather than a gap in the tool -- nothing was
+  invented and nothing was deleted to produce it.
+* Pointing an adapter at an uncommitted output is therefore not a way to get a
+  row filled in early. If a figure matters enough to appear in the fleet table,
+  it has to be committed in the repo that measured it.
+
+The escape hatch, ``mlkit portfolio --allow-dirty``, exists for looking at an
+artifact you have not committed yet. It writes no file, emits no table, and
+exits non-zero; nothing read through it can land in a row.
 """
 
 from __future__ import annotations
@@ -77,7 +97,16 @@ ADAPTERS: tuple[Adapter, ...] = (
         test_arm_spent=Field("main:training_summary.test_scored", transform="bool"),
         note=(
             "the served predictor of record is the reference itself; the candidate "
-            "column is the retired climate head that lost to it"
+            "column is the retired climate head that lost to it. "
+            "NOT COMMITTED: the `main:` artifact of this adapter is committed on no "
+            "ref in resilient-choco -- `git log --all` over it is empty and "
+            "`.gitignore` excludes the models tree (docs/ESCALATIONS.md E-M12). "
+            "Since committed reads landed, every column resolving through it "
+            "reports NA rather than a working-tree figure. This note states what "
+            "the reader does, not where the evidence lives; it lives nowhere "
+            "resolvable, and asserting otherwise is the fabrication E-M12 declined "
+            "to commit. Whether the file is committed, DVC-tracked or the row "
+            "withdrawn is resilient-choco's decision"
         ),
     ),
     # ---------------------------------------------------------------- arabica
