@@ -519,7 +519,17 @@ def markdown_table(rows: list[FleetRow]) -> str:
 
 
 def provenance_block(rows: list[FleetRow]) -> str:
-    """Which bytes each row came out of. This is the part that makes it checkable."""
+    """Which bytes each row came out of. This is the part that makes it checkable.
+
+    Refuses a marked row for the same reason ``markdown_table`` does. This block
+    emits a sha256 and a byte count, and a hash of working-tree bytes is the
+    most quotable unfetchable figure there is: it LOOKS like the thing that
+    makes a number checkable while naming bytes no reader can obtain. That the
+    CLI happens to return before reaching here under ``--allow-dirty`` is an
+    ordering, and an ordering is what the next caller changes.
+    """
+    for row in rows:
+        refuse_uncommitted(row.allow_dirty, f"the provenance block for row {row.key}")
     lines = [
         "| row | artifact | sha256 | bytes | read from | committed at HEAD | dirty | tree |",
         "|---|---|---|---|---|---|---|---|",
@@ -566,9 +576,16 @@ def na_summary(rows: list[FleetRow]) -> list[str]:
 
 
 def counts(rows: list[FleetRow]) -> dict[str, int]:
-    """How much of the table is measured, and how much is NA-with-reason."""
+    """How much of the table is measured, and how much is NA-with-reason.
+
+    Refuses a marked row. ``cells_measured`` is rendered verbatim into the
+    generated document ("cells measured: **N**"), so it is an emitted figure and
+    not an internal tally: counting an uncommitted cell as measured is the
+    coverage claim E-M12 made in miniature.
+    """
     measured = na = 0
     for row in rows:
+        refuse_uncommitted(row.allow_dirty, f"the fleet counts for row {row.key}")
         for cell in (
             row.model_of_record, row.candidate, row.metric, row.split, row.score,
             row.baseline_name, row.baseline_score, row.beats, row.test_arm_spent,

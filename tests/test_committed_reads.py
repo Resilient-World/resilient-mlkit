@@ -29,6 +29,7 @@ from pathlib import Path
 import pytest
 
 from resilient_mlkit import portfolio
+from resilient_mlkit.core import artifact as artifact_module
 from resilient_mlkit.core.artifact import (
     ALLOW_DIRTY_KEY,
     NOT_COMMITTED,
@@ -42,7 +43,9 @@ from resilient_mlkit.core.fleet import (
     Compare,
     Declared,
     Field,
+    counts,
     markdown_table,
+    provenance_block,
     read_row,
 )
 from resilient_mlkit.core.repo import Repo
@@ -394,6 +397,94 @@ def test_CR4_a_marked_cell_is_refused_even_where_a_column_is_declared_absent(
     assert row.allow_dirty
     with pytest.raises(UncommittedRead):
         markdown_table([row])
+
+
+
+# ---- CR-6: the OTHER two emitters, found by adversarial verification --------
+#
+# `markdown_table` and `to_dict` were refused; `provenance_block` and `counts`
+# were not. Neither is reachable with a marked row through today's CLI, which
+# returns into `_fleet_diagnosis` before either runs -- so this is an ordering
+# standing in for an invariant, and the ordering is what the next caller edits.
+# Both emit a FIGURE: provenance a sha256 and a byte count, counts a
+# "cells measured" tally rendered verbatim into the generated document.
+
+
+def test_CR6_fires_provenance_block_refuses_a_marked_row(toy_repo: Repo) -> None:
+    """FIRES: a sha256 of working-tree bytes is the most quotable unfetchable number.
+
+    It occupies the column that exists to make a figure checkable, while naming
+    bytes no reader can fetch.
+    """
+    _dirty(toy_repo)
+    row = read_row(toy_repo, _adapter(), allow_dirty=True)
+    assert row.allow_dirty
+    assert row.artifacts["main"].sha256, "precondition: a hash was in fact computed"
+    with pytest.raises(UncommittedRead) as caught:
+        provenance_block([row])
+    assert "allow-dirty" in str(caught.value)
+
+
+def test_CR6_stays_silent_provenance_block_prints_a_committed_row(
+    toy_repo: Repo,
+) -> None:
+    """SILENT: the ordinary committed row still gets its provenance line."""
+    row = read_row(toy_repo, _adapter())
+    block = provenance_block([row])
+    assert row.artifacts["main"].sha256 in block
+    assert "HEAD" in block
+
+
+def test_CR6_fires_counts_refuses_a_marked_row(toy_repo: Repo) -> None:
+    """FIRES: counting an uncommitted cell as measured is E-M12's coverage claim.
+
+    ``cells_measured`` is rendered into the document as "cells measured: **N**",
+    so it is an emitted figure and not an internal tally.
+    """
+    _dirty(toy_repo)
+    row = read_row(toy_repo, _adapter(), allow_dirty=True)
+    with pytest.raises(UncommittedRead):
+        counts([row])
+
+
+def test_CR6_stays_silent_counts_tallies_a_committed_row(toy_repo: Repo) -> None:
+    """SILENT: over committed rows the tally is unchanged, and is a real count."""
+    row = read_row(toy_repo, _adapter())
+    stat = counts([row])
+    assert stat["rows"] == 1
+    assert stat["cells_measured"] + stat["cells_na"] == 9
+    assert stat["cells_measured"] > 0
+
+
+def test_CR6_the_two_guards_with_no_producer_are_documented_as_such() -> None:
+    """The finding itself, held as a control.
+
+    ``CheckResult.__post_init__``'s marked-PASS refusal and
+    ``portfolio.resolve()``'s are real code, but nothing under ``checks/``
+    imports ``core.artifact``, so no input the shipped package can produce puts
+    ``ALLOW_DIRTY_KEY`` into a ``CheckResult``. They fire only on hand-built
+    evidence -- which is what the CR-4 controls above build. This test fails if
+    ``core/artifact.py`` stops saying so, because a guard with no producer
+    described as a closed path is the disclosure-shaped error again.
+    """
+    from resilient_mlkit import checks as checks_pkg
+
+    docstring = artifact_module.__doc__ or ""
+    assert "FORWARD GUARDS" in docstring
+    assert "disjoint call graphs" in docstring
+
+    # ...and the reachability claim is re-measured here, not just asserted.
+    root = Path(checks_pkg.__file__).parent
+    offenders = [
+        f.name
+        for f in sorted(root.glob("*.py"))
+        if "core.artifact" in f.read_text() or "from .artifact" in f.read_text()
+    ]
+    assert offenders == [], (
+        f"{offenders} now import core.artifact, so a CheckResult CAN carry the "
+        "marker. The two forward guards are live: update the docstring in "
+        "core/artifact.py and this control."
+    )
 
 
 # ------------------------ CR-5: the escape hatch works, outside the verdict path

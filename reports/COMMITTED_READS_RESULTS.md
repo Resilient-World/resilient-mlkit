@@ -161,3 +161,81 @@ origin/main -- portfolio/ tests/test_version_declaration.py` is empty.
    operator generating the table is at that moment editing away from the figure
    it would print. That is a judgement, it is recorded here as one, and
    `--allow-dirty` exists so that it costs nobody their diagnosis.
+
+## CR-6 — adversarial verification, and two things the first pass got wrong
+
+Added by a verification pass that attacked the claims above by running them,
+not by reading them. Everything in the table at the top of this file reproduced
+digit for digit (132 → 132, 20, 202). Two findings did not.
+
+### 1. Two of the four "verdict paths" had no producer
+
+The first pass claimed the allow-dirty marker "propagates to every `Cell` …
+**and to `CheckResult.evidence[ALLOW_DIRTY_KEY]`**", and counted four refusals.
+The propagation to `CheckResult.evidence` does not exist and no code performs
+it. `core.artifact` is imported by `core/fleet.py` alone; nothing under
+`checks/` imports it; `read_row` is called only by the `portfolio` command,
+while `portfolio.resolve()` is fed by `core/store.py`. The fleet reader and the
+check pipeline are **disjoint call graphs**.
+
+Measured, by mutation: disabling BOTH `CheckResult.__post_init__`'s marked-PASS
+refusal and `portfolio.resolve()`'s, then running every other focused test file
+(`test_fleet`, `test_promotion_state`, `test_fabricated_defaults`,
+`test_version_declaration`, `test_nonfinite_controls`, `test_ci_workflow`) →
+**182 passed**. The only two tests that notice are the two CR-4 controls that
+construct `evidence={ALLOW_DIRTY_KEY: True}` **by hand**.
+
+Those guards are kept — the first check that learns to read an artifact will
+need them. But they are **forward guards with no producer**, not evidence that
+the verdict path is closed, and the docstring that described them as closed has
+been corrected in `src/resilient_mlkit/core/artifact.py`. A guard with no
+producer presented as a live refusal is the disclosure-shaped error this branch
+was written to stop making.
+
+### 2. Two emitters of a figure did not refuse
+
+`markdown_table` and `FleetRow.to_dict` refused a marked row. `provenance_block`
+and `counts` did not, and both emit a figure:
+
+* `provenance_block` printed the **sha256 and byte count of working-tree bytes**
+  — the column that exists to make a number checkable, naming bytes no reader
+  can fetch.
+* `counts` returned `cells_measured`, which `cli._render_fleet_markdown` writes
+  into the document verbatim as `cells measured: **N**`.
+
+Neither was reachable with a marked row through today's CLI, because
+`cmd_fleet` returns into `_fleet_diagnosis` before either runs. That is an
+**ordering**, and an ordering is what the next caller changes. Both now call
+`refuse_uncommitted`, matching the rationale already written at
+`FleetRow.to_dict`: the refusal belongs at the emitter, not at the caller.
+
+Five controls added (`CR6`), each mutation-proven: reverting the two refusals
+fails exactly the two FIRES halves; softening the corrected docstring, or making
+a `checks/` module import `core.artifact`, fails the reachability control.
+
+### End-to-end, through the real CLI
+
+The first pass exercised `--allow-dirty` through `_fleet_diagnosis()` directly
+and recorded that as a limit. It was closed here, against a synthetic root in
+the scratchpad (never the live eight checkouts), with an artifact in the exact
+E-M12 shape — on disk, on no ref — at `arabica`'s declared path and pointers:
+
+| run | exit | the figure `91919.191919` |
+|---|---|---|
+| `portfolio --root S` | 1 | absent from stdout |
+| `portfolio --root S --json` | 1 | absent from the payload |
+| `portfolio --root S --out F.md` | 1 | absent from `F.md` **and** `F.json` |
+| `portfolio --root S --allow-dirty` | 2 | in stdout only; no `\|`, nothing written |
+| `portfolio --root S --allow-dirty --out G.md` | 2 | **no file created** |
+| same artifact, **committed**, `--out` | 1 | **present** — served, as it must be |
+
+The last row is the load-bearing one: the refusal is about commitment, not a
+reader that refuses everything.
+
+### Unchanged, re-measured independently
+
+`portfolio/FLEET_VERDICTS.md` `e984c815…`, `.json` `ba3b0ef5…`,
+`MODEL_QUALITY.md` `90a469ab…`, `tests/test_version_declaration.py` `2d28b7e6…`
+— identical to the values recorded before the change. `git diff main..HEAD` over
+`portfolio/`, `src/resilient_mlkit/checks/`, `docs/allowlist.yaml` and
+`tests/test_version_declaration.py` is empty. No tag; `__version__` 0.5.0.

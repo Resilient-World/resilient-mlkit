@@ -51,14 +51,25 @@ THE ESCAPE HATCH, AND WHY IT CANNOT ESCAPE
 ``load(repo, relpath, allow_dirty=True)`` reads the working tree, because
 diagnosing an artifact you have not committed yet is a real need and refusing it
 would just push people back to ``cat``. What it may not do is reach a verdict.
-The ref is marked ``allow_dirty_read``; the mark propagates to every ``Cell``
-derived from it, and to ``CheckResult.evidence[ALLOW_DIRTY_KEY]``; and the three
-paths that emit a verdict -- ``CheckResult.__post_init__`` for PASS,
-``portfolio.resolve()``, and ``fleet``'s table and ``to_dict`` emission --
-raise ``UncommittedRead`` on it. An allow-dirty number is usable in a terminal
-and structurally unable to land in a row. ``tests/test_committed_reads.py``
-holds all five halves of that claim; the comment you are reading is not the
-enforcement.
+The ref is marked ``allow_dirty_read`` and the mark propagates to every ``Cell``
+derived from it, surviving the one derived column (``fleet._compare``). Every
+path in ``fleet`` that EMITS -- ``markdown_table``, ``FleetRow.to_dict``,
+``provenance_block`` and ``counts`` -- raises ``UncommittedRead`` on a marked
+row. An allow-dirty number is usable in a terminal and structurally unable to
+land in a row.
+
+Two further refusals -- ``CheckResult.__post_init__`` for a marked PASS and
+``portfolio.resolve()`` -- are FORWARD GUARDS, and this comment used to overstate
+them by saying the mark "propagates to ``CheckResult.evidence``". It does not,
+and no code here makes it. Nothing under ``checks/`` imports this module: the
+fleet reader and the check pipeline are disjoint call graphs, so today no input
+can put ``ALLOW_DIRTY_KEY`` into a ``CheckResult``. Those two guards therefore
+fire only on evidence a caller constructs by hand, and their controls in
+``tests/test_committed_reads.py`` construct exactly that. They are kept because
+the first check that learns to read an artifact will need them and will not
+think to add them -- but a guard with no producer is not evidence that the
+verdict path is closed, and describing it as one is the disclosure-shaped error
+this module was rewritten to stop making.
 
 WORKTREES
 ---------
