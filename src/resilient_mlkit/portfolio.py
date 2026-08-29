@@ -74,6 +74,96 @@ def gating_ids() -> list[str]:
     return [cid for phase in GATING_PHASES for cid in PHASE_ORDER[phase]]
 
 
+#: Exit code per terminal state, in the order one outranks another: first match
+#: wins. Deliberately the SAME ladder ``cli.cmd_check`` uses for statuses, so
+#: the two commands cannot disagree about what a number off this tool means --
+#: 1 is a failure, 3 is incomplete, 4 is waiting on a person.
+#:
+#: ``_cmd_portfolio`` used to ``return 0`` unconditionally, which made
+#: ``README.md``'s "1 something failed (CI gates on this)" false for
+#: ``--portfolio``: a BLOCKED repo rendered in the table and exited green, so
+#: any CI job gating on this command gated on nothing. The README states the
+#: contract correctly and is not edited; this is the code being brought to it.
+STATE_EXIT_CODES: tuple[tuple[str, int], ...] = (
+    (BLOCKED, 1),
+    (IN_PROGRESS, 3),
+    (READY_PENDING_KEYS, 4),
+    (AWAITING, 4),
+    (READY, 0),
+)
+
+#: What an unrecognised terminal state exits. Fail closed: a state this module
+#: does not know about has not been shown to be a pass, and the alternative --
+#: falling through to 0 -- is the defect being fixed, one layer down.
+UNKNOWN_STATE_EXIT = 1
+
+
+def exit_code(states: list[RepoState]) -> int:
+    """The worst resolved state across the portfolio, as an exit code.
+
+    Empty input exits 1 rather than 0. A portfolio report over no repos is not
+    a clean portfolio; it is a report that measured nothing, and
+    ``scripts/verify_served_hash_parity.py`` already sets the precedent that a
+    green report over nothing is the defect rather than the pass.
+    """
+    if not states:
+        return UNKNOWN_STATE_EXIT
+    present = {st.state for st in states}
+    # A hard stop is a BLOCKED by construction in `resolve`, but assert it here
+    # too: a hard stop reaching this function under any other label is a bug in
+    # `resolve`, and it must not be able to exit 0 while that bug exists.
+    if any(st.halted for st in states):
+        return 1
+    unknown = present - {name for name, _ in STATE_EXIT_CODES}
+    if unknown:
+        return UNKNOWN_STATE_EXIT
+    for name, code in STATE_EXIT_CODES:
+        if name in present:
+            return code
+    return UNKNOWN_STATE_EXIT
+
+
+def phase_header(phase: str) -> str:
+    """A phase's column header, DERIVED from ``PHASE_ORDER``.
+
+    The headers were hand-written strings, and the readiness one had gone stale
+    in place: ``"R(9,10,11,1-8)"`` names one id fewer than
+    ``PHASE_ORDER["readiness"]`` holds, having not been updated when R12 joined
+    it. A header is a count, and this package's own rule is that a count is
+    obtained by counting -- so the header now expands from the registry and the
+    literal is gone. ``tests/test_portfolio_exit.py`` holds every integer a
+    header names against the ids the phase actually runs.
+
+    Ids are compressed into runs of consecutive numbers **in the order the
+    phase runs them**, because that order is itself a claim readiness makes
+    (R9 first, R8 last) and a sorted header would quietly deny it. One run
+    renders bare (``T1-5``); more than one is parenthesised (``R(9-12,1-8)``).
+    Anything that is not a shared-prefix-plus-integer falls back to listing the
+    ids, which is longer and always true.
+    """
+    ids = PHASE_ORDER[phase]
+    if not ids:
+        return phase.upper()
+    prefix = ids[0].rstrip("0123456789")
+    parts: list[tuple[str, str]] = []
+    for cid in ids:
+        stem = cid.rstrip("0123456789")
+        num = cid[len(stem):]
+        if stem != prefix or not num:
+            return ",".join(ids)
+        parts.append((stem, num))
+
+    runs: list[list[int]] = []
+    for _, num in parts:
+        n = int(num)
+        if runs and n == runs[-1][-1] + 1:
+            runs[-1].append(n)
+        else:
+            runs.append([n])
+    rendered = ",".join(f"{r[0]}-{r[-1]}" if len(r) > 1 else str(r[0]) for r in runs)
+    return f"{prefix}{rendered}" if len(runs) == 1 else f"{prefix}({rendered})"
+
+
 def resolve(repo: Repo, results: dict[str, CheckResult]) -> RepoState:
     """Decide a repo's terminal state from its measured results.
 
@@ -181,21 +271,21 @@ def render_portfolio(states: list[RepoState], nonce: str) -> str:
 
     rows = []
     for st in states:
+        # Cells and headers are both generated from PHASES x PHASE_ORDER, so a
+        # column cannot come to be labelled with one phase and filled from
+        # another -- which is how the readiness header came to name eleven
+        # checks beside a cell rendering twelve.
         rows.append(
             [
                 st.repo.name,
                 st.repo.short_sha or "-",
-                compact(st.results, PHASE_ORDER["triage"]),
-                compact(st.results, PHASE_ORDER["selection"]),
-                compact(st.results, PHASE_ORDER["readiness"]),
-                compact(st.results, PHASE_ORDER["decision"]),
-                compact(st.results, PHASE_ORDER["economics"]),
+                *(compact(st.results, PHASE_ORDER[p]) for p in PHASES),
                 st.state,
             ]
         )
     table = render(
         rows,
-        ["REPO", "SHA", "T1-5", "S1-5", "R(9,10,11,1-8)", "D1-5", "E1-5", "STATE"],
+        ["REPO", "SHA", *(phase_header(p) for p in PHASES), "STATE"],
     )
 
     lines = [table, "", LEGEND, ""]

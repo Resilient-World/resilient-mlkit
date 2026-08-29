@@ -25,7 +25,8 @@ from .core import policy, store
 from .core.repo import PORTFOLIO, Repo, discover, find_root
 from .core.result import CheckResult, CredentialRequired, Status
 from .core.table import phase_table
-from .portfolio import render_portfolio, resolve
+from .portfolio import READY, render_portfolio, resolve
+from .portfolio import exit_code as portfolio_exit_code
 
 
 def _detect_offline(timeout: float = 2.0) -> bool:
@@ -240,6 +241,16 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def _cmd_portfolio(repos: list[Repo], run_nonce: str, root: Path) -> int:
+    """Each repo's terminal readiness state, and an exit code that reflects it.
+
+    This used to ``return 0`` unconditionally. ``README.md`` says exit ``1``
+    means "something failed (CI gates on this)", and for ``--portfolio`` that
+    sentence was false: a BLOCKED repo rendered in the table, printed its
+    reason, and exited green, so a CI job gating on this command gated on
+    nothing at all. The exit code now comes from ``portfolio.exit_code``, which
+    reads the worst resolved state through the same ladder ``cmd_check`` uses
+    for statuses. The README is the contract and was not touched.
+    """
     print(f"mlkit {__version__}  portfolio  nonce={run_nonce}")
     print(f"root={root}")
     print()
@@ -251,7 +262,16 @@ def _cmd_portfolio(repos: list[Repo], run_nonce: str, root: Path) -> int:
     print()
     for repo in repos:
         print(f"HEAD resilient-{repo.name}: {repo.git_sha or '<not a git worktree>'}")
-    return 0
+
+    code = portfolio_exit_code(states)
+    if code:
+        outstanding = sorted({st.state for st in states} - {READY})
+        print(
+            f"PORTFOLIO EXIT {code}: {len(states)} repo(s) resolved and not every "
+            f"one is {READY} ({', '.join(outstanding) or 'no state resolved'})",
+            file=sys.stderr,
+        )
+    return code
 
 
 def cmd_fleet(args: argparse.Namespace) -> int:
