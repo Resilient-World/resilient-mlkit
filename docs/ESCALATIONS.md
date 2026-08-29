@@ -101,6 +101,51 @@ the spine and never propagated.
 Propagating is `python scripts/sync_spine.py`, which writes into eight repos and
 is therefore a decision, not a side effect of looking.
 
+**Re-measured on 2026-08-29 (R9-SPINE)** at the fleet as checked out that day,
+and the classification asked for: **16 of 16 drifts are an unsynced spine, and
+0 of 16 are a repo legitimately diverging.**
+
+Two independent lines of evidence, both measured, neither a judgement:
+
+1. **Byte identity across the fleet.** Grouping `portfolio/SPINE_DRIFT.json` by
+   `relpath` and `deployed_sha256` gives exactly one deployed sha per file,
+   shared by all eight repos:
+
+   ```
+   CLAUDE.md          DRIFTED  spine=8526df9dc9c454c2 deployed=5aa52879d78cbcad  n=8
+   docs/READINESS.md  DRIFTED  spine=aed512c6a0498f0e deployed=00838426cbb8a011  n=8
+   ```
+
+   A repo that had diverged for its own reasons would carry bytes nobody else
+   carries. Eight identical copies is one un-run sync, and it is not a claim
+   about intent — it is what the shas say.
+
+2. **Direction, at the line.** `core/spine.py` diffs spine-as-`want` against
+   deployed-as-`got`, so a `-` line is spine-side. Every changed line in both
+   files is spine-side content the repos never received, and each traces to a
+   commit in this repo:
+
+   * `CLAUDE.md`, 31 lines, from `eddbedb` (2026-08-14, "Add DEFERRED: a
+     missing API key is not the same as a broken loader"). The spine gained the
+     "Credentials are not blockers" section — rules 7–9 on `CredentialRequired`
+     and READY-PENDING-KEYS — which renumbered the two rules after it. The eight
+     deployed copies still carry the pre-`eddbedb` numbering.
+   * `docs/READINESS.md`, 66 lines, from `0a0ddac` (2026-08-28, "the canonical
+     order had drifted two checks behind"). The spine gained R10 and R11 and
+     says "Eleven checks"; all eight deployed copies say "Nine checks" and omit
+     both from the canonical order.
+
+   Not one changed line originates in a model repo.
+
+**Consequence, stated plainly:** the operator-facing document each repo's agents
+read as binding describes a nine-check readiness phase, while `mlkit` runs
+eleven. R10 and R11 are the two checks that catch fabricated defaults and
+fabricated targets, and no repo's copy of the spine mentions either.
+
+**Still the operator's call.** Nothing was synced. `scripts/sync_spine.py`
+writes into eight repos, and the two files are byte-identical everywhere, so the
+propagation is one decision covering all sixteen rather than sixteen judgements.
+
 ---
 
 ## E-M05 — chokepoint's pytest-timeout defect was already repaired; nothing owed
@@ -240,3 +285,36 @@ rule 12 reserves release decisions of record to the signatory's process).
 `main` and cut `v0.3.1` from it, so the first tag whose tree and name agree is
 also the first one the repos re-pin to. Recorded in the CHANGELOG's `v0.3.0`
 entry so a reader of the tag finds the caveat next to the release notes.
+
+**Partly closed on `feat/r9-gate-coverage` (R9-VERSION), by operator direction**
+to bump `main` so the next tag is correct. What was done: the version is now
+declared once, in `resilient_mlkit.__version__`; `pyproject.toml` reads it via
+`[tool.setuptools.dynamic]` and `cli` imports it, so the three literals that
+disagreed inside `v0.3.0` are one literal that cannot. `main` declares `0.4.0` — see below on why not `0.3.1`.
+Measured by execution on this branch:
+
+```
+.venv/bin/pip install -e . --no-deps  ; .venv/bin/pip show resilient-mlkit
+                                                   -> Version: 0.3.1
+.venv/bin/mlkit --version                          -> mlkit 0.3.1
+.venv/bin/python -m pytest tests/test_version_declaration.py -q
+                                                   -> 12 passed
+```
+
+`tests/test_version_declaration.py` holds `__version__` against the newest
+CHANGELOG heading and FIRES on both shapes that produced this escalation: a
+second `__version__` literal in a module, and a newest heading reading
+`Unreleased` rather than a version.
+
+**The bump is `0.4.0`, not the `0.3.1` proposed above, and that is a
+deviation worth reading.** The proposal predates this round's content. Two
+readiness checks now change verdict on unchanged repo code (R3 on a `str`
+split, R5 on a fractional or negative provenance count — both previously silent
+PASSes, see the CHANGELOG), and the scale at the top of `CHANGELOG.md` calls
+that a **major** release. On a `0.x` line the minimal reading of major is the
+leading nonzero, so `0.4.0`.
+
+**Still open, and still the signatory's:** the `v0.3.0` tag is untouched and its
+own tree still reads `0.2.0`. Three things remain a release decision of record —
+whether this line's major is `0.4.0` or `1.0.0`, which is written down nowhere;
+cutting the tag; and when the eight repos re-pin to it.

@@ -86,15 +86,28 @@ ADAPTERS: tuple[Adapter, ...] = (
         baseline_score=Field("main:baselines_on_test.persistence_t_minus_1.mae_lb_ac"),
         beats=Field("main:tracks.spatial_infill.beats_persistence_on_test.mae_lb_ac"),
         test_arm_spent=Absent(
-            "models_of_record.json carries no test-read counter or ledger; that TEST "
-            "was scored once per track is asserted in `record_rule` prose, which is "
-            "not a machine-readable field"
+            "no test-read counter exists for THIS track. The sibling "
+            "`forecast_available` track's test artifact carries `test_reads_spent`, "
+            "keyed by track name, and this row now reads it; spatial_infill's "
+            "`source.kind` is `base-menu` and the measurement it names, "
+            "reports/validation/observed_panel_model.json, has no equivalent field. "
+            "That TEST was scored once per track is asserted in `record_rule` prose, "
+            "which is not machine-readable. The gap is the counter, not the "
+            "provenance"
         ),
     ),
     Adapter(
         repo="fray",
         entry="forecast_available",
-        artifacts={"main": "reports/validation/models_of_record.json"},
+        artifacts={
+            "main": "reports/validation/models_of_record.json",
+            # models_of_record.json names this file itself, at
+            # tracks.forecast_available.source.test_artifact.path, as the
+            # artifact its TEST figures came from -- and that file carries the
+            # test-read counter this row used to report Absent. Following the
+            # chain the record itself declares is not guessing at a schema.
+            "test_artifact": "reports/validation/weather_covariate_extension.json",
+        },
         metric=Declared("mae"),
         lower_is_better=True,
         model_of_record=Field("main:tracks.forecast_available.candidate"),
@@ -104,11 +117,8 @@ ADAPTERS: tuple[Adapter, ...] = (
         baseline_name=Declared("persistence_t_minus_1", against="baseline"),
         baseline_score=Field("main:baselines_on_test.persistence_t_minus_1.mae_lb_ac"),
         beats=Field("main:tracks.forecast_available.beats_persistence_on_test.mae_lb_ac"),
-        test_arm_spent=Absent(
-            "models_of_record.json carries no test-read counter or ledger; that TEST "
-            "was scored once per track is asserted in `record_rule` prose, which is "
-            "not a machine-readable field"
-        ),
+        # Keyed by track name, so this is this row's count and not the repo's.
+        test_arm_spent=Field("test_artifact:test_reads_spent.forecast_available"),
     ),
     # ---------------------------------------------------------------- torrent
     Adapter(
@@ -122,9 +132,16 @@ ADAPTERS: tuple[Adapter, ...] = (
         lower_is_better=False,
         model_of_record=Absent(
             "no committed JSON artifact in resilient-torrent declares a model of "
-            "record. The ridge is named as one in prose only (docs/ESCALATIONS.md, "
-            "docs/HYDROLOGY_VAL_RESULTS_AND_TEST_DECISION.md, CHANGELOG.md), and "
-            "prose is not a field an adapter can read"
+            "record, and two committed artifacts positively say why not: "
+            "model_mesh/CURRENT_STATE.json records `current_maturity` as "
+            "'software smoke with screening fixtures' and `baseline` as 'observed "
+            "evaluation cohort not yet admitted', and model_mesh/"
+            "MODEL_DESCRIPTOR.json records `evidence_status: test_only`. That "
+            "file's `model_id` is the mesh service identity, not a trained model, "
+            "and reading it into this column would put a service contract where a "
+            "champion belongs. The ridge is named as the record in prose only "
+            "(docs/ESCALATIONS.md, docs/HYDROLOGY_VAL_RESULTS_AND_TEST_DECISION.md, "
+            "CHANGELOG.md)"
         ),
         candidate=Field("main:config"),
         score=Field("main:mean"),
@@ -145,6 +162,14 @@ ADAPTERS: tuple[Adapter, ...] = (
         artifacts={
             "main": "reports/train/row_parity_ridge_vs_melstm_val.json",
             "ledger": "reports/holdout_reads.jsonl",
+            # The two artifacts row_parity names as `left.artifact` and
+            # `right.artifact`. Both are declared so the provenance block
+            # carries both sha256s: the split below is read from `right`, the
+            # side whose figure this row reports, and a reader can check the
+            # other side against the same table rather than taking the
+            # artifact's own `same_rows: true` on trust.
+            "left": "reports/train/linear_reference_val_recheck.json",
+            "right": "reports/train/melstm_f_s1234_val.json",
         },
         metric=Declared("nse"),
         lower_is_better=False,
@@ -154,11 +179,11 @@ ADAPTERS: tuple[Adapter, ...] = (
         ),
         candidate=Field("main:right.name"),
         score=Field("main:right.median_nse"),
-        split=Absent(
-            "row_parity_ridge_vs_melstm_val.json records the compared rows, the "
-            "scored basin counts and `same_rows`, but no split field; the split "
-            "appears in the FILENAME only, which no adapter should read as data"
-        ),
+        # row_parity itself carries no split field, and the split appears in its
+        # FILENAME, which no adapter should read as data. It does not have to:
+        # the artifact names `right.artifact`, and that artifact records the
+        # split as a field.
+        split=Field("right:provenance.scored_split"),
         baseline_name=Field("main:left.name"),
         baseline_score=Field("main:left.median_nse"),
         beats=Compare(),
@@ -259,13 +284,14 @@ ADAPTERS: tuple[Adapter, ...] = (
         },
         metric=Declared("roc_auc"),
         lower_is_better=False,
-        model_of_record=Absent(
-            "no committed artifact in resilient-blackout declares a served model of "
-            "record. models/weather_failure_v1.joblib.provenance.json records that "
-            "checkpoint's family and sha256 but not its serving status, and the gate "
-            "artifact records `registry_state.n_versions: 0` — nothing has ever been "
-            "registered for this model"
-        ),
+        # The gate artifact's `shipped_baseline` block carries `label: "baseline:
+        # the artifact currently served"` and names the model. That is a
+        # committed artifact declaring what is served, which is what this column
+        # asks for -- the same reading as choco's, where the model of record is
+        # the served predictor and the candidate is the challenger measured
+        # against it. The registry tension is real and is recorded in the note
+        # rather than resolved here.
+        model_of_record=Field("gate:shipped_baseline.model"),
         candidate=Field("main:preregistration.selected_rung"),
         score=Field("main:test.selected_all_in_scope.roc_auc"),
         split=Declared("test"),
@@ -273,18 +299,34 @@ ADAPTERS: tuple[Adapter, ...] = (
         baseline_score=Field("main:test.anchor_planning_base.roc_auc"),
         beats=Compare(),
         test_arm_spent=Field("main:read_at"),
-        note="the pre-registered anchor comparison, on all 101,424 test rows",
+        note=(
+            "the pre-registered anchor comparison, on all 101,424 test rows. The "
+            "model of record is SERVED but not REGISTERED: the same gate artifact "
+            "records `registry_state.n_versions: 0` with the note that nothing has "
+            "ever been registered for this model, so a promotion would have nothing "
+            "to move"
+        ),
     ),
     Adapter(
         repo="blackout",
         entry="vs-persistence",
-        artifacts={"main": "reports/train/weather_failure_test_read.json"},
+        artifacts={
+            "main": "reports/train/weather_failure_test_read.json",
+            # Declared here too. It was on the sibling row only, which is why
+            # this row reported the served model Absent while the artifact
+            # naming it sat one row above.
+            "gate": "reports/train/weather_failure_all_in_scope_gate.json",
+        },
         metric=Declared("roc_auc"),
         lower_is_better=False,
-        model_of_record=Absent(
-            "no committed artifact in resilient-blackout declares a served model of "
-            "record; see the vs-planning-anchor row"
-        ),
+        # The gate artifact's `shipped_baseline` block carries `label: "baseline:
+        # the artifact currently served"` and names the model. That is a
+        # committed artifact declaring what is served, which is what this column
+        # asks for -- the same reading as choco's, where the model of record is
+        # the served predictor and the candidate is the challenger measured
+        # against it. The registry tension is real and is recorded in the note
+        # rather than resolved here.
+        model_of_record=Field("gate:shipped_baseline.model"),
         candidate=Field("main:preregistration.selected_rung"),
         # Persistence can only score the 89,774 rows with a contiguous previous
         # county-day. The model's figure on all 101,424 rows and persistence's on

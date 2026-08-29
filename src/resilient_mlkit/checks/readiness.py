@@ -32,6 +32,7 @@ ruler somebody drew.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from ..core import environment, fabricated_targets, fabrication, policy, report
@@ -196,7 +197,28 @@ def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
     except BindingError as exc:
         return CheckResult.na("R3", PHASE, str(exc))
     try:
-        splits = {str(k): set(map(str, v)) for k, v in dict(fn()).items()}
+        raw = dict(fn())
+        # A str (or bytes) is iterable, so `set(map(str, v))` accepts one and
+        # silently splits it into CHARACTERS. That is not a type quibble: a
+        # binding returning {"train": "abc", "val": "de", "test": "fg"} was
+        # reported PASS with n_train=3, n_val=2, n_test=2 -- the letters of
+        # 'abc' counted as three sites, disjoint, above the holdout floor, and
+        # indistinguishable in the table from a real blocked split. It fails
+        # loudly on long strings, which share characters, and silently on
+        # short ones, so the defect appears only where it does damage.
+        # Refused explicitly rather than coerced: mlkit does not get to decide
+        # that one string means one group.
+        stringy = {str(k): type(v).__name__ for k, v in raw.items() if isinstance(v, str | bytes)}
+        if stringy:
+            return CheckResult.failed(
+                "R3", PHASE,
+                "splits must map each split to a collection of group ids, but "
+                + ", ".join(f"{k} is a {t}" for k, t in sorted(stringy.items()))
+                + "; a string would be iterated by character and counted as one "
+                "group per letter",
+                {"non_collection_splits": stringy},
+            )
+        splits = {str(k): set(map(str, v)) for k, v in raw.items()}
     except CredentialRequired:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -301,14 +323,60 @@ def r5_data_provenance(repo: Repo, ctx: RunContext) -> CheckResult:
     if missing:
         return CheckResult.failed("R5", PHASE, "provenance missing splits: " + ", ".join(missing))
 
+    # A histogram of ROW COUNTS, or the invariant below is arithmetic about
+    # nothing. Two ways that went wrong, both silent, both measured:
+    #
+    #   {"real": 1.5, "synthetic": 0.5} -- a repo reporting PROPORTIONS. int()
+    #   truncates, so int(0.5) == 0 cleared the taint test and int(1.5) == 1
+    #   satisfied "at least one real row": a val split one third simulated,
+    #   reported PASS.
+    #
+    #   {"real": 100, "synthetic": -5} -- a counter that had gone negative.
+    #   -5 > 0 is False, so a broken count read as a clean holdout.
+    #
+    # Both are refused here rather than coerced, because the correct reading of
+    # a count mlkit does not understand is "unknown", and an unknown count in
+    # an evaluation split cannot clear the one invariant that is absolute.
+    counts: dict[str, dict[str, int]] = {}
+    malformed: list[str] = []
+    for split in ("train", "val", "test"):
+        counts[split] = {}
+        for kind, raw in prov[split].items():
+            try:
+                n = float(raw)
+            except (TypeError, ValueError):
+                malformed.append(f"{split}.{kind}={raw!r} is not a number")
+                continue
+            # `float()` accepts NaN and the infinities, including as the
+            # strings "nan"/"inf", and `int()` then raises out of the check --
+            # ValueError for a NaN, OverflowError for an infinity. That is the
+            # same defect this guard exists to close, one step further out:
+            # the check stops naming the split and the kind and names an
+            # interpreter error instead. NaN in particular is what a pandas or
+            # numpy count becomes when a groupby or a reindex misses a kind.
+            if not math.isfinite(n):
+                malformed.append(f"{split}.{kind}={raw!r} is not a finite row count")
+                continue
+            if n != int(n) or n < 0:
+                malformed.append(
+                    f"{split}.{kind}={raw!r} is not a whole non-negative row count"
+                )
+                continue
+            counts[split][str(kind)] = int(n)
+    if malformed:
+        return CheckResult.failed(
+            "R5", PHASE,
+            "provenance must report whole row counts per kind, and "
+            + "; ".join(malformed[:4])
+            + "; a count mlkit cannot read is an unknown, and an unknown cannot "
+            "clear the val/test invariant",
+            {"malformed": malformed},
+        )
+
     # The invariant is absolute: not a single simulated row in val or test.
     tainted: dict[str, dict[str, int]] = {}
     for split in ("val", "test"):
-        bad = {
-            kind: int(n)
-            for kind, n in prov[split].items()
-            if kind != "real" and int(n) > 0
-        }
+        bad = {kind: n for kind, n in counts[split].items() if kind != "real" and n > 0}
         if bad:
             tainted[split] = bad
 
@@ -324,7 +392,7 @@ def r5_data_provenance(repo: Repo, ctx: RunContext) -> CheckResult:
             "estimate cannot be believed against a target the pipeline generated",
             {**evidence, "tainted": tainted},
         )
-    if int(prov["val"].get("real", 0)) == 0 or int(prov["test"].get("real", 0)) == 0:
+    if counts["val"].get("real", 0) == 0 or counts["test"].get("real", 0) == 0:
         return CheckResult.failed("R5", PHASE, "val or test contains zero real rows", evidence)
     return CheckResult.passed("R5", PHASE, evidence)
 

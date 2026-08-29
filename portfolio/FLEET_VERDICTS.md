@@ -11,10 +11,10 @@ This file does NOT replace `portfolio/MODEL_QUALITY.md`. That document carries
 the adjudication and the refutation checks — judgement, which is not a field
 lookup. This one carries the arithmetic, so the two can disagree in public.
 
-- generated: `2026-08-29T03:56:30+00:00`
-- run nonce: `mlkit-20260829T035629Z-7b32b8958e8b`
-- mlkit: `0.2.0` at `d08d85ed796cef14c3602129e41d14e69900058f`
-- rows: **12**, cells measured: **99**, cells NA-with-reason: **9**
+- generated: `2026-08-29T06:40:14+00:00`
+- run nonce: `mlkit-20260829T064012Z-f5def062dd8c`
+- mlkit: `0.4.0` at `034122f406eed97742f7f70851dafa7566cc2f84`
+- rows: **12**, cells measured: **103**, cells NA-with-reason: **5**
 
 ## Repos as they were read
 
@@ -23,10 +23,10 @@ lookup. This one carries the arithmetic, so the two can disagree in public.
 | arabica | `feat/observed-panel-and-fabrication-gates` | `bb69ee283a3d` | clean |
 | blackout | `e021-decision` | `ed80086937e1` | clean |
 | choco | `review/observed-labels-fixes` | `d0a0357b400c` | clean |
-| chokepoint | `feat/r8-serve-integration-and-repin` | `222e138cc777` | clean |
-| fray | `feat/r8-record-checkpoint-and-repin` | `2c4f3a796604` | clean |
+| chokepoint | `feat/r9-operator-surface` | `287e048806d5` | DIRTY |
+| fray | `feat/r9-foundation-adapter-and-stress` | `d5c931c5e11b` | DIRTY |
 | surge | `feat/observed-corpus-and-fabrication-gates` | `9eab2fe80177` | clean |
-| torrent | `feat/r8-registry-cleanup-and-repin` | `58de276ebe4b` | DIRTY |
+| torrent | `feat/r9-attributes-and-declared-scale` | `a655a747c64e` | clean |
 | triage | `e028-decision` | `f44430853eac` | clean |
 
 ## Verdicts
@@ -35,16 +35,16 @@ lookup. This one carries the arithmetic, so the two can disagree in public.
 |---|---|---|---|---|---|---|---|---|---|
 | choco | lag_1_persistence | sklearn.ensemble.GradientBoostingRegressor | rmse | test | 2.689773 | lag_1_persistence | 0.227719 | no | yes |
 | arabica | prior-residual ridge (models.surrogate.prior_residual) | prior-residual ridge | rmse | test | 1.05676 | expanding per-unit prior mean | 1.084686 | yes | yes |
-| fray/spatial_infill | spatial_infill/hgb/leaves=63/lr=0.1/iter=300 | spatial_infill/hgb/leaves=63/lr=0.1/iter=300 | mae | test | 71.35922343344701 | persistence_t_minus_1 | 113.06701205090663 | yes | NA (models_of_record.json carries no test-read counter or l… |
-| fray/forecast_available | forecast_available+nbr+wx_prior/hgb/leaves=127/lr=0.05/iter… | forecast_available+nbr+wx_prior/hgb/leaves=127/lr=0.05/iter… | mae | test | 74.16097783177521 | persistence_t_minus_1 | 113.06701205090663 | yes | NA (models_of_record.json carries no test-read counter or l… |
+| fray/spatial_infill | spatial_infill/hgb/leaves=63/lr=0.1/iter=300 | spatial_infill/hgb/leaves=63/lr=0.1/iter=300 | mae | test | 71.35922343344701 | persistence_t_minus_1 | 113.06701205090663 | yes | NA (no test-read counter exists for THIS track. The sibling… |
+| fray/forecast_available | forecast_available+nbr+wx_prior/hgb/leaves=127/lr=0.05/iter… | forecast_available+nbr+wx_prior/hgb/leaves=127/lr=0.05/iter… | mae | test | 74.16097783177521 | persistence_t_minus_1 | 113.06701205090663 | yes | 1 |
 | torrent/melstm-10ep-n8-val | NA (no committed JSON artifact in resilient-torrent declare… | src/torrent/hydrology/training/configs/regional_eu_observed… | basin_normalised_nse (median across bas… | val | 0.2225867683526302 | persistence_lag3 | 0.26484161185831745 | no | 1 |
-| torrent/ridge-vs-melstm-val | NA (no committed JSON artifact in resilient-torrent declare… | model | nse | NA (row_parity_ridge_vs_melstm_val.json… | 0.23206894549246004 | ridge_with_observed_discharge | 0.4520685140972679 | no | 1 |
+| torrent/ridge-vs-melstm-val | NA (no committed JSON artifact in resilient-torrent declare… | model | nse | val | 0.23206894549246004 | ridge_with_observed_discharge | 0.4520685140972679 | no | 1 |
 | chokepoint/level-head | corridor_scale_only | scale_x_train_mean_depth | mae | test | 0.2594909570948433 | scale_x_train_mean_depth | NA — the level head IS the recorded bar — `recorded_bars.level.is_the_champion_head_itself` is… | NA (baseline is NA, so no comparison is… | ONCE, 2026-08-23. Quoted here; not re-read by this script o… |
 | chokepoint/direction-head | corridor_scale_only | corridor_scale_only | auc | relaxed TRAIN frame, leave-one-corridor… | 0.6984126984126984 | base_rate | 0.3482142857142857 | yes | NONE: val and test episodes are counted above and never sco… |
 | surge | data/model_registry/per_lead_anchor_ols | neural_model | rmse | test | 0.175095 | per_lead_anchor_ols | 0.163736 | no | 3 |
 | triage | cbdiff_pois_persistence_df10_lag4_pen1 | cbdiff_pois_persistence_df10_lag4_pen1 | rmse | test | 173.40814487545612 | reference_persistence_prev_week | 183.42262422319413 | yes | 2 |
-| blackout/vs-planning-anchor | NA (no committed artifact in resilient-blackout declares a … | all_in_scope | roc_auc | test | 0.6776159815675701 | planning_base | 0.6411684390728368 | yes | 2026-08-24T07:13:02Z |
-| blackout/vs-persistence | NA (no committed artifact in resilient-blackout declares a … | all_in_scope | roc_auc | test | 0.6802774287447294 | persistence_prior_day_outage | 0.689877078726717 | no | 2026-08-24T07:13:02Z |
+| blackout/vs-planning-anchor | weather_failure_v1 | all_in_scope | roc_auc | test | 0.6776159815675701 | planning_base | 0.6411684390728368 | yes | 2026-08-24T07:13:02Z |
+| blackout/vs-persistence | weather_failure_v1 | all_in_scope | roc_auc | test | 0.6802774287447294 | persistence_prior_day_outage | 0.689877078726717 | no | 2026-08-24T07:13:02Z |
 
 `beats bar?` is read from the artifact where the artifact records it, and
 otherwise derived from the two scores above it; the row's `beats` source
@@ -59,14 +59,17 @@ as it stands rather than normalised into a shape no repo actually uses.
 | choco | `models/observed_production_head.meta.json` (main) | `779f80be4d58506a27089ea121a254030ff8864250e1b6cb17711e4f96aeeab8` | 39172 | NO | no | checkout @ `review/observed-labels-fixes` `d0a0357b400c` |
 | choco | `models/observed_production_persistence.meta.json` (served) | `a310e0a4fa27d078359c2be14385ce1d50edc1109adacf5b77801ea86be6b2bb` | 28150 | yes | no | checkout @ `review/observed-labels-fixes` `d0a0357b400c` |
 | arabica | `reports/validation/yield_reference_skill.json` (main) | `b5db68412b7efa4fd288f07716b1d5804454a0bfd4836a8201e9bcac4b6739ad` | 6628 | yes | no | checkout @ `feat/observed-panel-and-fabrication-gates` `bb69ee283a3d` |
-| fray/spatial_infill | `reports/validation/models_of_record.json` (main) | `a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc` | 20541 | yes | no | checkout @ `feat/r8-record-checkpoint-and-repin` `2c4f3a796604` |
-| fray/forecast_available | `reports/validation/models_of_record.json` (main) | `a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc` | 20541 | yes | no | checkout @ `feat/r8-record-checkpoint-and-repin` `2c4f3a796604` |
-| torrent/melstm-10ep-n8-val | `reports/train/seed_summary_n8_val.json` (main) | `7d0c1d9ee48e98f0e216d0a8aa252565864b70e2ccef03bb3fb6f771c158ddd4` | 17468 | yes | no | checkout @ `feat/r8-registry-cleanup-and-repin` `58de276ebe4b` |
-| torrent/melstm-10ep-n8-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r8-registry-cleanup-and-repin` `58de276ebe4b` |
-| torrent/ridge-vs-melstm-val | `reports/train/row_parity_ridge_vs_melstm_val.json` (main) | `28fd9ace2517f5329ee9ff0c79a22c7dd389eaa5a586a739ccead2a85d416aad` | 1289 | yes | no | checkout @ `feat/r8-registry-cleanup-and-repin` `58de276ebe4b` |
-| torrent/ridge-vs-melstm-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r8-registry-cleanup-and-repin` `58de276ebe4b` |
-| chokepoint/level-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r8-serve-integration-and-repin` `222e138cc777` |
-| chokepoint/direction-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r8-serve-integration-and-repin` `222e138cc777` |
+| fray/spatial_infill | `reports/validation/models_of_record.json` (main) | `a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc` | 20541 | yes | no | checkout @ `feat/r9-foundation-adapter-and-stress` `d5c931c5e11b` |
+| fray/forecast_available | `reports/validation/models_of_record.json` (main) | `a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc` | 20541 | yes | no | checkout @ `feat/r9-foundation-adapter-and-stress` `d5c931c5e11b` |
+| fray/forecast_available | `reports/validation/weather_covariate_extension.json` (test_artifact) | `803412d7cf3875caebcbba632b959b8716e4fb8df675501dc06ed1689f5e8b3d` | 34480 | yes | no | checkout @ `feat/r9-foundation-adapter-and-stress` `d5c931c5e11b` |
+| torrent/melstm-10ep-n8-val | `reports/train/seed_summary_n8_val.json` (main) | `7d0c1d9ee48e98f0e216d0a8aa252565864b70e2ccef03bb3fb6f771c158ddd4` | 17468 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| torrent/melstm-10ep-n8-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| torrent/ridge-vs-melstm-val | `reports/train/row_parity_ridge_vs_melstm_val.json` (main) | `28fd9ace2517f5329ee9ff0c79a22c7dd389eaa5a586a739ccead2a85d416aad` | 1289 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| torrent/ridge-vs-melstm-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| torrent/ridge-vs-melstm-val | `reports/train/linear_reference_val_recheck.json` (left) | `fb8234d825df2b25a36da2c07a4aa59ec4bb003f2573eb828014c11b74a1f2e1` | 28618 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| torrent/ridge-vs-melstm-val | `reports/train/melstm_f_s1234_val.json` (right) | `615d5c9638ec6e2173e3336efcfd7dbd0a432e2f0d09d7d1d21e52b9d0f0d85a` | 38145 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| chokepoint/level-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r9-operator-surface` `287e048806d5` |
+| chokepoint/direction-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r9-operator-surface` `287e048806d5` |
 | surge | `data/model_registry/per_lead_anchor_ols/model.json` (main) | `3e8bf748277471e49e416572fd45afb042915f6577a3d2a6391345138331673d` | 17713 | yes | no | worktree `/Users/david/Downloads/Claude Code/resilient-surge/.worktrees/pr55` @ `feat/surgeistm-lora-finetune` `de37eddfbea7` |
 | surge | `data/model_registry/index.json` (index) | `cecdc5ecb66ed458719af2c29076abe97178072aa89d7808fe3f6a3c5ce93643` | 2639 | yes | no | worktree `/Users/david/Downloads/Claude Code/resilient-surge/.worktrees/pr55` @ `feat/surgeistm-lora-finetune` `de37eddfbea7` |
 | surge | `reports/holdout_reads.jsonl` (ledger) | `db3eec7008b6ea476a6b58be1ca886174cf202615d5841484602ab693cb30ab6` | 1735 | yes | no | worktree `/Users/david/Downloads/Claude Code/resilient-surge/.worktrees/pr55` @ `feat/surgeistm-lora-finetune` `de37eddfbea7` |
@@ -74,6 +77,7 @@ as it stands rather than normalised into a shape no repo actually uses.
 | blackout/vs-planning-anchor | `reports/train/weather_failure_test_read.json` (main) | `b835d0505de1bd08a96c31fd45eab468f3d2f5de1307f4816e74afa48a90c47e` | 6842 | yes | no | checkout @ `e021-decision` `ed80086937e1` |
 | blackout/vs-planning-anchor | `reports/train/weather_failure_all_in_scope_gate.json` (gate) | `8e844cdca13b1ef5533fba9e3d8a078cd7a03c275922b16ee7340e7e3637b37e` | 4788 | yes | no | checkout @ `e021-decision` `ed80086937e1` |
 | blackout/vs-persistence | `reports/train/weather_failure_test_read.json` (main) | `b835d0505de1bd08a96c31fd45eab468f3d2f5de1307f4816e74afa48a90c47e` | 6842 | yes | no | checkout @ `e021-decision` `ed80086937e1` |
+| blackout/vs-persistence | `reports/train/weather_failure_all_in_scope_gate.json` (gate) | `8e844cdca13b1ef5533fba9e3d8a078cd7a03c275922b16ee7340e7e3637b37e` | 4788 | yes | no | checkout @ `e021-decision` `ed80086937e1` |
 
 ## Artifacts that are not where a reader would look for them
 
@@ -89,17 +93,13 @@ as it stands rather than normalised into a shape no repo actually uses.
 - **torrent/ridge-vs-melstm-val** — the ridge is the `left` side here: the network is measured against it
 - **chokepoint/direction-head** — scored leave-one-corridor-out on the TRAIN frame, not on a holdout; the artifact says so in `frame` and the split column carries it verbatim
 - **surge** — these artifacts are NOT on the branch resilient-surge has checked out; they live on feat/surgeistm-lora-finetune in a linked worktree, which the artifact block records
-- **blackout/vs-planning-anchor** — the pre-registered anchor comparison, on all 101,424 test rows
+- **blackout/vs-planning-anchor** — the pre-registered anchor comparison, on all 101,424 test rows. The model of record is SERVED but not REGISTERED: the same gate artifact records `registry_state.n_versions: 0` with the note that nothing has ever been registered for this model, so a promotion would have nothing to move
 - **blackout/vs-persistence** — like-for-like: both sides on the 89,774-row persistence subset, which is the only frame in which the two are comparable
 
 ## Every NA in this table, and why
 
-- **fray/spatial_infill / test arm** — models_of_record.json carries no test-read counter or ledger; that TEST was scored once per track is asserted in `record_rule` prose, which is not a machine-readable field
-- **fray/forecast_available / test arm** — models_of_record.json carries no test-read counter or ledger; that TEST was scored once per track is asserted in `record_rule` prose, which is not a machine-readable field
-- **torrent/melstm-10ep-n8-val / model of record** — no committed JSON artifact in resilient-torrent declares a model of record. The ridge is named as one in prose only (docs/ESCALATIONS.md, docs/HYDROLOGY_VAL_RESULTS_AND_TEST_DECISION.md, CHANGELOG.md), and prose is not a field an adapter can read
+- **fray/spatial_infill / test arm** — no test-read counter exists for THIS track. The sibling `forecast_available` track's test artifact carries `test_reads_spent`, keyed by track name, and this row now reads it; spatial_infill's `source.kind` is `base-menu` and the measurement it names, reports/validation/observed_panel_model.json, has no equivalent field. That TEST was scored once per track is asserted in `record_rule` prose, which is not machine-readable. The gap is the counter, not the provenance
+- **torrent/melstm-10ep-n8-val / model of record** — no committed JSON artifact in resilient-torrent declares a model of record, and two committed artifacts positively say why not: model_mesh/CURRENT_STATE.json records `current_maturity` as 'software smoke with screening fixtures' and `baseline` as 'observed evaluation cohort not yet admitted', and model_mesh/MODEL_DESCRIPTOR.json records `evidence_status: test_only`. That file's `model_id` is the mesh service identity, not a trained model, and reading it into this column would put a service contract where a champion belongs. The ridge is named as the record in prose only (docs/ESCALATIONS.md, docs/HYDROLOGY_VAL_RESULTS_AND_TEST_DECISION.md, CHANGELOG.md)
 - **torrent/ridge-vs-melstm-val / model of record** — no committed JSON artifact in resilient-torrent declares a model of record; see the melstm-10ep-n8-val row
-- **torrent/ridge-vs-melstm-val / split** — row_parity_ridge_vs_melstm_val.json records the compared rows, the scored basin counts and `same_rows`, but no split field; the split appears in the FILENAME only, which no adapter should read as data
 - **chokepoint/level-head / bar score** — the level head IS the recorded bar — `recorded_bars.level.is_the_champion_head_itself` is true — so there is no separate bar figure to read. The challenger that failed against it is recorded under `challengers_that_failed`, not as a bar
 - **chokepoint/level-head / beats bar?** — baseline is NA, so no comparison is possible: the level head IS the recorded bar — `recorded_bars.level.is_the_champion_head_itself` is true — so there is no separate bar figure to read. The challenger that failed against it is recorded under `challengers_that_failed`, not as a bar
-- **blackout/vs-planning-anchor / model of record** — no committed artifact in resilient-blackout declares a served model of record. models/weather_failure_v1.joblib.provenance.json records that checkpoint's family and sha256 but not its serving status, and the gate artifact records `registry_state.n_versions: 0` — nothing has ever been registered for this model
-- **blackout/vs-persistence / model of record** — no committed artifact in resilient-blackout declares a served model of record; see the vs-planning-anchor row

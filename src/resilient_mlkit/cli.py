@@ -17,6 +17,7 @@ import sys
 import traceback
 from pathlib import Path
 
+from . import __version__
 from . import checks as checks_pkg
 from .checks import PHASE_ORDER, PHASES, RunContext, for_phase
 from .core import nonce as nonce_mod
@@ -25,8 +26,6 @@ from .core.repo import PORTFOLIO, Repo, discover, find_root
 from .core.result import CheckResult, CredentialRequired, Status
 from .core.table import phase_table
 from .portfolio import render_portfolio, resolve
-
-__version__ = "0.2.0"
 
 
 def _detect_offline(timeout: float = 2.0) -> bool:

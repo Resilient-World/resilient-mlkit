@@ -486,3 +486,187 @@ def test_tests_directory_is_not_walked(tmp_path):
 
     findings = ft.scan_repo(tmp_path)
     assert [f.path for f in findings] == ["scripts/build_panel.py"]
+
+
+# ---------------------------------------------------------------------------
+# The CHECK, not the scanner
+#
+# Everything above exercises `core.fabricated_targets` directly. That leaves the
+# wrapper untested, and the wrapper is where the consequential decisions live:
+# what counts as unmeasurable, whether the walk is scoped to declared trees, and
+# whether R11 reaches R5 before R5 counts rows by a field R11 has just shown to
+# be false. A scanner that is right inside a check that never calls it on the
+# right files is a check that measures nothing.
+# ---------------------------------------------------------------------------
+
+
+def _repo(tmp_path, toml: str, files: dict[str, str]):
+    from resilient_mlkit.core.repo import Repo
+
+    (tmp_path / ".mlkit").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".mlkit" / "repo.toml").write_text(toml)
+    for rel, body in files.items():
+        target = tmp_path / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(textwrap.dedent(body))
+    return Repo(name="fixturerepo", path=tmp_path)
+
+
+def _ctx(tmp_path):
+    from resilient_mlkit.checks import RunContext
+
+    return RunContext(nonce="test-nonce", root=tmp_path, offline=True)
+
+
+def test_r11_is_registered_and_gates_and_runs_before_R5():
+    """The ordering claim in the module docstring, held as an assertion.
+
+    R11 must precede R5, and the reason is not tidiness: R5 counts rows by the
+    provenance field R11 exists to falsify. An R5 PASS recorded after an R11
+    FAIL is a pass counted with a ruler the previous check just broke, and a
+    reader of the readiness table has no way to see that from the two verdicts
+    side by side.
+    """
+    from resilient_mlkit.checks import PHASE_ORDER, load_all
+    from resilient_mlkit.portfolio import gating_ids
+
+    load_all()
+    order = PHASE_ORDER["readiness"]
+    assert "R11" in order
+    assert order.index("R11") < order.index("R5")
+    # Third, after the licence gate and the other pure AST walk: same cost, and
+    # it invalidates the inputs of everything after it.
+    assert order[:3] == ["R9", "R10", "R11"]
+    assert "R11" in gating_ids()
+
+
+def test_positive_control_r11_fails_on_the_incident_and_writes_the_full_list(tmp_path):
+    """FIRES: the choco PR #160 shape, through the check rather than the scanner."""
+    from resilient_mlkit.checks.readiness import (
+        R11_REPORT_RELPATH,
+        r11_fabricated_targets,
+    )
+    from resilient_mlkit.core.result import Status
+
+    repo = _repo(
+        tmp_path,
+        '[repo]\nname = "x"\n[source]\ntrees = ["src"]\n',
+        {"scripts/build_panel.py": INCIDENT.format(label_origin="observed_ccc")},
+    )
+    result = r11_fabricated_targets(repo, _ctx(tmp_path))
+
+    assert result.status is Status.FAIL
+    assert result.evidence["target_fabricated"] == 1
+    assert result.evidence["files_walked"] == 1
+    # The row declared `split: "test"`, so this is R5's invariant broken at the
+    # source. The reason has to say so, because that is what changes the
+    # reader's next action.
+    assert result.evidence["stamped_into_holdout"] == 1
+    assert "R5's invariant" in result.reason
+    assert "label_origin" in result.reason
+
+    written = (tmp_path / R11_REPORT_RELPATH).read_text()
+    assert "TARGET_FABRICATED" in written
+    assert "scripts/build_panel.py" in written
+    assert "test-nonce" in written
+
+
+def test_negative_control_r11_passes_on_the_same_repo_labelled_synthetic(tmp_path):
+    """SILENT: one string different, and the repo is building fixtures.
+
+    The scanner-level pair for this exists above. It is repeated at the check
+    level because a wrapper is perfectly capable of turning a clean scan into a
+    FAIL -- or of reporting PASS while walking nothing -- and neither would show
+    up in a scanner test.
+    """
+    from resilient_mlkit.checks.readiness import (
+        R11_REPORT_RELPATH,
+        r11_fabricated_targets,
+    )
+    from resilient_mlkit.core.result import Status
+
+    repo = _repo(
+        tmp_path,
+        '[repo]\nname = "x"\n[source]\ntrees = ["src"]\n',
+        {"scripts/build_panel.py": INCIDENT.format(label_origin="synthetic")},
+    )
+    result = r11_fabricated_targets(repo, _ctx(tmp_path))
+
+    assert result.status is Status.PASS
+    assert result.evidence["findings"] == 0
+    # A PASS is only worth anything if something was walked. Without this the
+    # control is satisfied by an empty repo.
+    assert result.evidence["files_walked"] == 1
+    assert "(none)" in (tmp_path / R11_REPORT_RELPATH).read_text()
+
+
+def test_r11_walks_the_undeclared_tree_that_R10_cannot_see(tmp_path):
+    """The pair that is R11's entire reason for existing.
+
+    Same repo, same fixture, two checks. `[source] trees = ["src"]` is clean,
+    and the fabrication is in `scripts/` -- which is where the real incident
+    was. R10 is scoped to the declared trees, correctly, and reports PASS. R11
+    is not scoped, and reports FAIL.
+
+    Run together they say something neither says alone: R10 passing is a
+    statement about the declared trees and nothing more, and if R11 did not
+    exist that PASS would be the only signal in the table.
+    """
+    from resilient_mlkit.checks.readiness import (
+        r10_fabricated_defaults,
+        r11_fabricated_targets,
+    )
+    from resilient_mlkit.core.result import Status
+
+    repo = _repo(
+        tmp_path,
+        '[repo]\nname = "x"\n[source]\ntrees = ["src"]\n',
+        {
+            "src/model.py": "def predict(x):\n    return x * 2.0\n",
+            "scripts/build_panel.py": INCIDENT.format(label_origin="observed_ccc"),
+        },
+    )
+    ctx = _ctx(tmp_path)
+
+    r10 = r10_fabricated_defaults(repo, ctx)
+    assert r10.status is Status.PASS
+    assert r10.evidence["files_walked"] == 1, "R10 saw src/ only, which is right"
+
+    r11 = r11_fabricated_targets(repo, ctx)
+    assert r11.status is Status.FAIL
+    assert r11.evidence["files_walked"] == 2, "R11 saw both, which is the point"
+    assert r11.evidence["target_fabricated"] == 1
+
+
+def test_r11_is_NA_not_PASS_when_there_is_no_python_to_walk(tmp_path):
+    """A walk over nothing that reports green is the defect, applied to the check."""
+    from resilient_mlkit.checks.readiness import r11_fabricated_targets
+    from resilient_mlkit.core.result import Status
+
+    repo = _repo(tmp_path, '[repo]\nname = "x"\n', {"README.md": "no code here\n"})
+    result = r11_fabricated_targets(repo, _ctx(tmp_path))
+
+    assert result.status is Status.NA
+    assert "unmeasured, not established" in result.reason
+    assert result.evidence["files_walked"] == 0
+
+
+def test_r11_needs_no_declared_tree_at_all(tmp_path):
+    """SILENT on the config, loud on the code: there is no NA-by-omission path.
+
+    R10 goes NA when a repo declares no `[source] trees`, and that is right for
+    R10. R11 must not inherit it, because the declared-tree list is exactly the
+    surface an author controls -- an author who could make R11 quiet by
+    deleting a line of TOML would have a gate they can switch off.
+    """
+    from resilient_mlkit.checks.readiness import r11_fabricated_targets
+    from resilient_mlkit.core.result import Status
+
+    repo = _repo(
+        tmp_path,
+        '[repo]\nname = "x"\n',
+        {"scripts/build_panel.py": INCIDENT.format(label_origin="observed_ccc")},
+    )
+    result = r11_fabricated_targets(repo, _ctx(tmp_path))
+    assert result.status is Status.FAIL
+    assert result.evidence["files_walked"] == 1

@@ -4,9 +4,9 @@
 model repo.** `scripts/sync_spine.py` is the only writer, and it still refuses
 to overwrite a file it did not author.
 
-- generated: `2026-08-29T03:57:39+00:00`
-- run nonce: `mlkit-20260829T035739Z-c1210455524f`
-- spine: `/Users/david/Downloads/Claude Code/resilient-mlkit/spine` at mlkit `14fbe7272d0b076f53a7515dba9bf5924b60d1d2`
+- generated: `2026-08-29T06:40:15+00:00`
+- run nonce: `mlkit-20260829T064014Z-37158f11fe35`
+- spine: `/Users/david/Downloads/Claude Code/resilient-mlkit/spine` at mlkit `034122f406eed97742f7f70851dafa7566cc2f84`
 - canonical files compared per repo: **6**
 - verdicts: **DRIFTED** 16, **IN-SYNC** 32
 
@@ -24,9 +24,9 @@ to overwrite a file it did not author.
 |---|---|---|---|---|---|---|---|
 | choco | `review/observed-labels-fixes` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
 | arabica | `feat/observed-panel-and-fabrication-gates` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
-| fray | `feat/r8-record-checkpoint-and-repin` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
-| torrent | `feat/r8-registry-cleanup-and-repin` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
-| chokepoint | `feat/r8-serve-integration-and-repin` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
+| fray | `feat/r9-foundation-adapter-and-stress` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
+| torrent | `feat/r9-attributes-and-declared-scale` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
+| chokepoint | `feat/r9-operator-surface` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
 | surge | `feat/observed-corpus-and-fabrication-gates` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
 | triage | `e028-decision` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
 | blackout | `e021-decision` | **DRIFTED** (31 lines) | in sync | in sync | **DRIFTED** (66 lines) | in sync | in sync |
