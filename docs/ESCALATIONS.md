@@ -409,9 +409,9 @@ too. No tag should be cut from either branch until E-M08/E-M09 are settled.
 ## E-M11 — the v0.5.0 heading is reconciled; the number itself is still the signatory's
 
 **Measured by** `.venv/bin/python -m pytest tests/test_version_declaration.py -q
---timeout=180` on `feat/loop-mlkit-4` (python 3.14.6, pytest 9.1.1): 15 failed→
-see the branch's pre-registration commit for the FIRES run, 17 passed after the
-heading was corrected.
+--timeout=180` on `feat/loop-mlkit-4` (python 3.14.6, pytest 9.1.1): **2 failed,
+15 passed** against the `CHANGELOG.md` committed at `25cd618` (which is `main`'s
+byte for byte), and **17 passed** after the heading was corrected.
 
 **What was wrong.** `main` at `21f7e6f` carried a `v0.5.0` entry written on
 `feat/r10-served-contract` (PR #6), where the release was one new check, R12,
