@@ -2,10 +2,10 @@
  "artifact_schema": "resilient-mlkit/spine-drift/1",
  "generated_by": "mlkit spine",
  "mlkit_version": "0.2.0",
- "generated_at_utc": "2026-08-29T02:31:04+00:00",
- "run_nonce": "mlkit-20260829T023104Z-7354a849e03a",
+ "generated_at_utc": "2026-08-29T03:57:39+00:00",
+ "run_nonce": "mlkit-20260829T035739Z-c1210455524f",
  "spine_root": "/Users/david/Downloads/Claude Code/resilient-mlkit/spine",
- "mlkit_git_sha": "036683e15caf38d3f59f1a8d1d940982bd1211f3",
+ "mlkit_git_sha": "14fbe7272d0b076f53a7515dba9bf5924b60d1d2",
  "canonical_files": [
   "CLAUDE.md",
   "docs/DATA_POLICY.md",
@@ -26,18 +26,18 @@
    "dirty": false
   },
   "fray": {
-   "git_sha": "87a1dbee64d22ca83a08827e753d99671c5e5258",
-   "branch": "feat/r6-serving-and-uncertainty",
-   "dirty": true
+   "git_sha": "2c4f3a796604e479a136ce0c1c275983eb15931d",
+   "branch": "feat/r8-record-checkpoint-and-repin",
+   "dirty": false
   },
   "torrent": {
-   "git_sha": "b6b88af2f18226975e966b540698a14b79aa89f3",
-   "branch": "feat/r6-attributes-and-scale",
+   "git_sha": "58de276ebe4b9ab5de680c7e13ec8c1c1eb2f594",
+   "branch": "feat/r8-registry-cleanup-and-repin",
    "dirty": true
   },
   "chokepoint": {
-   "git_sha": "80f16a776864869b3b7e9117ce40bd692c44592f",
-   "branch": "feat/r6-horizon-ladder-and-uq",
+   "git_sha": "222e138cc777639c4d6a5a4c3bdf2178e8f8c90a",
+   "branch": "feat/r8-serve-integration-and-repin",
    "dirty": false
   },
   "surge": {

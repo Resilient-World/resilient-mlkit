@@ -12,7 +12,16 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
-## Unreleased
+## v0.3.0 — 2026-08-28
+
+Tagged at `d08d85e` (the merge of PR #3). This entry was retitled from
+"Unreleased" after the tag was cut; the tag itself is immutable and its tree
+matches what is described here. One known discrepancy in the tag, recorded
+rather than repaired: `pyproject.toml` and `cli.__version__` inside `v0.3.0`
+still read `0.2.0`, so artifacts generated from that tag stamp
+`mlkit_version: 0.2.0`. The `mlkit_git_sha` field in every generated artifact
+is the reliable identity. Whether to bump and cut a corrective tag is the
+session lead's call — see `docs/ESCALATIONS.md` E-M08.
 
 Two new read-only surfaces. Neither changes any check's verdict, so a repo that
 upgrades sees no gate move.
@@ -29,7 +38,22 @@ and — where the artifact does not carry the column — `NA` with the reason.
 Repos do not share an artifact schema and are not made to. Each declares its own
 pointers in `fleet_adapters.py`. Labels (metric, split) are corroborated
 mechanically against the pointer they are declared for, so a label that drifts
-from the quantity it names reports NA instead of mislabelling a real number.
+from the quantity it names reports NA instead of mislabelling a real number;
+`036683e` additionally rejects a `Declared` label that is itself a bare figure,
+closing the door that guard left open for a typed-in number.
+
+**An asserted verdict is not a measured one** (`1ca63dd`, found by adversarial
+verification of the branch before merge). Three rows point `beats bar?` at a
+boolean the repo publishes itself, and the first reader passed it straight
+through: a `true` rendered beside `score: NA`, and a `true` contradicting the
+row's own two figures, both silently. Fixed at the root in `core/fleet.py`: an
+asserted verdict is admitted only when the score and baseline on that row
+reproduce it, and is otherwise NA with the reason — strictly more conservative,
+since corroboration can turn an asserted pass into NA and never an NA into a
+pass. Measured on the real fleet at merge: no verdict changed; all three
+asserted booleans are reproduced by their rows' figures, and the artifact's
+`source` strings now record the corroboration. Five FIRES/SILENT controls in
+`tests/test_fleet.py`.
 
 ### `mlkit spine`
 

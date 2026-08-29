@@ -11,9 +11,9 @@ This file does NOT replace `portfolio/MODEL_QUALITY.md`. That document carries
 the adjudication and the refutation checks — judgement, which is not a field
 lookup. This one carries the arithmetic, so the two can disagree in public.
 
-- generated: `2026-08-29T02:59:39+00:00`
-- run nonce: `mlkit-20260829T025937Z-babb3f1b289d`
-- mlkit: `0.2.0` at `fe3c3917e7659a8d73d56311424d010293b8aeb0`
+- generated: `2026-08-29T03:56:30+00:00`
+- run nonce: `mlkit-20260829T035629Z-7b32b8958e8b`
+- mlkit: `0.2.0` at `d08d85ed796cef14c3602129e41d14e69900058f`
 - rows: **12**, cells measured: **99**, cells NA-with-reason: **9**
 
 ## Repos as they were read
@@ -23,10 +23,10 @@ lookup. This one carries the arithmetic, so the two can disagree in public.
 | arabica | `feat/observed-panel-and-fabrication-gates` | `bb69ee283a3d` | clean |
 | blackout | `e021-decision` | `ed80086937e1` | clean |
 | choco | `review/observed-labels-fixes` | `d0a0357b400c` | clean |
-| chokepoint | `feat/r6-horizon-ladder-and-uq` | `c4062c381fb9` | clean |
-| fray | `feat/r6-serving-and-uncertainty` | `712b5cdec22c` | clean |
+| chokepoint | `feat/r8-serve-integration-and-repin` | `222e138cc777` | clean |
+| fray | `feat/r8-record-checkpoint-and-repin` | `2c4f3a796604` | clean |
 | surge | `feat/observed-corpus-and-fabrication-gates` | `9eab2fe80177` | clean |
-| torrent | `feat/r6-attributes-and-scale` | `fb2f5c35cf92` | DIRTY |
+| torrent | `feat/r8-registry-cleanup-and-repin` | `58de276ebe4b` | DIRTY |
 | triage | `e028-decision` | `f44430853eac` | clean |
 
 ## Verdicts
@@ -59,14 +59,14 @@ as it stands rather than normalised into a shape no repo actually uses.
 | choco | `models/observed_production_head.meta.json` (main) | `779f80be4d58506a27089ea121a254030ff8864250e1b6cb17711e4f96aeeab8` | 39172 | NO | no | checkout @ `review/observed-labels-fixes` `d0a0357b400c` |
 | choco | `models/observed_production_persistence.meta.json` (served) | `a310e0a4fa27d078359c2be14385ce1d50edc1109adacf5b77801ea86be6b2bb` | 28150 | yes | no | checkout @ `review/observed-labels-fixes` `d0a0357b400c` |
 | arabica | `reports/validation/yield_reference_skill.json` (main) | `b5db68412b7efa4fd288f07716b1d5804454a0bfd4836a8201e9bcac4b6739ad` | 6628 | yes | no | checkout @ `feat/observed-panel-and-fabrication-gates` `bb69ee283a3d` |
-| fray/spatial_infill | `reports/validation/models_of_record.json` (main) | `a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc` | 20541 | yes | no | checkout @ `feat/r6-serving-and-uncertainty` `712b5cdec22c` |
-| fray/forecast_available | `reports/validation/models_of_record.json` (main) | `a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc` | 20541 | yes | no | checkout @ `feat/r6-serving-and-uncertainty` `712b5cdec22c` |
-| torrent/melstm-10ep-n8-val | `reports/train/seed_summary_n8_val.json` (main) | `7d0c1d9ee48e98f0e216d0a8aa252565864b70e2ccef03bb3fb6f771c158ddd4` | 17468 | yes | no | checkout @ `feat/r6-attributes-and-scale` `fb2f5c35cf92` |
-| torrent/melstm-10ep-n8-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r6-attributes-and-scale` `fb2f5c35cf92` |
-| torrent/ridge-vs-melstm-val | `reports/train/row_parity_ridge_vs_melstm_val.json` (main) | `28fd9ace2517f5329ee9ff0c79a22c7dd389eaa5a586a739ccead2a85d416aad` | 1289 | yes | no | checkout @ `feat/r6-attributes-and-scale` `fb2f5c35cf92` |
-| torrent/ridge-vs-melstm-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r6-attributes-and-scale` `fb2f5c35cf92` |
-| chokepoint/level-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r6-horizon-ladder-and-uq` `c4062c381fb9` |
-| chokepoint/direction-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r6-horizon-ladder-and-uq` `c4062c381fb9` |
+| fray/spatial_infill | `reports/validation/models_of_record.json` (main) | `a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc` | 20541 | yes | no | checkout @ `feat/r8-record-checkpoint-and-repin` `2c4f3a796604` |
+| fray/forecast_available | `reports/validation/models_of_record.json` (main) | `a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc` | 20541 | yes | no | checkout @ `feat/r8-record-checkpoint-and-repin` `2c4f3a796604` |
+| torrent/melstm-10ep-n8-val | `reports/train/seed_summary_n8_val.json` (main) | `7d0c1d9ee48e98f0e216d0a8aa252565864b70e2ccef03bb3fb6f771c158ddd4` | 17468 | yes | no | checkout @ `feat/r8-registry-cleanup-and-repin` `58de276ebe4b` |
+| torrent/melstm-10ep-n8-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r8-registry-cleanup-and-repin` `58de276ebe4b` |
+| torrent/ridge-vs-melstm-val | `reports/train/row_parity_ridge_vs_melstm_val.json` (main) | `28fd9ace2517f5329ee9ff0c79a22c7dd389eaa5a586a739ccead2a85d416aad` | 1289 | yes | no | checkout @ `feat/r8-registry-cleanup-and-repin` `58de276ebe4b` |
+| torrent/ridge-vs-melstm-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r8-registry-cleanup-and-repin` `58de276ebe4b` |
+| chokepoint/level-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r8-serve-integration-and-repin` `222e138cc777` |
+| chokepoint/direction-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r8-serve-integration-and-repin` `222e138cc777` |
 | surge | `data/model_registry/per_lead_anchor_ols/model.json` (main) | `3e8bf748277471e49e416572fd45afb042915f6577a3d2a6391345138331673d` | 17713 | yes | no | worktree `/Users/david/Downloads/Claude Code/resilient-surge/.worktrees/pr55` @ `feat/surgeistm-lora-finetune` `de37eddfbea7` |
 | surge | `data/model_registry/index.json` (index) | `cecdc5ecb66ed458719af2c29076abe97178072aa89d7808fe3f6a3c5ce93643` | 2639 | yes | no | worktree `/Users/david/Downloads/Claude Code/resilient-surge/.worktrees/pr55` @ `feat/surgeistm-lora-finetune` `de37eddfbea7` |
 | surge | `reports/holdout_reads.jsonl` (ledger) | `db3eec7008b6ea476a6b58be1ca886174cf202615d5841484602ab693cb30ab6` | 1735 | yes | no | worktree `/Users/david/Downloads/Claude Code/resilient-surge/.worktrees/pr55` @ `feat/surgeistm-lora-finetune` `de37eddfbea7` |
