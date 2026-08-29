@@ -12,6 +12,27 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v0.3.1 — 2026-08-28
+
+Not yet tagged. The heading is written at the version the code declares, not
+retitled from "Unreleased" after a tag is cut — that retitling step is what
+went missing at `v0.3.0`, and `tests/test_version_declaration.py` now fails the
+suite whenever the newest heading here and `resilient_mlkit.__version__`
+disagree.
+
+### The version is declared once
+
+`pyproject.toml`, `resilient_mlkit/__init__.py` and `resilient_mlkit/cli.py`
+each carried their own `0.2.0` literal, and `v0.3.0` was tagged with all three
+still unbumped (`docs/ESCALATIONS.md` E-M08). `pyproject.toml` now reads the
+value through `[tool.setuptools.dynamic]` and `cli` imports it, so there is one
+literal in the repo. Verified by execution against this branch: `pip install -e
+. --no-deps` then `pip show resilient-mlkit` reports `Version: 0.3.1`, and
+`mlkit --version` prints `mlkit 0.3.1`.
+
+The `v0.3.0` tag is unchanged and still ships `0.2.0` in its own tree; that is
+recorded in the entry below and is not repaired by this bump.
+
 ## v0.3.0 — 2026-08-28
 
 Tagged at `d08d85e` (the merge of PR #3). This entry was retitled from

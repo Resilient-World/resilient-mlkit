@@ -4,7 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "resilient-mlkit"
-version = "0.2.0"
+# Read from `resilient_mlkit.__version__`, not repeated here. Three separate
+# literals is how the v0.3.0 tag came to declare 0.2.0 in every artifact it
+# generated (docs/ESCALATIONS.md E-M08): each copy was individually plausible
+# and nothing compared them. See tests/test_version_declaration.py, which
+# additionally holds this against the newest CHANGELOG heading.
+dynamic = ["version"]
 description = "The single measurement and gating tool for the Resilient avoided-loss model portfolio"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,6 +26,9 @@ dependencies = [
 
 [project.scripts]
 mlkit = "resilient_mlkit.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "resilient_mlkit.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]

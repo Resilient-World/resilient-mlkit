@@ -240,3 +240,27 @@ rule 12 reserves release decisions of record to the signatory's process).
 `main` and cut `v0.3.1` from it, so the first tag whose tree and name agree is
 also the first one the repos re-pin to. Recorded in the CHANGELOG's `v0.3.0`
 entry so a reader of the tag finds the caveat next to the release notes.
+
+**Partly closed on `feat/r9-gate-coverage` (R9-VERSION), by operator direction**
+to bump `main` so the next tag is correct. What was done: the version is now
+declared once, in `resilient_mlkit.__version__`; `pyproject.toml` reads it via
+`[tool.setuptools.dynamic]` and `cli` imports it, so the three literals that
+disagreed inside `v0.3.0` are one literal that cannot. `main` declares `0.3.1`.
+Measured by execution on this branch:
+
+```
+.venv/bin/pip install -e . --no-deps  ; .venv/bin/pip show resilient-mlkit
+                                                   -> Version: 0.3.1
+.venv/bin/mlkit --version                          -> mlkit 0.3.1
+.venv/bin/python -m pytest tests/test_version_declaration.py -q
+                                                   -> 12 passed
+```
+
+`tests/test_version_declaration.py` holds `__version__` against the newest
+CHANGELOG heading and FIRES on both shapes that produced this escalation: a
+second `__version__` literal in a module, and a newest heading reading
+`Unreleased` rather than a version.
+
+**Still open, and still the signatory's:** the `v0.3.0` tag is untouched and its
+own tree still reads `0.2.0`. Cutting `v0.3.1` from `main`, and deciding when
+the eight repos re-pin to it, remains a release decision of record.
