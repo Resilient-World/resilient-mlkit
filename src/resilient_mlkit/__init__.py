@@ -7,5 +7,5 @@ the same as having none.
 
 from .core.result import CheckResult, CredentialRequired, Status
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = ["CheckResult", "CredentialRequired", "Status", "__version__"]

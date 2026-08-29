@@ -18,13 +18,23 @@ plausible numeric default that then satisfied the gate consuming it -- and
 every one of them lived in code no readiness check reached. R10 walks the
 declared source tree with ``ast`` instead of importing anything, so it sees the
 trainer's own feature path.
+
+R11 closes the last gap in that argument. R10 walks the trees a repo DECLARES,
+and resilient-choco PR #160 shipped fabricated data under ``scripts/`` --
+outside the declared trees, outside that repo's own generated-paths guard, and
+past fifty-one green tests. R11 walks every Python file in the repo and looks
+for one shape only: a value drawn from an RNG, flowed into a data record, and
+stamped with a provenance field claiming the record was observed. That stamp
+is what makes it a fabrication rather than a fixture, and it is what R5 counts
+rows by -- so R11 runs before R5, because when it fires, R5 is counting with a
+ruler somebody drew.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from ..core import fabrication, policy
+from ..core import environment, fabricated_targets, fabrication, policy, report
 from ..core.repo import BindingError, Repo
 from ..core.result import CheckResult, CredentialRequired
 from . import RunContext, check
@@ -511,8 +521,141 @@ def _write_r10_report(
     if not findings:
         lines.append("| — | — | — | — | — | (none) |")
     lines.append("")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines))
+    # Unguarded on purpose: this report is produced by parsing source, not by
+    # importing the repo, so it is measured correctly from any interpreter.
+    # See core/report.py, "WHAT IS NOT GUARDED, AND WHY".
+    report.guarded_write(
+        path, "\n".join(lines), probe=None, depends_on_bindings=False,
+        nonce=ctx.nonce, git_sha=repo.git_sha,
+    )
+
+
+#: Where R11 writes the full finding list, relative to the repo root.
+R11_REPORT_RELPATH = "reports/fabricated_targets.md"
+
+#: Most findings printed into a FAIL reason; the rest live in the report.
+R11_REASON_FINDINGS = 3
+
+
+@check("R11", PHASE, "FABRICATED_TARGETS — no RNG-derived row stamped as observed")
+def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
+    """Walk every Python file in the repo for fabricated targets.
+
+    The defect: a value is drawn from a random number generator, flows into
+    the numbers written onto a data record, and that record is stamped with a
+    provenance field claiming the numbers were observed. The stamp is the
+    defect -- the same code stamped ``synthetic`` is a fixture -- and it
+    compounds, because R5 counts rows BY that field and will count these as
+    real.
+
+    Deliberately NOT scoped to ``[source] trees``. R10 is, and that is right
+    for R10; here the declared-tree list is precisely the surface an author
+    controls, and the incident this check exists for (resilient-choco PR #160,
+    five files under ``scripts/``) lived entirely outside it. There is
+    therefore no NA path for an undeclared tree: every repo has Python files,
+    so every repo is measurable here.
+    """
+    findings = fabricated_targets.scan_repo(repo.path)
+    files = fabricated_targets.count_python_files([repo.path])
+
+    targets = [f for f in findings if f.severity == fabricated_targets.TARGET_FABRICATED]
+    inputs = [f for f in findings if f.severity != fabricated_targets.TARGET_FABRICATED]
+    in_holdout = [f for f in findings if f.split.lower() in {"val", "test", "valid", "validation"}]
+
+    report_path = repo.path / R11_REPORT_RELPATH
+    _write_r11_report(report_path, repo, ctx, findings, files)
+
+    evidence = {
+        "files_walked": files,
+        "findings": len(findings),
+        "target_fabricated": len(targets),
+        "input_fabricated": len(inputs),
+        "stamped_into_holdout": len(in_holdout),
+        "report": str(report_path.relative_to(repo.path)),
+        "top": [f.to_dict() for f in (targets or inputs)[:R11_REASON_FINDINGS]],
+    }
+
+    if not files:
+        # A repo with no Python source at all. Not a pass: a walk over nothing
+        # that reports green is the defect this instrument exists to catch,
+        # applied to the instrument.
+        return CheckResult.na(
+            "R11", PHASE,
+            f"no Python files found under {repo.path}; the absence of fabricated "
+            "targets is unmeasured, not established",
+            evidence,
+        )
+
+    if findings:
+        head = (targets or inputs)[:R11_REASON_FINDINGS]
+        detail = "; ".join(
+            f'{f.path}:{f.line} {f.field} <- {f.origin_call} stamped '
+            f'{f.claim_field}="{f.claim_value}"'
+            for f in head
+        )
+        more = len(findings) - len(head)
+        holdout = (
+            f"; {len(in_holdout)} of them declare a val/test split, which is R5's "
+            "invariant broken at the source"
+            if in_holdout else ""
+        )
+        return CheckResult.failed(
+            "R11", PHASE,
+            f"{len(findings)} record(s) built from an RNG draw carry a provenance "
+            f"field claiming observed origin ({len(targets)} of them fabricate the "
+            f"target itself): {detail}{holdout}"
+            + (f"; +{more} more in {R11_REPORT_RELPATH}" if more > 0 else ""),
+            evidence,
+        )
+    return CheckResult.passed("R11", PHASE, evidence)
+
+
+def _write_r11_report(
+    path: Path,
+    repo: Repo,
+    ctx: RunContext,
+    findings: list[fabricated_targets.Finding],
+    files: int,
+) -> None:
+    """Write every finding out, because a truncated reason is not evidence."""
+    lines = [
+        f"# Fabricated targets (R11) — resilient-{repo.name}",
+        "",
+        f"- run nonce: `{ctx.nonce}`",
+        f"- git SHA: `{repo.git_sha}`",
+        (f"- files walked: {files} (every `.py` in the repo, excluding vendored "
+         "directories and `tests/`)"),
+        f"- findings: {len(findings)}",
+        "",
+        "Each row is a record whose numbers can be traced back to a random draw and",
+        "whose provenance stamp says they were observed. The `claim` column is the",
+        "specific field that makes it a fabrication rather than an honestly-labelled",
+        "simulation: change that value to `synthetic` and the record becomes a",
+        "fixture, which this check does not report.",
+        "",
+        "`TARGET_FABRICATED` marks a draw reaching the field a model is trained to",
+        "predict. `INPUT_FABRICATED` marks one reaching another data field of the",
+        "same stamped record.",
+        "",
+        "| severity | record | field | drawn at | claim | split | drawn fields | corroborating |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for f in findings:
+        corroborating = ", ".join(f"`{c}`" for c in f.corroborating) or "—"
+        lines.append(
+            f"| {f.severity} | `{f.path}:{f.line}` | `{f.field}` | "
+            f"`{f.origin_symbol}` = `{f.origin_call}` (line {f.origin_line}) | "
+            f'`{f.claim_field}="{f.claim_value}"` | {f.split or "—"} | '
+            f"{f.tainted_fields}/{f.data_fields} | {corroborating} |"
+        )
+    if not findings:
+        lines.append("| — | — | — | — | — | — | — | (none) |")
+    lines.append("")
+    # Unguarded: static analysis, no repo imports. See core/report.py.
+    report.guarded_write(
+        path, "\n".join(lines), probe=None, depends_on_bindings=False,
+        nonce=ctx.nonce, git_sha=repo.git_sha,
+    )
 
 
 @check("R8", PHASE, "REPORT — readiness report generated from measured results")
@@ -520,6 +663,23 @@ def r8_report(repo: Repo, ctx: RunContext) -> CheckResult:
     prior = {k: v for k, v in ctx.prior.items() if k.startswith("R") and k != "R8"}
     if not prior:
         return CheckResult.na("R8", PHASE, "no R-check results in this run to report on")
+
+    # Ask, before composing anything, whether this interpreter could have
+    # measured any of it. A numpy-less python3.14 regenerated this exact file
+    # in at least four repos in August 2026, replacing measured PASSes with
+    # ModuleNotFoundError (resilient-chokepoint docs/ESCALATIONS.md E-019).
+    # Every one of those results was individually honest -- the check really
+    # did fail to run -- and the aggregate was still a lie, because the
+    # composite reads as a statement about the repo when it is a statement
+    # about the shell.
+    #
+    # assess(), not probe(): the import probe alone misses a lazily-importing
+    # binding, which imports cleanly from a broken interpreter and fails only
+    # when called. Measured 2026-08-28 from a numpy-less python 3.14.6,
+    # resilient-surge reported MEASURABLE on 11 of 11 bindings from an
+    # interpreter that cannot run any of them. The results this run already
+    # produced are the stronger evidence, and they cost nothing extra.
+    probe = environment.assess(repo, prior)
 
     lines = [
         f"# Readiness report — resilient-{repo.name}",
@@ -542,15 +702,31 @@ def r8_report(repo: Repo, ctx: RunContext) -> CheckResult:
     lines.append("")
 
     out = repo.path / "reports" / "readiness.md"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("\n".join(lines))
+    written = report.guarded_write(
+        out, "\n".join(lines),
+        probe=probe, depends_on_bindings=True,
+        nonce=ctx.nonce, git_sha=repo.git_sha,
+    )
 
     counts: dict[str, int] = {}
     for r in prior.values():
         counts[r.status.value] = counts.get(r.status.value, 0) + 1
-    return CheckResult.passed(
-        "R8", PHASE, {"path": str(out.relative_to(repo.path)), "counts": counts}
-    )
+
+    evidence = {
+        "path": str(out.relative_to(repo.path)),
+        "counts": counts,
+        "environment": probe.to_dict(),
+        "write": written.to_dict(),
+    }
+
+    if not written.written:
+        # NA, never FAIL. "This environment cannot measure this repo" is not a
+        # verdict on the repo, and recording it as one would put a red mark on
+        # eight repos every time somebody ran mlkit from the wrong shell --
+        # which is how a gate stops being read.
+        return CheckResult.na("R8", PHASE, written.reason, evidence)
+
+    return CheckResult.passed("R8", PHASE, evidence)
 
 
 # -- helpers --------------------------------------------------------------

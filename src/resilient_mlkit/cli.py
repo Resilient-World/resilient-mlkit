@@ -23,7 +23,7 @@ from .core.result import CheckResult, CredentialRequired, Status
 from .core.table import phase_table
 from .portfolio import render_portfolio, resolve
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 
 def _detect_offline(timeout: float = 2.0) -> bool:
@@ -261,6 +261,60 @@ def cmd_keys(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_env(args: argparse.Namespace) -> int:
+    """Report whether THIS interpreter can measure each repo at all.
+
+    Exists so that "environment unmeasurable" can be asked for directly rather
+    than only discovered after a phase has already tried to write over a
+    measured report. A numpy-less python3.14 regenerated ``reports/readiness.md``
+    in at least four repos in August 2026; this command answers, in one line
+    per repo and before anything is written, whether the shell you are in
+    could have measured anything.
+    """
+    from .core import environment
+
+    root = Path(args.root).resolve() if args.root else find_root()
+    repos = _select_repos(args, root)
+    if not repos:
+        print(f"no portfolio repos found under {root}", file=sys.stderr)
+        return 2
+
+    print(f"mlkit {__version__}  environment  interpreter={sys.executable}")
+    print(f"python {sys.version.split()[0]}  root={root}")
+    print()
+
+    rows, unmeasurable = [], 0
+    for repo in repos:
+        try:
+            probe = environment.probe(repo)
+        finally:
+            repo.release()
+        if probe.verdict == environment.UNMEASURABLE:
+            unmeasurable += 1
+        ok = sum(1 for v in probe.bindings.values() if v == "ok")
+        rows.append([
+            repo.name,
+            probe.verdict,
+            f"{ok}/{len(probe.bindings)}" if probe.bindings else "0/0",
+            ", ".join(probe.missing_modules[:4]) or "-",
+        ])
+
+    from .core.table import render
+
+    print(render(rows, ["REPO", "VERDICT", "BINDINGS OK", "MISSING FROM THIS INTERPRETER"]))
+    print()
+    print("MEASURABLE   this interpreter imported every declared binding")
+    print("UNMEASURABLE at least one binding needs a module that is not this repo's own")
+    print("             source and is absent here; binding-dependent reports are REFUSED")
+    print("UNDECLARED   no bindings declared, so nothing was imported and nothing concluded")
+    if unmeasurable:
+        print()
+        print(f"{unmeasurable} repo(s) cannot be measured from this interpreter. That is a")
+        print("fact about the shell, not about the repos. Re-run from each repo's own")
+        print("environment (its .venv, or `uv run --group gates`).")
+    return 1 if unmeasurable else 0
+
+
 def cmd_allowlist(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve() if args.root else find_root()
     repos = _select_repos(args, root)
@@ -319,6 +373,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_keys = sub.add_parser("keys", help="list credentials the portfolio is waiting on")
     common(p_keys)
     p_keys.set_defaults(func=cmd_keys)
+
+    p_env = sub.add_parser(
+        "env", help="report whether this interpreter can measure each repo at all"
+    )
+    common(p_env)
+    p_env.set_defaults(func=cmd_env)
 
     p_allow = sub.add_parser("allowlist", help="verify allowlist structure and signature")
     common(p_allow)
