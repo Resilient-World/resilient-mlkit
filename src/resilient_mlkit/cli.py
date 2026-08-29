@@ -148,9 +148,17 @@ def cmd_check(args: argparse.Namespace) -> int:
     print(f"root={root}  network={'offline' if offline else 'online'}")
     print()
 
-    # The denominator is what the phase DECLARES, read live from PHASE_ORDER,
-    # not what the run produced. `11/11 PASS` for a twelve-check phase is the
-    # shape this whole change exists to stop printing.
+    # The denominator is what the phase DECLARES, read live from PHASE_ORDER.
+    # NOTE, corrected: this line is NOT a behaviour change. `phase_ids(phase)`
+    # returns `list(PHASE_ORDER[phase])`, and the build before it read
+    # `total = len(PHASE_ORDER[phase])` -- the same value. An earlier comment
+    # here claimed the old build printed `11/11 PASS` for a twelve-check phase;
+    # measured against main 3df724d with R5 dropped from the registry, it
+    # printed `READINESS: 1/12 PASS  ESCALATED=1  NA=9` and exited 3. Going
+    # through `phase_ids` buys one thing only: a single live answer to "how
+    # many checks are in this phase", so a caller cannot hold a stale binding.
+    # The behaviour that changed is below, at the INCOMPLETE guard, and in
+    # `_run_phase`'s backfill.
     declared_ids = phase_ids(phase)
     total = len(declared_ids)
     agg: dict[str, int] = {}
@@ -212,8 +220,22 @@ def cmd_check(args: argparse.Namespace) -> int:
     # An incomplete run is not a green one, and this is checked BEFORE the
     # status ladder because a run that lost a check has nothing trustworthy to
     # say about the checks it kept. The denominator is PHASE_ORDER's; the
-    # numerator is what was actually aggregated. Before this, both came from
-    # the run, so they agreed by construction and the comparison was vacuous.
+    # numerator is what was actually aggregated. Before this there was no
+    # comparison at all: the counts summed to eleven, the fraction said twelve,
+    # and the ladder answered 3 off the NAs -- "unmeasured" for what is an
+    # instrument fault. (An earlier comment here said both sides came from the
+    # run and agreed by construction. They did not; the denominator was already
+    # `len(PHASE_ORDER[phase])`. Corrected rather than left standing.)
+    #
+    # Which side of the inequality is reachable, stated honestly: `_run_phase`
+    # now backfills every declared id, so `observed < expected` cannot arise
+    # from production code -- it is forceable only by replacing `_run_phase`
+    # itself, which is what tests/test_phase_denominator.py does.
+    # `observed > expected` IS production-reachable and this guard catches it:
+    # a check whose function returns a CheckResult carrying the wrong
+    # `check_id` (a copy-paste inside a check module -- `_run_phase` does not
+    # overwrite the id) leaves a declared id unproduced, gets a backfilled FAIL
+    # for it, and arrives here with one row too many.
     expected = total * len(repos)
     observed = sum(agg.values())
     if observed != expected:

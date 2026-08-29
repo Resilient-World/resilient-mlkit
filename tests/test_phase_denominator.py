@@ -1,11 +1,23 @@
 """SV-2-PHASE-EXIT — the phase's denominator is PHASE_ORDER, not what ran.
 
-``cmd_check`` derived both the printed fraction and the exit code from the
-results it happened to collect. Numerator and denominator therefore came from
-the same source and agreed by construction, so the comparison carried no
-information: a readiness phase that lost a check to an import error printed
-``11/11 PASS`` and exited ``0``. The fraction looked like coverage and was a
-tautology.
+CORRECTED BASELINE. An earlier version of this docstring said that ``cmd_check``
+derived both the printed fraction and the exit code from the results it
+collected, and that a readiness phase which lost a check printed ``11/11 PASS``
+and exited ``0``. That was written from reasoning, not from a run, and it is
+false. Measured against ``main`` 3df724d, with R5 dropped from ``_REGISTRY`` and
+readiness run against a fixture repo::
+
+    R5     -          not run
+    READINESS: 1/12 PASS  ESCALATED=1  NA=9        exit 3
+
+The denominator was already ``len(PHASE_ORDER[phase])`` on that build, and
+``phase_table`` already rendered the missing row as ``not run``.
+
+The real defect is narrower and is what the two guards below fix: eleven
+statuses were counted beside a denominator of twelve, and the ladder answered
+``3`` -- "unmeasured, stale or awaiting sign-off" -- for a registry that could
+not account for its own declared parts. That is an instrument fault and must
+exit ``1``.
 
 Two guards now stand between that and a green build, and both are exercised
 here in a control pair:
@@ -32,11 +44,12 @@ from pathlib import Path
 
 import pytest
 
+from resilient_mlkit import checks as checks_pkg
 from resilient_mlkit import cli
-from resilient_mlkit.checks import PHASE_ORDER, RunContext, phase_ids
+from resilient_mlkit.checks import PHASE_ORDER, CheckSpec, RunContext, phase_ids
 from resilient_mlkit.cli import LOST_RESULT_REASON, _run_phase, cmd_check
 from resilient_mlkit.core.repo import Repo
-from resilient_mlkit.core.result import Status
+from resilient_mlkit.core.result import CheckResult, Status
 
 PHASE = "readiness"
 
@@ -154,3 +167,47 @@ def test_lost_check_exits_one(
     # actionable: how many came back, and how many the phase declares.
     assert f"{len(phase_ids(PHASE)) - 1} result(s)" in captured.err
     assert f"{len(phase_ids(PHASE))} declared check(s)" in captured.err
+
+
+def test_lost_check_exits_one_from_a_production_shaped_defect(
+    one_repo_run: argparse.Namespace,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The guard fires without replacing ``_run_phase``.
+
+    ``test_lost_check_exits_one`` above forces ``cmd_check``'s denominator
+    comparison by replacing ``_run_phase`` wholesale -- a shape production
+    cannot reach, because ``_run_phase`` now backfills every declared id before
+    returning. A control that only fires in a shape production never uses
+    measures the test, not the code, so this is the same guard forced through a
+    defect that production CAN have.
+
+    ``_run_phase`` does not overwrite ``result.check_id`` with ``spec.check_id``.
+    A check whose function returns a ``CheckResult`` carrying the wrong id -- a
+    copy-paste inside a check module -- therefore leaves its declared id
+    unproduced. The backfill supplies a FAIL for the declared id, the
+    mislabelled row is kept rather than dropped, and the run arrives at the
+    guard with one row more than the phase declares.
+    """
+    real_spec = checks_pkg.get("R5")
+
+    def mislabelling(repo: Repo, ctx: RunContext) -> CheckResult:
+        result = real_spec.fn(repo, ctx)
+        result.check_id = "R5_TYPO"
+        return result
+
+    monkeypatch.setitem(
+        checks_pkg._REGISTRY,
+        "R5",
+        CheckSpec("R5", PHASE, real_spec.title, mislabelling),
+    )
+
+    code = cmd_check(one_repo_run)
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "INCOMPLETE" in err
+    # One row MORE than declared, not fewer: the declared id was backfilled and
+    # the mislabelled row was kept. Both halves of the comparison are named.
+    assert f"{len(phase_ids(PHASE)) + 1} result(s)" in err
+    assert f"{len(phase_ids(PHASE))} declared check(s)" in err

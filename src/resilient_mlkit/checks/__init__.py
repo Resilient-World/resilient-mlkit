@@ -143,9 +143,30 @@ def _unregistered(check_id: str, phase: str) -> CheckSpec:
     ``PHASE_ORDER`` declares and the registry does not hold was not reported
     missing -- it stopped existing. A phase that lost a check to an import
     error, a typo in a decorator, or a module dropped from ``load_all()`` ran
-    the remainder, counted the remainder, and printed a green ``11/11``. The
-    absence rendered as a success, which is the one outcome this package exists
-    to make impossible.
+    the remainder and counted the remainder.
+
+    What that actually produced, MEASURED against ``main`` 3df724d rather than
+    described -- R5 removed from ``_REGISTRY`` and a readiness phase run
+    against a fixture repo::
+
+        READINESS: 1/12 PASS  ESCALATED=1  NA=9        exit 3
+        R5     -          not run
+
+    So the denominator was never wrong (``cmd_check`` read
+    ``len(PHASE_ORDER[phase])`` on that build too) and the row was not invisible
+    (``core.table.phase_table`` already rendered ``not run``). One earlier
+    version of this docstring said the run "printed a green ``11/11``" and
+    exited 0; that baseline was written from reasoning rather than from a run
+    and both halves of it are false. Corrected here rather than left standing,
+    because a fabricated baseline is exactly what CLAUDE.md rule 2 forbids and
+    an overstated defect makes the real one harder to see.
+
+    The real defect, which is narrower and is what this function fixes: the
+    status counts summed to eleven beside a denominator of twelve, and the
+    ladder answered 3 -- "unmeasured" -- for what is an instrument fault. A
+    check that declared itself and never arrived is not something the
+    environment failed to support; it is the registry failing to account for
+    its own parts, and it must exit 1.
 
     A synthesized FAIL is the right shape rather than an NA. NA means "the
     environment could not support this measurement", and that is a statement
