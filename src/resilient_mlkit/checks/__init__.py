@@ -119,10 +119,88 @@ def get(check_id: str) -> CheckSpec:
     return _REGISTRY[check_id]
 
 
+#: The reason a synthesized row carries. A constant because the test that
+#: forces the row and the code that emits it must match on the same sentence
+#: rather than on two hand-typed strings that drift apart.
+UNREGISTERED_REASON = "declared in PHASE_ORDER but absent from registry after load_all()"
+
+
+def missing_from_registry() -> list[str]:
+    """Ids ``PHASE_ORDER`` declares that ``_REGISTRY`` does not hold.
+
+    Empty on a healthy tree. ``tests/test_registry_completeness.py`` asserts
+    exactly that, so the synthesized row below is a backstop against a state
+    the real package is never in -- not a state anyone is meant to reach.
+    """
+    return [cid for cid in all_check_ids() if cid not in _REGISTRY]
+
+
+def _unregistered(check_id: str, phase: str) -> CheckSpec:
+    """A FAIL-shaped stand-in for a check that declared itself and never arrived.
+
+    This function is the whole of the fix for the defect this module used to
+    have. ``for_phase`` filtered on ``if cid in _REGISTRY``, so an id that
+    ``PHASE_ORDER`` declares and the registry does not hold was not reported
+    missing -- it stopped existing. A phase that lost a check to an import
+    error, a typo in a decorator, or a module dropped from ``load_all()`` ran
+    the remainder, counted the remainder, and printed a green ``11/11``. The
+    absence rendered as a success, which is the one outcome this package exists
+    to make impossible.
+
+    A synthesized FAIL is the right shape rather than an NA. NA means "the
+    environment could not support this measurement", and that is a statement
+    about the world; this is a statement about the instrument, and an
+    instrument that cannot account for its own declared parts is broken, not
+    unlucky.
+    """
+
+    def _fn(repo: Repo, ctx: RunContext) -> CheckResult:
+        return CheckResult.failed(
+            check_id,
+            phase,
+            UNREGISTERED_REASON,
+            {
+                "declared_in": "checks.PHASE_ORDER",
+                "phase": phase,
+                "registry_size": len(_REGISTRY),
+                "registered_in_phase": [c for c in PHASE_ORDER[phase] if c in _REGISTRY],
+                "remedy": (
+                    "the check module either failed to import inside load_all() or no "
+                    "longer registers this id. Fix the module; do not remove the id "
+                    "from PHASE_ORDER to make this row go away"
+                ),
+            },
+        )
+
+    return CheckSpec(check_id, phase, f"{check_id} (unregistered)", _fn)
+
+
 def for_phase(phase: str) -> list[CheckSpec]:
+    """Every id ``PHASE_ORDER`` declares for ``phase``, in order, none dropped.
+
+    The length of the returned list is ``len(PHASE_ORDER[phase])``, always. An
+    id the registry does not hold comes back as a spec that FAILs with
+    ``UNREGISTERED_REASON`` instead of being filtered out.
+    """
     if phase not in PHASE_ORDER:
         raise KeyError(f"unknown phase {phase!r}; expected one of {PHASES}")
-    return [_REGISTRY[cid] for cid in PHASE_ORDER[phase] if cid in _REGISTRY]
+    return [
+        _REGISTRY[cid] if cid in _REGISTRY else _unregistered(cid, phase)
+        for cid in PHASE_ORDER[phase]
+    ]
+
+
+def phase_ids(phase: str) -> list[str]:
+    """The ids ``PHASE_ORDER`` declares for ``phase``, read live.
+
+    The denominator of a phase run. Callers go through this rather than
+    importing ``PHASE_ORDER`` by name so that there is exactly one answer to
+    "how many checks are in this phase", and so a caller cannot end up holding
+    a stale binding to a dict the registry has since been asked about.
+    """
+    if phase not in PHASE_ORDER:
+        raise KeyError(f"unknown phase {phase!r}; expected one of {PHASES}")
+    return list(PHASE_ORDER[phase])
 
 
 def all_check_ids() -> list[str]:

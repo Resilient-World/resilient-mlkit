@@ -1,85 +1,151 @@
 {
   "report_type": "served_hash_parity",
-  "question": "does resilient_mlkit.core.served.canonical_payload_sha256 reproduce the artifact_sha256 each repo's own local function already committed?",
-  "generated_at": "2026-08-29T07:44:11.730151+00:00",
+  "question": "does resilient_mlkit.core.served reproduce every committed champion pin in the fleet -- canonical_payload_sha256 for a record that hashes itself, sha256_file for a record that pins a separate coefficient file's bytes?",
+  "generated_at": "2026-08-29T15:44:08.069161+00:00",
   "mlkit_version": "0.5.0",
-  "mlkit_git_sha": "14b2e6c96ff03fd2a91b1e5a477f16dedb1e281a",
+  "mlkit_git_sha": "f48334f9c6d3b56aee28d8d405e7a68a4b35f06c",
   "python": "3.14.6",
   "portfolio_root": "/Users/david/Downloads/Claude Code",
-  "artifacts_compared": 5,
-  "matched": 5,
+  "searched_roots": [
+    "models",
+    "data/model_registry"
+  ],
+  "artifacts_compared": 8,
+  "matched": 8,
   "differed": 0,
+  "unresolvable_pins": 0,
+  "by_kind": {
+    "canonical_self_hash": {
+      "compared": 5,
+      "matched": 5,
+      "differed": 0,
+      "unresolvable": 0,
+      "means": "top-level artifact_sha256 over the record's own canonical JSON with the hash field excluded; recomputed with core.served.canonical_payload_sha256. Every field of the record is covered by this digest."
+    },
+    "sidecar_coefficient_digest": {
+      "compared": 3,
+      "matched": 3,
+      "differed": 0,
+      "unresolvable": 0,
+      "means": "top-level artifact.sha256 over the bytes of the separate file at artifact.path; recomputed with core.served.sha256_file. WEAKER than a self-hash: the coefficients cannot be swapped undetected, but the record wrapped around them carries no digest of itself, so its metrics, splits and provenance prose can be edited without this digest moving."
+    }
+  },
   "rows": [
     {
       "repo": "choco",
-      "git_sha": "d0a0357b400cc6ea13a9fa5172a50e48463f2c0e",
+      "git_sha": "a54d0e9ab1b88f42648a2f2f864fd7ba3ba574f0",
+      "branch": "main",
       "status": "NA",
-      "reason": "no committed artifact under models/ carries an artifact_sha256; this repo serves nothing hash-pinned yet"
+      "reason": "no JSON under models/ or data/model_registry/ -- in the checkout or any linked worktree -- carries a top-level artifact_sha256 or a top-level artifact object with both path and sha256. This states what was searched for and not found; it is not a finding about what the repo serves"
     },
     {
       "repo": "arabica",
-      "git_sha": "bb69ee283a3d9f336c4e72d9dc08bdc00f42a6bd",
-      "status": "NA",
-      "reason": "no committed artifact under models/ carries an artifact_sha256; this repo serves nothing hash-pinned yet"
-    },
-    {
-      "repo": "fray",
-      "git_sha": "3b1941f9c92facc5df5f4b5ac9565d4076ced116",
-      "artifact": "models/county_yield/champion_forecast_available.json",
-      "recorded_sha256": "b6a9b9331232e3a941a4d4b59cc25ec56bccf677c0f558f8b551cf95f766cd12",
-      "recomputed_sha256": "b6a9b9331232e3a941a4d4b59cc25ec56bccf677c0f558f8b551cf95f766cd12",
+      "git_sha": "5cc0fd0d186ec469f064b3f3231166440b6031d8",
+      "branch": "main",
+      "artifact": "models/yield_model_of_record/model.json",
+      "kind": "sidecar_coefficient_digest",
+      "pins": "models/yield_model_of_record/coefficients.json",
+      "verified_with": "core.served.sha256_file",
+      "recorded_sha256": "db945e7edaf53918d453ce4f9d6d30c3403e56e9ae7f501ff432526e1b268399",
+      "recomputed_sha256": "db945e7edaf53918d453ce4f9d6d30c3403e56e9ae7f501ff432526e1b268399",
+      "referenced_bytes": 1360,
       "status": "MATCH"
     },
     {
       "repo": "fray",
-      "git_sha": "3b1941f9c92facc5df5f4b5ac9565d4076ced116",
+      "git_sha": "aef69eda3ac6e77eb1d31a8421a73ac878c326aa",
+      "branch": "feat/loop-fray-3",
+      "artifact": "models/county_yield/champion_forecast_available.json",
+      "kind": "canonical_self_hash",
+      "pins": "this record's own canonical JSON",
+      "verified_with": "core.served.canonical_payload_sha256",
+      "recorded_sha256": "b862f7f56c3774d7972005ad8652ab6318261e3451b37e9f3d7efb186ca98a12",
+      "recomputed_sha256": "b862f7f56c3774d7972005ad8652ab6318261e3451b37e9f3d7efb186ca98a12",
+      "status": "MATCH"
+    },
+    {
+      "repo": "fray",
+      "git_sha": "aef69eda3ac6e77eb1d31a8421a73ac878c326aa",
+      "branch": "feat/loop-fray-3",
       "artifact": "models/county_yield/champion_spatial_infill.json",
-      "recorded_sha256": "cba79308d6d545720ddc685a6bc48a82e7cb56e699b99b308744b429588a845c",
-      "recomputed_sha256": "cba79308d6d545720ddc685a6bc48a82e7cb56e699b99b308744b429588a845c",
+      "kind": "canonical_self_hash",
+      "pins": "this record's own canonical JSON",
+      "verified_with": "core.served.canonical_payload_sha256",
+      "recorded_sha256": "da2d077363683093cdbfe8fc4ecf9960760e783e0f6a9bc158d892eba3f4f9cc",
+      "recomputed_sha256": "da2d077363683093cdbfe8fc4ecf9960760e783e0f6a9bc158d892eba3f4f9cc",
       "status": "MATCH"
     },
     {
       "repo": "torrent",
-      "git_sha": "c16c2101d8e2eb0e71a5c2bb10ec2859c17b9a1c",
-      "status": "NA",
-      "reason": "no committed artifact under models/ carries an artifact_sha256; this repo serves nothing hash-pinned yet"
+      "git_sha": "a60f1594163673a5473193937b6bdb3f879fc518",
+      "branch": "feat/loop-torrent-4",
+      "artifact": "models/hydrology_ridge/model.json",
+      "kind": "sidecar_coefficient_digest",
+      "pins": "models/hydrology_ridge/ridge.npz",
+      "verified_with": "core.served.sha256_file",
+      "recorded_sha256": "0f168335d49c9ecb7991942f7d99ac24ed2c477065ba80f42c4434e852f23fb7",
+      "recomputed_sha256": "0f168335d49c9ecb7991942f7d99ac24ed2c477065ba80f42c4434e852f23fb7",
+      "referenced_bytes": 2446,
+      "status": "MATCH"
     },
     {
       "repo": "chokepoint",
-      "git_sha": "57695ab780dc3e0fcf5a85d79acbc6d8f64879a7",
+      "git_sha": "c8ef34bbc555ed1a45107a48fab586b256195bf9",
+      "branch": "main",
       "artifact": "models/daily_flow/champion.json",
+      "kind": "canonical_self_hash",
+      "pins": "this record's own canonical JSON",
+      "verified_with": "core.served.canonical_payload_sha256",
       "recorded_sha256": "408cb02daf86c27d5cc94e0bca77b697b5f8dc7ada0f4171950eab175e63c224",
       "recomputed_sha256": "408cb02daf86c27d5cc94e0bca77b697b5f8dc7ada0f4171950eab175e63c224",
       "status": "MATCH"
     },
     {
       "repo": "chokepoint",
-      "git_sha": "57695ab780dc3e0fcf5a85d79acbc6d8f64879a7",
+      "git_sha": "c8ef34bbc555ed1a45107a48fab586b256195bf9",
+      "branch": "main",
       "artifact": "models/episode_response/champion.json",
+      "kind": "canonical_self_hash",
+      "pins": "this record's own canonical JSON",
+      "verified_with": "core.served.canonical_payload_sha256",
       "recorded_sha256": "3efca9a6ee9bad96b7b31ea6ea6b96f0ddcd0ad19eaeccc43f085d3297954391",
       "recomputed_sha256": "3efca9a6ee9bad96b7b31ea6ea6b96f0ddcd0ad19eaeccc43f085d3297954391",
       "status": "MATCH"
     },
     {
       "repo": "surge",
-      "git_sha": "9eab2fe801776d3fbad064900c204dac5d1e0f48",
-      "status": "NA",
-      "reason": "no committed artifact under models/ carries an artifact_sha256; this repo serves nothing hash-pinned yet"
-    },
-    {
-      "repo": "triage",
-      "git_sha": "f44430853eac04ade440f586a08a106cb2a870bf",
-      "artifact": "models/weekly_mortality/champion.json",
-      "recorded_sha256": "ec8bd643dc433bd5798bc531f8d4cd19b8abe48aa51fa6b94bc0a201e1e2ad56",
-      "recomputed_sha256": "ec8bd643dc433bd5798bc531f8d4cd19b8abe48aa51fa6b94bc0a201e1e2ad56",
+      "git_sha": "826a226017936ab92d8899e423c7e6778dc64ab0",
+      "branch": "feat/loop-surge-2",
+      "artifact": "data/model_registry/per_lead_anchor_ols/model.json",
+      "kind": "sidecar_coefficient_digest",
+      "pins": "data/model_registry/per_lead_anchor_ols/coefficients.npz",
+      "verified_with": "core.served.sha256_file",
+      "recorded_sha256": "6e5b1a1cf71c7755ebb10874099d4c88256711e32b20154bfefac41170b9382f",
+      "recomputed_sha256": "6e5b1a1cf71c7755ebb10874099d4c88256711e32b20154bfefac41170b9382f",
+      "referenced_bytes": 3234,
       "status": "MATCH"
     },
     {
+      "repo": "triage",
+      "git_sha": "afb33e9b16ea1710645db234124d7caedb438f1c",
+      "branch": "HEAD",
+      "artifact": "models/weekly_mortality/champion.json",
+      "kind": "canonical_self_hash",
+      "pins": "this record's own canonical JSON",
+      "verified_with": "core.served.canonical_payload_sha256",
+      "recorded_sha256": "ec8bd643dc433bd5798bc531f8d4cd19b8abe48aa51fa6b94bc0a201e1e2ad56",
+      "recomputed_sha256": "ec8bd643dc433bd5798bc531f8d4cd19b8abe48aa51fa6b94bc0a201e1e2ad56",
+      "status": "MATCH",
+      "worktree": "/Users/david/Downloads/Claude Code/resilient-triage/.worktrees/e029",
+      "scope_note": "sourced from a linked worktree, not the repo's checked-out branch; this row is evidence about that worktree"
+    },
+    {
       "repo": "blackout",
-      "git_sha": "ed80086937e1a4c02bb2ac1ce79a754ae8fecdcf",
+      "git_sha": "68cf76fd89d1baf59c3e0660eecefc8b813f69e6",
+      "branch": "main",
       "status": "NA",
-      "reason": "no committed artifact under models/ carries an artifact_sha256; this repo serves nothing hash-pinned yet"
+      "reason": "no JSON under models/ or data/model_registry/ -- in the checkout or any linked worktree -- carries a top-level artifact_sha256 or a top-level artifact object with both path and sha256. This states what was searched for and not found; it is not a finding about what the repo serves"
     }
   ],
-  "note": "Duplicates inside .worktrees are excluded: a worktree carries a byte-identical copy of the same artifact and would inflate the count without adding evidence."
+  "note": "The two kinds are counted separately and must not be added together as though they asserted the same thing: a canonical_self_hash covers every field of the record, a sidecar_coefficient_digest covers only the file it points at and leaves the record itself unpinned. Duplicates inside .worktrees are excluded from a tree's own scan; a linked worktree is consulted only when the checkout yields nothing, so it can add evidence and never inflate a count. An NA states what was searched for and not found -- it is not a finding about what a repo serves."
 }
