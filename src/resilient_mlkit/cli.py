@@ -28,7 +28,6 @@ from .core.table import phase_table
 from .portfolio import render_portfolio, resolve
 
 
-
 def _detect_offline(timeout: float = 2.0) -> bool:
     """Cheap reachability probe.
 

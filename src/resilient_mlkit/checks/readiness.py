@@ -322,14 +322,50 @@ def r5_data_provenance(repo: Repo, ctx: RunContext) -> CheckResult:
     if missing:
         return CheckResult.failed("R5", PHASE, "provenance missing splits: " + ", ".join(missing))
 
+    # A histogram of ROW COUNTS, or the invariant below is arithmetic about
+    # nothing. Two ways that went wrong, both silent, both measured:
+    #
+    #   {"real": 1.5, "synthetic": 0.5} -- a repo reporting PROPORTIONS. int()
+    #   truncates, so int(0.5) == 0 cleared the taint test and int(1.5) == 1
+    #   satisfied "at least one real row": a val split one third simulated,
+    #   reported PASS.
+    #
+    #   {"real": 100, "synthetic": -5} -- a counter that had gone negative.
+    #   -5 > 0 is False, so a broken count read as a clean holdout.
+    #
+    # Both are refused here rather than coerced, because the correct reading of
+    # a count mlkit does not understand is "unknown", and an unknown count in
+    # an evaluation split cannot clear the one invariant that is absolute.
+    counts: dict[str, dict[str, int]] = {}
+    malformed: list[str] = []
+    for split in ("train", "val", "test"):
+        counts[split] = {}
+        for kind, raw in prov[split].items():
+            try:
+                n = float(raw)
+            except (TypeError, ValueError):
+                malformed.append(f"{split}.{kind}={raw!r} is not a number")
+                continue
+            if n != int(n) or n < 0:
+                malformed.append(
+                    f"{split}.{kind}={raw!r} is not a whole non-negative row count"
+                )
+                continue
+            counts[split][str(kind)] = int(n)
+    if malformed:
+        return CheckResult.failed(
+            "R5", PHASE,
+            "provenance must report whole row counts per kind, and "
+            + "; ".join(malformed[:4])
+            + "; a count mlkit cannot read is an unknown, and an unknown cannot "
+            "clear the val/test invariant",
+            {"malformed": malformed},
+        )
+
     # The invariant is absolute: not a single simulated row in val or test.
     tainted: dict[str, dict[str, int]] = {}
     for split in ("val", "test"):
-        bad = {
-            kind: int(n)
-            for kind, n in prov[split].items()
-            if kind != "real" and int(n) > 0
-        }
+        bad = {kind: n for kind, n in counts[split].items() if kind != "real" and n > 0}
         if bad:
             tainted[split] = bad
 
@@ -345,7 +381,7 @@ def r5_data_provenance(repo: Repo, ctx: RunContext) -> CheckResult:
             "estimate cannot be believed against a target the pipeline generated",
             {**evidence, "tainted": tainted},
         )
-    if int(prov["val"].get("real", 0)) == 0 or int(prov["test"].get("real", 0)) == 0:
+    if counts["val"].get("real", 0) == 0 or counts["test"].get("real", 0) == 0:
         return CheckResult.failed("R5", PHASE, "val or test contains zero real rows", evidence)
     return CheckResult.passed("R5", PHASE, evidence)
 
