@@ -432,3 +432,142 @@ def test_every_portfolio_repo_has_at_least_one_adapter() -> None:
 
     covered = {a.repo for a in ADAPTERS}
     assert covered == set(PORTFOLIO), f"repos with no declared adapter: {set(PORTFOLIO) - covered}"
+
+
+# ------------------------------------ no figure may be typed into an adapter
+#
+# The reader exists because a hand-transcribed number has no error detection.
+# That guarantee survives only while the DECLARATIONS stay free of figures: one
+# `score=Declared("74.16097783177521")` and the table is back to being typed in,
+# except now it is typed in somewhere nobody reads and rendered with the
+# authority of a machine.
+#
+# This is live right now. fray's `forecast_available` record is being restated
+# this round to the verified weather winner. mlkit must pick that up by reading
+# whatever fray commits, and must not carry the figure itself.
+
+
+def _adapter_source() -> str:
+    import resilient_mlkit.fleet_adapters as mod
+
+    return Path(mod.__file__).read_text(encoding="utf-8")
+
+
+def numeric_literals(source: str) -> list[str]:
+    """Every int/float literal in real code in ``source``.
+
+    An `ast` walk, so comments and docstrings are out of scope by construction
+    and the prose above may discuss figures freely. Booleans are excluded:
+    `lower_is_better=True` is a property of the metric, not a value of it.
+    """
+    import ast
+
+    out: list[str] = []
+    for node in ast.walk(ast.parse(source)):
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, (int, float))
+            and not isinstance(node.value, bool)
+        ):
+            out.append(f"line {node.lineno}: {node.value!r}")
+    return out
+
+
+def test_no_adapter_declaration_contains_a_numeric_literal() -> None:
+    """FIRES on a typed-in figure. This is the guarantee the whole command rests on."""
+    found = numeric_literals(_adapter_source())
+    assert found == [], (
+        "fleet_adapters.py contains numeric literals. Nothing in an adapter is a "
+        "measurement -- an adapter is a path, a pointer, a corroborated label or a "
+        "written reason. A number here is a hand-transcribed figure wearing the "
+        f"generated table's authority: {found}"
+    )
+
+
+def test_positive_control_a_typed_in_figure_is_caught() -> None:
+    """FIRES: the exact mistake the note above warns about, in miniature.
+
+    Without this, the test above is equally consistent with a walker that finds
+    nothing because it is looking in the wrong place.
+    """
+    smuggled = (
+        'X = Adapter(\n'
+        '    repo="fray",\n'
+        '    lower_is_better=True,\n'
+        '    score=Declared("74.16097783177521"),\n'
+        '    baseline_score=74.16097783177521,\n'
+        ')\n'
+    )
+    found = numeric_literals(smuggled)
+    assert len(found) == 1, found
+    assert "74.16097783177521" in found[0]
+
+
+def test_negative_control_a_figure_in_prose_is_not_a_declaration() -> None:
+    """SILENT: an adapter may explain itself, including about numbers.
+
+    `blackout/vs-persistence` says "the 89,774-row persistence subset" in its
+    note, and must keep being able to. Only executable literals count.
+    """
+    prose_only = (
+        '"""fray moved to the winner at TEST MAE 74.16097783177521."""\n'
+        'X = Adapter(\n'
+        '    # persistence scores only 89,774 of the 101,424 rows\n'
+        '    note="like-for-like on the 89,774-row subset",\n'
+        '    lower_is_better=False,\n'
+        ')\n'
+    )
+    assert numeric_literals(prose_only) == []
+
+
+def test_a_declared_label_that_is_a_bare_figure_cannot_be_admitted(
+    toy_repo: Repo,
+) -> None:
+    """The other door into the same room, closed by corroboration.
+
+    `Declared` takes a string, so a figure CAN be typed as one and slip past a
+    numeric-literal walk. It still must not reach the table: a label is admitted
+    only when the pointer it is declared against echoes it, and no pointer
+    echoes a bare number. NA with a reason, never the figure.
+
+    On the shape of the assertion. This test first asserted that the figure
+    appears nowhere in the rendered cell, and that FAILED -- the NA reason
+    quotes the rejected label back, verbatim and by design. Quoting what was
+    refused is the behaviour that makes the refusal checkable, so the test was
+    wrong and the code was right. What is asserted instead is the property that
+    actually matters: the figure never becomes the cell's VALUE, and the cell
+    renders as an NA rather than as a number.
+    """
+    row = read_row(toy_repo, _adapter(metric=Declared("74.16097783177521")))
+    assert not row.metric.present
+    assert "not echoed" in row.metric.na_reason
+    assert row.metric.value != "74.16097783177521"
+    assert row.metric.render().startswith("NA"), (
+        "a bare figure declared as a label rendered as though it were a value"
+    )
+
+
+def test_the_reader_follows_the_artifact_when_the_recorded_figure_changes(
+    toy_repo: Repo,
+) -> None:
+    """The fray case, exercised: rewrite the artifact, re-read, get the new number.
+
+    Read twice off the same declaration with the file changed in between. If any
+    figure were baked into the adapter or cached across reads, the two scores
+    would agree -- and the second would be quietly wrong.
+    """
+    adapter = _adapter()
+    before = read_row(toy_repo, adapter)
+
+    path = toy_repo.path / "reports" / "scores.json"
+    document = json.loads(path.read_text())
+    document["splits_scored"]["test"]["candidates"][0]["rmse"] = 74.16097783177521
+    path.write_text(json.dumps(document))
+
+    after = read_row(toy_repo, adapter)
+    assert before.score.value != after.score.value, (
+        "the score did not move when the artifact did, so it is not being read "
+        "from the artifact"
+    )
+    assert after.score.value == 74.16097783177521
+    assert after.score.present
