@@ -1,0 +1,1151 @@
+{
+ "artifact_schema": "resilient-mlkit/fleet-verdicts/1",
+ "generated_by": "mlkit portfolio",
+ "mlkit_version": "0.5.0",
+ "generated_at_utc": "2026-08-29T17:45:56+00:00",
+ "run_nonce": "mlkit-20260829T174552Z-eb880d15132b",
+ "root": "/Users/david/Downloads/Claude Code",
+ "mlkit_git_sha": "2abbd2beeb96831da321c9db70de3b32fe490743",
+ "repos_read": {
+  "arabica": {
+   "git_sha": "b186c2b140d953e873a1a183c62d23ed130bea83",
+   "branch": "fix/e-046-rng-streams-self-describe-synthetic",
+   "dirty": true
+  },
+  "blackout": {
+   "git_sha": "68cf76fd89d1baf59c3e0660eecefc8b813f69e6",
+   "branch": "main",
+   "dirty": true
+  },
+  "choco": {
+   "git_sha": "a54d0e9ab1b88f42648a2f2f864fd7ba3ba574f0",
+   "branch": "main",
+   "dirty": false
+  },
+  "chokepoint": {
+   "git_sha": "9f54300c9b69cde5b54af96397b30fb085bb7af3",
+   "branch": "feat/loop-chokepoint-2",
+   "dirty": true
+  },
+  "fray": {
+   "git_sha": "e95f99530fc858c178ed86b27e70c870365d1436",
+   "branch": "main",
+   "dirty": false
+  },
+  "surge": {
+   "git_sha": "727dee5fe25e15137f422746d1166fa782aadd9f",
+   "branch": "main",
+   "dirty": true
+  },
+  "torrent": {
+   "git_sha": "b66e000298555644a54aabc1b31e99ca08e6b9e4",
+   "branch": "feat/scs-mirror-retirement-proposal",
+   "dirty": true
+  },
+  "triage": {
+   "git_sha": "ef85b1c94c48eb2719735215696f48646849597d",
+   "branch": "main",
+   "dirty": true
+  }
+ },
+ "repos_not_found_under_root": [],
+ "counts": {
+  "rows": 12,
+  "cells_measured": 97,
+  "cells_na": 11
+ },
+ "rows": [
+  {
+   "repo": "choco",
+   "entry": null,
+   "metric": {
+    "value": "rmse",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:training_summary.paired_persistence_test.lags.lag_1.model_rmse_same_rows",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": "lag_1_persistence",
+    "na_reason": null,
+    "source": "models/observed_production_persistence.meta.json#predictor",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": null,
+    "na_reason": "not committed at HEAD: models/observed_production_head.meta.json \u2014 present in the working tree of /Users/david/Downloads/Claude Code/resilient-choco (39172 bytes) and absent from main. A figure read from it can be quoted and cannot be fetched by the reader it is quoted to (docs/ESCALATIONS.md E-M12)",
+    "source": "main:model_family",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": null,
+    "na_reason": "not committed at HEAD: models/observed_production_head.meta.json \u2014 present in the working tree of /Users/david/Downloads/Claude Code/resilient-choco (39172 bytes) and absent from main. A figure read from it can be quoted and cannot be fetched by the reader it is quoted to (docs/ESCALATIONS.md E-M12)",
+    "source": "main:training_summary.paired_persistence_test.lags.lag_1.model_rmse_same_rows",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": null,
+    "na_reason": "not committed at HEAD: models/observed_production_head.meta.json \u2014 present in the working tree of /Users/david/Downloads/Claude Code/resilient-choco (39172 bytes) and absent from main. A figure read from it can be quoted and cannot be fetched by the reader it is quoted to (docs/ESCALATIONS.md E-M12)",
+    "source": "main:training_summary.test_baselines.split",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "lag_1_persistence",
+    "na_reason": null,
+    "source": "models/observed_production_persistence.meta.json#predictor",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": null,
+    "na_reason": "not committed at HEAD: models/observed_production_head.meta.json \u2014 present in the working tree of /Users/david/Downloads/Claude Code/resilient-choco (39172 bytes) and absent from main. A figure read from it can be quoted and cannot be fetched by the reader it is quoted to (docs/ESCALATIONS.md E-M12)",
+    "source": "main:training_summary.paired_persistence_test.lags.lag_1.persistence_rmse",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": null,
+    "na_reason": "score is NA, so no comparison is possible: not committed at HEAD: models/observed_production_head.meta.json \u2014 present in the working tree of /Users/david/Downloads/Claude Code/resilient-choco (39172 bytes) and absent from main. A figure read from it can be quoted and cannot be fetched by the reader it is quoted to (docs/ESCALATIONS.md E-M12)",
+    "source": null,
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": null,
+    "na_reason": "not committed at HEAD: models/observed_production_head.meta.json \u2014 present in the working tree of /Users/david/Downloads/Claude Code/resilient-choco (39172 bytes) and absent from main. A figure read from it can be quoted and cannot be fetched by the reader it is quoted to (docs/ESCALATIONS.md E-M12)",
+    "source": "main:training_summary.test_scored",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "choco",
+     "relpath": "models/observed_production_head.meta.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-choco/models/observed_production_head.meta.json",
+     "sha256": null,
+     "bytes": null,
+     "worktree": null,
+     "branch": "main",
+     "git_sha": "a54d0e9ab1b88f42648a2f2f864fd7ba3ba574f0",
+     "committed_at_head": false,
+     "dirty": false,
+     "read_from": null,
+     "allow_dirty_read": false,
+     "error": "not committed at HEAD: models/observed_production_head.meta.json \u2014 present in the working tree of /Users/david/Downloads/Claude Code/resilient-choco (39172 bytes) and absent from main. A figure read from it can be quoted and cannot be fetched by the reader it is quoted to (docs/ESCALATIONS.md E-M12)"
+    },
+    "served": {
+     "repo": "choco",
+     "relpath": "models/observed_production_persistence.meta.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-choco/models/observed_production_persistence.meta.json",
+     "sha256": "a310e0a4fa27d078359c2be14385ce1d50edc1109adacf5b77801ea86be6b2bb",
+     "bytes": 28150,
+     "worktree": null,
+     "branch": "main",
+     "git_sha": "a54d0e9ab1b88f42648a2f2f864fd7ba3ba574f0",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    }
+   },
+   "note": "the served predictor of record is the reference itself; the candidate column is the retired climate head that lost to it. NOT COMMITTED: the `main:` artifact of this adapter is committed on no ref in resilient-choco -- `git log --all` over it is empty and `.gitignore` excludes the models tree (docs/ESCALATIONS.md E-M12). Since committed reads landed, every column resolving through it reports NA rather than a working-tree figure. This note states what the reader does, not where the evidence lives; it lives nowhere resolvable, and asserting otherwise is the fabrication E-M12 declined to commit. Whether the file is committed, DVC-tracked or the row withdrawn is resilient-choco's decision"
+  },
+  {
+   "repo": "arabica",
+   "entry": null,
+   "metric": {
+    "value": "rmse",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:splits_scored.test.candidates.0.rmse",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": "prior-residual ridge (models.surrogate.prior_residual)",
+    "na_reason": null,
+    "source": "reports/validation/yield_reference_skill.json#model.name",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "prior-residual ridge",
+    "na_reason": null,
+    "source": "reports/validation/yield_reference_skill.json#splits_scored.test.candidates.0.name",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 1.05676,
+    "na_reason": null,
+    "source": "reports/validation/yield_reference_skill.json#splits_scored.test.candidates.0.rmse",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "test",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:splits_scored.test.candidates.0.rmse",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "expanding per-unit prior mean",
+    "na_reason": null,
+    "source": "reports/validation/yield_reference_skill.json#splits_scored.test.reference.name",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": 1.084686,
+    "na_reason": null,
+    "source": "reports/validation/yield_reference_skill.json#splits_scored.test.reference.rmse",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": true,
+    "na_reason": null,
+    "source": "derived: 1.05676 vs 1.084686 (lower is better); both read from the artifacts above",
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": true,
+    "na_reason": null,
+    "source": "reports/validation/yield_reference_skill.json#test_scored",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "arabica",
+     "relpath": "reports/validation/yield_reference_skill.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-arabica/reports/validation/yield_reference_skill.json",
+     "sha256": "b5db68412b7efa4fd288f07716b1d5804454a0bfd4836a8201e9bcac4b6739ad",
+     "bytes": 6628,
+     "worktree": null,
+     "branch": "fix/e-046-rng-streams-self-describe-synthetic",
+     "git_sha": "b186c2b140d953e873a1a183c62d23ed130bea83",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    }
+   },
+   "note": null
+  },
+  {
+   "repo": "fray",
+   "entry": "spatial_infill",
+   "metric": {
+    "value": "mae",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:tracks.spatial_infill.test.mae_lb_ac",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": "spatial_infill/hgb/leaves=63/lr=0.1/iter=300",
+    "na_reason": null,
+    "source": "reports/validation/models_of_record.json#tracks.spatial_infill.candidate",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "spatial_infill/hgb/leaves=63/lr=0.1/iter=300",
+    "na_reason": null,
+    "source": "reports/validation/models_of_record.json#tracks.spatial_infill.candidate",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 71.35922343344701,
+    "na_reason": null,
+    "source": "reports/validation/models_of_record.json#tracks.spatial_infill.test.mae_lb_ac",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "test",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:tracks.spatial_infill.test.mae_lb_ac",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "persistence_t_minus_1",
+    "na_reason": null,
+    "source": "declared, corroborated by baseline pointer main:baselines_on_test.persistence_t_minus_1.mae_lb_ac",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": 113.06701205090663,
+    "na_reason": null,
+    "source": "reports/validation/models_of_record.json#baselines_on_test.persistence_t_minus_1.mae_lb_ac",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": true,
+    "na_reason": null,
+    "source": "reports/validation/models_of_record.json#tracks.spatial_infill.beats_persistence_on_test.mae_lb_ac; corroborated by this row's own figures (derived: 71.35922343344701 vs 113.06701205090663 (lower is better); both read from the artifacts above)",
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": null,
+    "na_reason": "no test-read counter exists for THIS track. The sibling `forecast_available` track's test artifact carries `test_reads_spent`, keyed by track name, and this row now reads it; spatial_infill's `source.kind` is `base-menu` and the measurement it names, reports/validation/observed_panel_model.json, has no equivalent field. That TEST was scored once per track is asserted in `record_rule` prose, which is not machine-readable. The gap is the counter, not the provenance",
+    "source": null,
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "fray",
+     "relpath": "reports/validation/models_of_record.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-fray/reports/validation/models_of_record.json",
+     "sha256": "a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc",
+     "bytes": 20541,
+     "worktree": null,
+     "branch": "main",
+     "git_sha": "e95f99530fc858c178ed86b27e70c870365d1436",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    }
+   },
+   "note": null
+  },
+  {
+   "repo": "fray",
+   "entry": "forecast_available",
+   "metric": {
+    "value": "mae",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:tracks.forecast_available.test.mae_lb_ac",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": "forecast_available+nbr+wx_prior/hgb/leaves=127/lr=0.05/iter=400",
+    "na_reason": null,
+    "source": "reports/validation/models_of_record.json#tracks.forecast_available.candidate",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "forecast_available+nbr+wx_prior/hgb/leaves=127/lr=0.05/iter=400",
+    "na_reason": null,
+    "source": "reports/validation/models_of_record.json#tracks.forecast_available.candidate",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 74.16097783177521,
+    "na_reason": null,
+    "source": "reports/validation/models_of_record.json#tracks.forecast_available.test.mae_lb_ac",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "test",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:tracks.forecast_available.test.mae_lb_ac",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "persistence_t_minus_1",
+    "na_reason": null,
+    "source": "declared, corroborated by baseline pointer main:baselines_on_test.persistence_t_minus_1.mae_lb_ac",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": 113.06701205090663,
+    "na_reason": null,
+    "source": "reports/validation/models_of_record.json#baselines_on_test.persistence_t_minus_1.mae_lb_ac",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": true,
+    "na_reason": null,
+    "source": "reports/validation/models_of_record.json#tracks.forecast_available.beats_persistence_on_test.mae_lb_ac; corroborated by this row's own figures (derived: 74.16097783177521 vs 113.06701205090663 (lower is better); both read from the artifacts above)",
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": 1,
+    "na_reason": null,
+    "source": "reports/validation/weather_covariate_extension.json#test_reads_spent.forecast_available",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "fray",
+     "relpath": "reports/validation/models_of_record.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-fray/reports/validation/models_of_record.json",
+     "sha256": "a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc",
+     "bytes": 20541,
+     "worktree": null,
+     "branch": "main",
+     "git_sha": "e95f99530fc858c178ed86b27e70c870365d1436",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "test_artifact": {
+     "repo": "fray",
+     "relpath": "reports/validation/weather_covariate_extension.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-fray/reports/validation/weather_covariate_extension.json",
+     "sha256": "803412d7cf3875caebcbba632b959b8716e4fb8df675501dc06ed1689f5e8b3d",
+     "bytes": 34480,
+     "worktree": null,
+     "branch": "main",
+     "git_sha": "e95f99530fc858c178ed86b27e70c870365d1436",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    }
+   },
+   "note": null
+  },
+  {
+   "repo": "torrent",
+   "entry": "melstm-10ep-n8-val",
+   "metric": {
+    "value": "basin_normalised_nse (median across basins)",
+    "na_reason": null,
+    "source": "reports/train/seed_summary_n8_val.json#metric",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": "ridge_with_observed_discharge",
+    "na_reason": null,
+    "source": "models/hydrology_ridge/model.json#served_model",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "src/torrent/hydrology/training/configs/regional_eu_observed.yml",
+    "na_reason": null,
+    "source": "reports/train/seed_summary_n8_val.json#config",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 0.2225867683526302,
+    "na_reason": null,
+    "source": "reports/train/seed_summary_n8_val.json#mean",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "val",
+    "na_reason": null,
+    "source": "reports/train/seed_summary_n8_val.json#split",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "persistence_lag3",
+    "na_reason": null,
+    "source": "reports/train/seed_summary_n8_val.json#reference.name",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": 0.26484161185831745,
+    "na_reason": null,
+    "source": "reports/train/seed_summary_n8_val.json#reference.median_nse",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": false,
+    "na_reason": null,
+    "source": "derived: 0.2225867683526302 vs 0.26484161185831745 (higher is better); both read from the artifacts above",
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": 5,
+    "na_reason": null,
+    "source": "reports/holdout_reads.jsonl#",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "torrent",
+     "relpath": "reports/train/seed_summary_n8_val.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-torrent/reports/train/seed_summary_n8_val.json",
+     "sha256": "7d0c1d9ee48e98f0e216d0a8aa252565864b70e2ccef03bb3fb6f771c158ddd4",
+     "bytes": 17468,
+     "worktree": null,
+     "branch": "feat/scs-mirror-retirement-proposal",
+     "git_sha": "b66e000298555644a54aabc1b31e99ca08e6b9e4",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "ledger": {
+     "repo": "torrent",
+     "relpath": "reports/holdout_reads.jsonl",
+     "path": "/Users/david/Downloads/Claude Code/resilient-torrent/reports/holdout_reads.jsonl",
+     "sha256": "0cf1cf4c639bd9d64a93ae0d017c401a13a52b8ff418136a3523202c9a45a27c",
+     "bytes": 36787,
+     "worktree": null,
+     "branch": "feat/scs-mirror-retirement-proposal",
+     "git_sha": "b66e000298555644a54aabc1b31e99ca08e6b9e4",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "record": {
+     "repo": "torrent",
+     "relpath": "models/hydrology_ridge/model.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-torrent/models/hydrology_ridge/model.json",
+     "sha256": "c93f50d40c7e9140d876cf61cec56b0c00e7bba207d670c10480786d3b6f8507",
+     "bytes": 6969,
+     "worktree": null,
+     "branch": "feat/scs-mirror-retirement-proposal",
+     "git_sha": "b66e000298555644a54aabc1b31e99ca08e6b9e4",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    }
+   },
+   "note": "score is the mean of 8 per-seed val medians; the artifact's own interval_note warns that the recorded interval is on the MEAN and is not a prediction interval for the next seed"
+  },
+  {
+   "repo": "torrent",
+   "entry": "ridge-vs-melstm-val",
+   "metric": {
+    "value": "nse",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:right.median_nse",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": "ridge_with_observed_discharge",
+    "na_reason": null,
+    "source": "models/hydrology_ridge/model.json#served_model",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "model",
+    "na_reason": null,
+    "source": "reports/train/row_parity_ridge_vs_melstm_val.json#right.name",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 0.23206894549246004,
+    "na_reason": null,
+    "source": "reports/train/row_parity_ridge_vs_melstm_val.json#right.median_nse",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "val",
+    "na_reason": null,
+    "source": "reports/train/melstm_f_s1234_val.json#provenance.scored_split",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "ridge_with_observed_discharge",
+    "na_reason": null,
+    "source": "reports/train/row_parity_ridge_vs_melstm_val.json#left.name",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": 0.4520685140972679,
+    "na_reason": null,
+    "source": "reports/train/row_parity_ridge_vs_melstm_val.json#left.median_nse",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": false,
+    "na_reason": null,
+    "source": "derived: 0.23206894549246004 vs 0.4520685140972679 (higher is better); both read from the artifacts above",
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": 5,
+    "na_reason": null,
+    "source": "reports/holdout_reads.jsonl#",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "torrent",
+     "relpath": "reports/train/row_parity_ridge_vs_melstm_val.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-torrent/reports/train/row_parity_ridge_vs_melstm_val.json",
+     "sha256": "28fd9ace2517f5329ee9ff0c79a22c7dd389eaa5a586a739ccead2a85d416aad",
+     "bytes": 1289,
+     "worktree": null,
+     "branch": "feat/scs-mirror-retirement-proposal",
+     "git_sha": "b66e000298555644a54aabc1b31e99ca08e6b9e4",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "ledger": {
+     "repo": "torrent",
+     "relpath": "reports/holdout_reads.jsonl",
+     "path": "/Users/david/Downloads/Claude Code/resilient-torrent/reports/holdout_reads.jsonl",
+     "sha256": "0cf1cf4c639bd9d64a93ae0d017c401a13a52b8ff418136a3523202c9a45a27c",
+     "bytes": 36787,
+     "worktree": null,
+     "branch": "feat/scs-mirror-retirement-proposal",
+     "git_sha": "b66e000298555644a54aabc1b31e99ca08e6b9e4",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "left": {
+     "repo": "torrent",
+     "relpath": "reports/train/linear_reference_val_recheck.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-torrent/reports/train/linear_reference_val_recheck.json",
+     "sha256": "fb8234d825df2b25a36da2c07a4aa59ec4bb003f2573eb828014c11b74a1f2e1",
+     "bytes": 28618,
+     "worktree": null,
+     "branch": "feat/scs-mirror-retirement-proposal",
+     "git_sha": "b66e000298555644a54aabc1b31e99ca08e6b9e4",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "right": {
+     "repo": "torrent",
+     "relpath": "reports/train/melstm_f_s1234_val.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-torrent/reports/train/melstm_f_s1234_val.json",
+     "sha256": "615d5c9638ec6e2173e3336efcfd7dbd0a432e2f0d09d7d1d21e52b9d0f0d85a",
+     "bytes": 38145,
+     "worktree": null,
+     "branch": "feat/scs-mirror-retirement-proposal",
+     "git_sha": "b66e000298555644a54aabc1b31e99ca08e6b9e4",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "record": {
+     "repo": "torrent",
+     "relpath": "models/hydrology_ridge/model.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-torrent/models/hydrology_ridge/model.json",
+     "sha256": "c93f50d40c7e9140d876cf61cec56b0c00e7bba207d670c10480786d3b6f8507",
+     "bytes": 6969,
+     "worktree": null,
+     "branch": "feat/scs-mirror-retirement-proposal",
+     "git_sha": "b66e000298555644a54aabc1b31e99ca08e6b9e4",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    }
+   },
+   "note": "the ridge is the `left` side here: the network is measured against it"
+  },
+  {
+   "repo": "chokepoint",
+   "entry": "level-head",
+   "metric": {
+    "value": "mae",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:measurements.level_head_on_the_episode_holdouts.test_mae_mtpd",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": "corridor_scale_only",
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#model_id",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "scale_x_train_mean_depth",
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#heads.level.name",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 0.2594909570948433,
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#measurements.level_head_on_the_episode_holdouts.test_mae_mtpd",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "test",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:measurements.level_head_on_the_episode_holdouts.test_mae_mtpd",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "scale_x_train_mean_depth",
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#recorded_bars.level.name",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": null,
+    "na_reason": "the level head IS the recorded bar \u2014 `recorded_bars.level.is_the_champion_head_itself` is true \u2014 so there is no separate bar figure to read. The challenger that failed against it is recorded under `challengers_that_failed`, not as a bar",
+    "source": null,
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": null,
+    "na_reason": "baseline is NA, so no comparison is possible: the level head IS the recorded bar \u2014 `recorded_bars.level.is_the_champion_head_itself` is true \u2014 so there is no separate bar figure to read. The challenger that failed against it is recorded under `challengers_that_failed`, not as a bar",
+    "source": null,
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": "ONCE, 2026-08-23. Quoted here; not re-read by this script or by the serving path.",
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#measurements.level_head_on_the_episode_holdouts.test_read",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "chokepoint",
+     "relpath": "models/episode_response/champion.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-chokepoint/models/episode_response/champion.json",
+     "sha256": "c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae",
+     "bytes": 11250,
+     "worktree": null,
+     "branch": "feat/loop-chokepoint-2",
+     "git_sha": "9f54300c9b69cde5b54af96397b30fb085bb7af3",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    }
+   },
+   "note": null
+  },
+  {
+   "repo": "chokepoint",
+   "entry": "direction-head",
+   "metric": {
+    "value": "auc",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:measurements.direction_head_pooled_loco_auc.auc",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": "corridor_scale_only",
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#model_id",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "corridor_scale_only",
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#heads.direction.name",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 0.6984126984126984,
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#measurements.direction_head_pooled_loco_auc.auc",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "relaxed TRAIN frame, leave-one-corridor-out, pooled",
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#measurements.direction_head_pooled_loco_auc.frame",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "base_rate",
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#measurements.the_do_nothing_floor_the_direction_head_beats.reference",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": 0.3482142857142857,
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#measurements.the_do_nothing_floor_the_direction_head_beats.auc",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": true,
+    "na_reason": null,
+    "source": "derived: 0.6984126984126984 vs 0.3482142857142857 (higher is better); both read from the artifacts above",
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": "NONE: val and test episodes are counted above and never scored here, by any predictor, under either tier; the only test read in this repo remains the 2026-08-23 one in reports/benchmarks/episode_skill.json",
+    "na_reason": null,
+    "source": "models/episode_response/champion.json#measurements.direction_head_pooled_loco_auc.holdout_read",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "chokepoint",
+     "relpath": "models/episode_response/champion.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-chokepoint/models/episode_response/champion.json",
+     "sha256": "c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae",
+     "bytes": 11250,
+     "worktree": null,
+     "branch": "feat/loop-chokepoint-2",
+     "git_sha": "9f54300c9b69cde5b54af96397b30fb085bb7af3",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    }
+   },
+   "note": "scored leave-one-corridor-out on the TRAIN frame, not on a holdout; the artifact says so in `frame` and the split column carries it verbatim"
+  },
+  {
+   "repo": "surge",
+   "entry": null,
+   "metric": {
+    "value": "rmse",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:test_evidence.neural_model_rmse_on_same_slices",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": "data/model_registry/per_lead_anchor_ols",
+    "na_reason": null,
+    "source": "data/model_registry/index.json#surge-residual-forecaster.0.model_path",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "neural_model",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:test_evidence.neural_model_rmse_on_same_slices",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 0.175095,
+    "na_reason": null,
+    "source": "data/model_registry/per_lead_anchor_ols/model.json#test_evidence.neural_model_rmse_on_same_slices",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "test",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:test_evidence.neural_model_rmse_on_same_slices",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "per_lead_anchor_ols",
+    "na_reason": null,
+    "source": "data/model_registry/per_lead_anchor_ols/model.json#test_evidence.strongest_baseline_on_test.name",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": 0.163736,
+    "na_reason": null,
+    "source": "data/model_registry/per_lead_anchor_ols/model.json#test_evidence.strongest_baseline_on_test.rmse",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": false,
+    "na_reason": null,
+    "source": "data/model_registry/per_lead_anchor_ols/model.json#test_evidence.strongest_baseline_on_test.model_beats_it; corroborated by this row's own figures (derived: 0.175095 vs 0.163736 (lower is better); both read from the artifacts above)",
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": 3,
+    "na_reason": null,
+    "source": "data/model_registry/per_lead_anchor_ols/model.json#test_evidence.holdout_reads_so_far",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "surge",
+     "relpath": "data/model_registry/per_lead_anchor_ols/model.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-surge/data/model_registry/per_lead_anchor_ols/model.json",
+     "sha256": "949275e60faaca8e77c7b648448452bc3db31e4d6e1d3c9006e84dcaf0e5b18a",
+     "bytes": 18919,
+     "worktree": null,
+     "branch": "main",
+     "git_sha": "727dee5fe25e15137f422746d1166fa782aadd9f",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "index": {
+     "repo": "surge",
+     "relpath": "data/model_registry/index.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-surge/data/model_registry/index.json",
+     "sha256": "cecdc5ecb66ed458719af2c29076abe97178072aa89d7808fe3f6a3c5ce93643",
+     "bytes": 2639,
+     "worktree": null,
+     "branch": "main",
+     "git_sha": "727dee5fe25e15137f422746d1166fa782aadd9f",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "ledger": {
+     "repo": "surge",
+     "relpath": "reports/holdout_reads.jsonl",
+     "path": "/Users/david/Downloads/Claude Code/resilient-surge/reports/holdout_reads.jsonl",
+     "sha256": "db3eec7008b6ea476a6b58be1ca886174cf202615d5841484602ab693cb30ab6",
+     "bytes": 1735,
+     "worktree": null,
+     "branch": "main",
+     "git_sha": "727dee5fe25e15137f422746d1166fa782aadd9f",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    }
+   },
+   "note": "these artifacts are NOT on the branch resilient-surge has checked out; they live on feat/surgeistm-lora-finetune in a linked worktree, which the artifact block records"
+  },
+  {
+   "repo": "triage",
+   "entry": null,
+   "metric": {
+    "value": "rmse",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:measurements.test.rmse_model",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": "cbdiff_pois_persistence_df10_lag4_pen1",
+    "na_reason": null,
+    "source": "models/weekly_mortality/champion.json#model_id",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "cbdiff_pois_persistence_df10_lag4_pen1",
+    "na_reason": null,
+    "source": "models/weekly_mortality/champion.json#model_id",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 173.40814487545612,
+    "na_reason": null,
+    "source": "models/weekly_mortality/champion.json#measurements.test.rmse_model",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "test",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:measurements.test.rmse_model",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "reference_persistence_prev_week",
+    "na_reason": null,
+    "source": "models/weekly_mortality/champion.json#measurements.test.best_reference",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": 183.42262422319413,
+    "na_reason": null,
+    "source": "models/weekly_mortality/champion.json#measurements.test.rmse_persistence",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": true,
+    "na_reason": null,
+    "source": "derived: 173.40814487545612 vs 183.42262422319413 (lower is better); both read from the artifacts above",
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": 2,
+    "na_reason": null,
+    "source": "models/weekly_mortality/champion.json#measurements.test.reads_of_this_arm",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "triage",
+     "relpath": "models/weekly_mortality/champion.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-triage/.worktrees/e029/models/weekly_mortality/champion.json",
+     "sha256": "6316caaaedda11db6f6d7d5af35cf9a6a3ebfea797f6398c5492822c5ba2c47d",
+     "bytes": 7339,
+     "worktree": "/Users/david/Downloads/Claude Code/resilient-triage/.worktrees/e029",
+     "branch": "HEAD",
+     "git_sha": "afb33e9b16ea1710645db234124d7caedb438f1c",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    }
+   },
+   "note": "BRANCH-DEPENDENT: this artifact is committed on `e028-decision`, the branch resilient-triage had checked out when the fleet table was generated, and it is NOT on that repo's `main` -- do not read this row as main-committed evidence. The provenance table in portfolio/FLEET_VERDICTS.md records the branch and the sha256"
+  },
+  {
+   "repo": "blackout",
+   "entry": "vs-planning-anchor",
+   "metric": {
+    "value": "roc_auc",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:test.selected_all_in_scope.roc_auc",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": null,
+    "na_reason": "artifact not found at reports/train/weather_failure_all_in_scope_gate.json in the checkout or any linked worktree (searched 3 tree(s): /Users/david/Downloads/Claude Code/resilient-blackout, /Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/catalogue, /Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/pr129)",
+    "source": "gate:shipped_baseline.model",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "all_in_scope",
+    "na_reason": null,
+    "source": "reports/train/weather_failure_test_read.json#preregistration.selected_rung",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 0.6776159815675701,
+    "na_reason": null,
+    "source": "reports/train/weather_failure_test_read.json#test.selected_all_in_scope.roc_auc",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "test",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:test.selected_all_in_scope.roc_auc",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "planning_base",
+    "na_reason": null,
+    "source": "reports/train/weather_failure_test_read.json#preregistration.anchor_rung",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": 0.6411684390728368,
+    "na_reason": null,
+    "source": "reports/train/weather_failure_test_read.json#test.anchor_planning_base.roc_auc",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": true,
+    "na_reason": null,
+    "source": "derived: 0.6776159815675701 vs 0.6411684390728368 (higher is better); both read from the artifacts above",
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": "2026-08-24T07:13:02Z",
+    "na_reason": null,
+    "source": "reports/train/weather_failure_test_read.json#read_at",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "blackout",
+     "relpath": "reports/train/weather_failure_test_read.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/catalogue/reports/train/weather_failure_test_read.json",
+     "sha256": "b835d0505de1bd08a96c31fd45eab468f3d2f5de1307f4816e74afa48a90c47e",
+     "bytes": 6842,
+     "worktree": "/Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/catalogue",
+     "branch": "feat/conformal-risk-control-causal-impact-suite",
+     "git_sha": "cef5e8b254ea873eefd2feb05f3d821624e98436",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "gate": {
+     "repo": "blackout",
+     "relpath": "reports/train/weather_failure_all_in_scope_gate.json",
+     "path": null,
+     "sha256": null,
+     "bytes": null,
+     "worktree": null,
+     "branch": null,
+     "git_sha": null,
+     "committed_at_head": false,
+     "dirty": false,
+     "read_from": null,
+     "allow_dirty_read": false,
+     "error": "artifact not found at reports/train/weather_failure_all_in_scope_gate.json in the checkout or any linked worktree (searched 3 tree(s): /Users/david/Downloads/Claude Code/resilient-blackout, /Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/catalogue, /Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/pr129)"
+    }
+   },
+   "note": "the pre-registered anchor comparison, on all 101,424 test rows. The model of record is SERVED but not REGISTERED: the same gate artifact records `registry_state.n_versions: 0` with the note that nothing has ever been registered for this model, so a promotion would have nothing to move. BRANCH-DEPENDENT: both artifacts are committed on `e021-decision`, the branch resilient-blackout had checked out when the fleet table was generated, and neither is on that repo's `main` -- do not read this row as main-committed evidence"
+  },
+  {
+   "repo": "blackout",
+   "entry": "vs-persistence",
+   "metric": {
+    "value": "roc_auc",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:test.selected_all_in_scope.roc_auc_on_persistence_subset",
+    "allow_dirty_read": false
+   },
+   "model_of_record": {
+    "value": null,
+    "na_reason": "artifact not found at reports/train/weather_failure_all_in_scope_gate.json in the checkout or any linked worktree (searched 3 tree(s): /Users/david/Downloads/Claude Code/resilient-blackout, /Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/catalogue, /Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/pr129)",
+    "source": "gate:shipped_baseline.model",
+    "allow_dirty_read": false
+   },
+   "candidate": {
+    "value": "all_in_scope",
+    "na_reason": null,
+    "source": "reports/train/weather_failure_test_read.json#preregistration.selected_rung",
+    "allow_dirty_read": false
+   },
+   "score": {
+    "value": 0.6802774287447294,
+    "na_reason": null,
+    "source": "reports/train/weather_failure_test_read.json#test.selected_all_in_scope.roc_auc_on_persistence_subset",
+    "allow_dirty_read": false
+   },
+   "split": {
+    "value": "test",
+    "na_reason": null,
+    "source": "declared, corroborated by score pointer main:test.selected_all_in_scope.roc_auc_on_persistence_subset",
+    "allow_dirty_read": false
+   },
+   "baseline_name": {
+    "value": "persistence_prior_day_outage",
+    "na_reason": null,
+    "source": "reports/train/weather_failure_test_read.json#test.persistence_reference.reference",
+    "allow_dirty_read": false
+   },
+   "baseline_score": {
+    "value": 0.689877078726717,
+    "na_reason": null,
+    "source": "reports/train/weather_failure_test_read.json#test.persistence_reference.roc_auc",
+    "allow_dirty_read": false
+   },
+   "beats": {
+    "value": false,
+    "na_reason": null,
+    "source": "derived: 0.6802774287447294 vs 0.689877078726717 (higher is better); both read from the artifacts above",
+    "allow_dirty_read": false
+   },
+   "test_arm_spent": {
+    "value": "2026-08-24T07:13:02Z",
+    "na_reason": null,
+    "source": "reports/train/weather_failure_test_read.json#read_at",
+    "allow_dirty_read": false
+   },
+   "artifacts": {
+    "main": {
+     "repo": "blackout",
+     "relpath": "reports/train/weather_failure_test_read.json",
+     "path": "/Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/catalogue/reports/train/weather_failure_test_read.json",
+     "sha256": "b835d0505de1bd08a96c31fd45eab468f3d2f5de1307f4816e74afa48a90c47e",
+     "bytes": 6842,
+     "worktree": "/Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/catalogue",
+     "branch": "feat/conformal-risk-control-causal-impact-suite",
+     "git_sha": "cef5e8b254ea873eefd2feb05f3d821624e98436",
+     "committed_at_head": true,
+     "dirty": false,
+     "read_from": "HEAD",
+     "allow_dirty_read": false,
+     "error": null
+    },
+    "gate": {
+     "repo": "blackout",
+     "relpath": "reports/train/weather_failure_all_in_scope_gate.json",
+     "path": null,
+     "sha256": null,
+     "bytes": null,
+     "worktree": null,
+     "branch": null,
+     "git_sha": null,
+     "committed_at_head": false,
+     "dirty": false,
+     "read_from": null,
+     "allow_dirty_read": false,
+     "error": "artifact not found at reports/train/weather_failure_all_in_scope_gate.json in the checkout or any linked worktree (searched 3 tree(s): /Users/david/Downloads/Claude Code/resilient-blackout, /Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/catalogue, /Users/david/Downloads/Claude Code/resilient-blackout/.worktrees/pr129)"
+    }
+   },
+   "note": "like-for-like: both sides on the 89,774-row persistence subset, which is the only frame in which the two are comparable. BRANCH-DEPENDENT: both artifacts are committed on `e021-decision`, the branch resilient-blackout had checked out when the fleet table was generated, and neither is on that repo's `main` -- do not read this row as main-committed evidence"
+  }
+ ]
+}

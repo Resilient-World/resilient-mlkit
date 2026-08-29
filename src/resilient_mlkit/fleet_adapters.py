@@ -11,9 +11,20 @@ value, and do not delete a field to make a row look complete -- an ``Absent``
 with its reason is the correct output for "this repo has not written that down",
 and it is the finding, not a gap in the tool.
 
-Every path below was resolved against the repo checkouts on 2026-08-28; the
-adapters carry no figures, so a pointer that later moves reports NA naming the
-pointer rather than serving a stale number.
+Every path below was resolved against the repo checkouts on 2026-08-28, and
+torrent's ``record`` artifact on 2026-08-29 when it was added; the adapters
+carry no figures, so a pointer that later moves reports NA naming the pointer
+rather than serving a stale number.
+
+An ``Absent`` reason expires the same way a pointer does, and nothing in the
+tool notices. Torrent's ``model_of_record`` was ``Absent`` with the reason
+"no committed JSON artifact in resilient-torrent declares a model of record";
+that was true when it was written and stopped being true when
+``models/hydrology_ridge/model.json`` landed on torrent's ``main``
+(``promoted_at`` 2026-08-29, re-emitted under ``TORRENT-L4-PATHS``). A false
+``Absent`` is worse than an empty column: it is a written claim about another
+repo that a reader has no reason to re-check. The repair is TORRENT-RECORD,
+pre-registered in ``reports/MEASUREMENT_EXPORT_PREREGISTRATION.md``.
 
 WHERE THE EVIDENCE LIVES
 ------------------------
@@ -32,8 +43,9 @@ holds the two in agreement.
 One correction to an earlier reading of that probe, which claimed the other six
 repos' artifacts were "all present on their own ``main``". Re-measured the same
 way on 2026-08-29 over the distinct ``(repo, path)`` pairs these adapters
-declare -- 16 of 17 resolve on the ref their note implies -- but the
-seventeenth, ``choco``'s ``main`` artifact
+declare, and re-run again the same day once torrent's ``record`` artifact took
+the count from 17 pairs to 18: 17 of the 18 resolve on the ref their note
+implies -- but the one that does not, ``choco``'s ``main`` artifact
 ``models/observed_production_head.meta.json`` is committed on NO ref in that
 clone -- ``git -C resilient-choco log --all -- <path>`` is empty and
 ``git check-ignore -v`` reports ``.gitignore:82:/models/*``. It exists only in
@@ -184,22 +196,25 @@ ADAPTERS: tuple[Adapter, ...] = (
         artifacts={
             "main": "reports/train/seed_summary_n8_val.json",
             "ledger": "reports/holdout_reads.jsonl",
+            # The model of record, which this column reported Absent until
+            # 2026-08-29 on the ground that torrent had committed no such
+            # artifact. It has: this file is on torrent's `main`, carries
+            # `promoted_at`, and pins the served coefficients by sha256.
+            # mlkit already reads it elsewhere --
+            # scripts/verify_served_hash_parity.py names it as one of the three
+            # sidecar-pinned champions in the fleet.
+            "record": "models/hydrology_ridge/model.json",
         },
         metric=Field("main:metric"),
         lower_is_better=False,
-        model_of_record=Absent(
-            "no committed JSON artifact in resilient-torrent declares a model of "
-            "record, and two committed artifacts positively say why not: "
-            "model_mesh/CURRENT_STATE.json records `current_maturity` as "
-            "'software smoke with screening fixtures' and `baseline` as 'observed "
-            "evaluation cohort not yet admitted', and model_mesh/"
-            "MODEL_DESCRIPTOR.json records `evidence_status: test_only`. That "
-            "file's `model_id` is the mesh service identity, not a trained model, "
-            "and reading it into this column would put a service contract where a "
-            "champion belongs. The ridge is named as the record in prose only "
-            "(docs/ESCALATIONS.md, docs/HYDROLOGY_VAL_RESULTS_AND_TEST_DECISION.md, "
-            "CHANGELOG.md)"
-        ),
+        # `served_model` and not `name`: `name` is the registry's label for the
+        # service ("hydrology-riverine-forecaster"), while `served_model` is the
+        # identifier the repo's other artifacts use for the same object -- it is
+        # verbatim the `left.name` of row_parity_ridge_vs_melstm_val.json, the
+        # bar the sibling row's network is measured against. Reading the label
+        # would put a service identity where a champion belongs, which is the
+        # mistake the superseded Absent reason was written to avoid.
+        model_of_record=Field("record:served_model"),
         candidate=Field("main:config"),
         score=Field("main:mean"),
         split=Field("main:split"),
@@ -227,13 +242,15 @@ ADAPTERS: tuple[Adapter, ...] = (
             # artifact's own `same_rows: true` on trust.
             "left": "reports/train/linear_reference_val_recheck.json",
             "right": "reports/train/melstm_f_s1234_val.json",
+            "record": "models/hydrology_ridge/model.json",
         },
         metric=Declared("nse"),
         lower_is_better=False,
-        model_of_record=Absent(
-            "no committed JSON artifact in resilient-torrent declares a model of "
-            "record; see the melstm-10ep-n8-val row"
-        ),
+        # Same pointer as the melstm-10ep-n8-val row, and the value it reads is
+        # the same string as this row's `baseline_name` (`main:left.name`).
+        # That is the fact, not a duplication: the ridge IS the model of record
+        # and it IS the bar the network was measured against.
+        model_of_record=Field("record:served_model"),
         candidate=Field("main:right.name"),
         score=Field("main:right.median_nse"),
         # row_parity itself carries no split field, and the split appears in its
