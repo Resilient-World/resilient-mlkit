@@ -18,9 +18,10 @@ import importlib
 import subprocess
 import sys
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 #: The eight avoided-loss model repos, in the portfolio's canonical order.
 PORTFOLIO = (

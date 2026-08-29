@@ -263,12 +263,11 @@ def _read(
                 f"pointer '{pointer}' in {ref.relpath} is not a number ({value!r})",
                 spec.pointer,
             )
-    elif spec.transform == "bool":
-        if not isinstance(value, bool):
-            return Cell.missing(
-                f"pointer '{pointer}' in {ref.relpath} is not a boolean ({value!r})",
-                spec.pointer,
-            )
+    elif spec.transform == "bool" and not isinstance(value, bool):
+        return Cell.missing(
+            f"pointer '{pointer}' in {ref.relpath} is not a boolean ({value!r})",
+            spec.pointer,
+        )
     if value is None:
         return Cell.missing(
             f"pointer '{pointer}' in {ref.relpath} resolves to null", spec.pointer

@@ -227,7 +227,7 @@ def cmd_fleet(args: argparse.Namespace) -> int:
         rows.append(fleet.read_row(repo, adapter))
 
     stats = fleet.counts(rows)
-    generated_at = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
+    generated_at = _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds")
     payload = {
         "artifact_schema": "resilient-mlkit/fleet-verdicts/1",
         "generated_by": "mlkit portfolio",
@@ -305,14 +305,19 @@ def _render_fleet_markdown(
         f"- generated: `{payload['generated_at_utc']}`",
         f"- run nonce: `{payload['run_nonce']}`",
         f"- mlkit: `{payload['mlkit_version']}` at `{payload['mlkit_git_sha'] or 'NA (not a git worktree)'}`",
-        f"- rows: **{stats['rows']}**, cells measured: **{stats['cells_measured']}**, "
-        f"cells NA-with-reason: **{stats['cells_na']}**",
+        (
+            f"- rows: **{stats['rows']}**, cells measured: "
+            f"**{stats['cells_measured']}**, "
+            f"cells NA-with-reason: **{stats['cells_na']}**"
+        ),
         "",
     ]
     if missing_repos:
         lines += [
-            f"- repos declared but not found under the root: "
-            f"{', '.join(f'`{m}`' for m in missing_repos)}",
+            (
+                "- repos declared but not found under the root: "
+                f"{', '.join(f'`{m}`' for m in missing_repos)}"
+            ),
             "",
         ]
     lines += [
@@ -432,7 +437,7 @@ def cmd_spine(args: argparse.Namespace) -> int:
         "artifact_schema": "resilient-mlkit/spine-drift/1",
         "generated_by": "mlkit spine",
         "mlkit_version": __version__,
-        "generated_at_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
+        "generated_at_utc": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
         "run_nonce": run_nonce,
         "spine_root": str(spine_root),
         "mlkit_git_sha": _self_sha(),
@@ -484,21 +489,29 @@ def _render_spine_markdown(payload: dict, drifts: list, repos: list) -> str:
         "",
         f"- generated: `{payload['generated_at_utc']}`",
         f"- run nonce: `{payload['run_nonce']}`",
-        f"- spine: `{payload['spine_root']}` at mlkit "
-        f"`{payload['mlkit_git_sha'] or 'NA (not a git worktree)'}`",
+        (
+            f"- spine: `{payload['spine_root']}` at mlkit "
+            f"`{payload['mlkit_git_sha'] or 'NA (not a git worktree)'}`"
+        ),
         f"- canonical files compared per repo: **{len(payload['canonical_files'])}**",
         "- verdicts: " + ", ".join(f"**{k}** {v}" for k, v in sorted(counts.items())),
         "",
         "| verdict | meaning |",
         "|---|---|",
         f"| `{spine_mod.IN_SYNC}` | deployed copy is byte-identical to the spine |",
-        f"| `{spine_mod.DRIFTED}` | carries the `{spine_mod.MARKER}` banner but its bytes have "
-        "moved; the next sync reverts it |",
+        (
+            f"| `{spine_mod.DRIFTED}` | carries the `{spine_mod.MARKER}` banner but "
+            "its bytes have moved; the next sync reverts it |"
+        ),
         f"| `{spine_mod.ABSENT}` | no deployed copy at all — the spine is not in force here |",
-        f"| `{spine_mod.UNCLAIMED}` | a file without the banner occupies the canonical "
-        "filename; the syncer will not touch it |",
-        f"| `{spine_mod.NO_SPINE_SOURCE}` | the spine itself has no such file — a defect in "
-        "this repo, not in that one |",
+        (
+            f"| `{spine_mod.UNCLAIMED}` | a file without the banner occupies the "
+            "canonical filename; the syncer will not touch it |"
+        ),
+        (
+            f"| `{spine_mod.NO_SPINE_SOURCE}` | the spine itself has no such file — a "
+            "defect in this repo, not in that one |"
+        ),
         "",
         "## Per repo",
         "",

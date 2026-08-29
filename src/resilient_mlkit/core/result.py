@@ -150,7 +150,7 @@ class CheckResult:
                 "measured behind it is indistinguishable from a fabricated one."
             )
         if not self.measured_at:
-            self.measured_at = _dt.datetime.now(_dt.timezone.utc).isoformat(
+            self.measured_at = _dt.datetime.now(_dt.UTC).isoformat(
                 timespec="seconds"
             )
 
@@ -161,7 +161,7 @@ class CheckResult:
     @classmethod
     def passed(
         cls, check_id: str, phase: str, evidence: dict[str, Any], reason: str = ""
-    ) -> "CheckResult":
+    ) -> CheckResult:
         return cls(check_id, phase, Status.PASS, reason, evidence)
 
     @classmethod
@@ -171,7 +171,7 @@ class CheckResult:
         phase: str,
         reason: str,
         evidence: dict[str, Any] | None = None,
-    ) -> "CheckResult":
+    ) -> CheckResult:
         return cls(check_id, phase, Status.FAIL, reason, evidence or {})
 
     @classmethod
@@ -181,7 +181,7 @@ class CheckResult:
         phase: str,
         reason: str,
         evidence: dict[str, Any] | None = None,
-    ) -> "CheckResult":
+    ) -> CheckResult:
         """Not measurable here, and here is why.
 
         NA is the correct output when the environment cannot support the
@@ -198,7 +198,7 @@ class CheckResult:
         credential: str,
         detail: str,
         evidence: dict[str, Any] | None = None,
-    ) -> "CheckResult":
+    ) -> CheckResult:
         """Wired and exercised; stops at a credential the signatory will supply.
 
         Not a pass, and never counted as one. What it asserts is narrow and
@@ -224,7 +224,7 @@ class CheckResult:
         phase: str,
         reason: str,
         evidence: dict[str, Any] | None = None,
-    ) -> "CheckResult":
+    ) -> CheckResult:
         """Reserved to a human signatory. Drives AWAITING-SIGNOFF."""
         return cls(check_id, phase, Status.ESCALATED, reason, evidence or {})
 
@@ -244,7 +244,7 @@ class CheckResult:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "CheckResult":
+    def from_dict(cls, d: dict[str, Any]) -> CheckResult:
         return cls(
             check_id=d["check_id"],
             phase=d["phase"],

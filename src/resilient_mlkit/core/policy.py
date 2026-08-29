@@ -154,7 +154,7 @@ def entries_digest(entries: dict[str, Entry]) -> str:
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def _verify_signature(allowlist: "Allowlist", claimed: bool, repo: Repo) -> bool:
+def _verify_signature(allowlist: Allowlist, claimed: bool, repo: Repo) -> bool:
     """Decide whether a claimed signature holds up.
 
     What this can prove: that the entries are byte-for-byte the ones the

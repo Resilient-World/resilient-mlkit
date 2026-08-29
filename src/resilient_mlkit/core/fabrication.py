@@ -45,6 +45,8 @@ code. They remain a matter for review.
 from __future__ import annotations
 
 import ast
+import itertools
+import math
 import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -305,7 +307,16 @@ def tokenise(name: str) -> list[str]:
     # quantity both ways: ``pretrend_pvalue`` is one token but ``p_value`` is
     # two, and ``std_err``, ``ci_low``, ``effect_size`` and ``r_squared`` all
     # only become recognisable once rejoined.
-    parts.extend(a + b for a, b in zip(parts, parts[1:]))
+    #
+    # The snapshot is load-bearing, not decoration. `parts` is being extended by
+    # the very call that consumes it, so pairing must run over the list AS IT
+    # WAS. The previous spelling, `zip(parts, parts[1:])`, got that right only
+    # by accident of `parts[1:]` being a copy that bounded the zip; pairing the
+    # live list instead feeds each appended item straight back in and does not
+    # terminate. Written explicitly here so the bound is a stated fact -- the
+    # depluralise step below already spells the same snapshot out.
+    snapshot = list(parts)
+    parts.extend(a + b for a, b in itertools.pairwise(snapshot))
     # Depluralise, so that ``scores``, ``probs`` and ``rrs`` reach the same
     # vocabulary entry as their singulars.
     parts.extend(p[:-1] for p in list(parts) if len(p) > 2 and p.endswith("s"))
@@ -405,7 +416,11 @@ def _numeric_literal(node: ast.AST | None) -> str | None:
             return "True" if node.value else None
         if isinstance(node.value, (int, float)):
             value = float(node.value)
-            if value != value or value in (float("inf"), float("-inf")):
+            # NaN and the infinities are not plausible figures, so they are not
+            # fabrications. Spelled with `math` rather than the `value != value`
+            # self-comparison this used to carry: same truth value on a float,
+            # but it reads as a typo and a linter is right to say so.
+            if math.isnan(value) or math.isinf(value):
                 return None
             if value != 0.0 and abs(value) < 1e-4:
                 # 1e-6, 1e-9 and friends are divide-by-zero guards, not
@@ -1027,8 +1042,8 @@ class _ModuleScanner:
             if not satisfies_a_gate(arg.arg, literal):
                 continue
             sink = sinks.get(arg.arg)
-            if sink is None or not (
-                sink.startswith("compared against") or sink.startswith("decides the verdict")
+            if sink is None or not sink.startswith(
+                ("compared against", "decides the verdict")
             ):
                 continue
             line = getattr(default, "lineno", getattr(fn, "lineno", 0))
@@ -1099,9 +1114,10 @@ class _ModuleScanner:
         if not first:
             return False
         for word in re.findall(r"\b[A-Z][A-Za-z0-9]{1,6}\b", first):
-            if word.isupper() or re.fullmatch(r"[A-Z][a-z]?[A-Z][A-Za-z0-9]*", word):
-                if word.lower() in MEASURED_TOKENS:
-                    return True
+            if (
+                word.isupper() or re.fullmatch(r"[A-Z][a-z]?[A-Z][A-Za-z0-9]*", word)
+            ) and word.lower() in MEASURED_TOKENS:
+                return True
         return False
 
     def _scan_gate_pass_literal(self, node: ast.Return) -> None:
@@ -1303,10 +1319,15 @@ class _ModuleScanner:
             if isinstance(parent, ast.If):
                 if current in parent.body and _is_absence_test(parent.test):
                     return "absence"
-                if current in parent.orelse and not _is_absence_test(parent.test):
-                    # `if smds: ... else: 0.0` -- the else arm IS the empty case.
-                    if isinstance(parent.test, (ast.Name, ast.Attribute, ast.Call, ast.Compare)):
-                        return "absence"
+                # `if smds: ... else: 0.0` -- the else arm IS the empty case.
+                if (
+                    current in parent.orelse
+                    and not _is_absence_test(parent.test)
+                    and isinstance(
+                        parent.test, (ast.Name, ast.Attribute, ast.Call, ast.Compare)
+                    )
+                ):
+                    return "absence"
             if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Module)):
                 return None
             current = parent

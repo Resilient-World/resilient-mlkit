@@ -76,21 +76,21 @@ def toy_repo(tmp_path: Path) -> Repo:
 
 
 def _adapter(**overrides: object) -> Adapter:
-    base: dict[str, object] = dict(
-        repo="toy",
-        entry="",
-        artifacts={"main": "reports/scores.json"},
-        metric=Declared("rmse"),
-        lower_is_better=True,
-        model_of_record=Field("main:model.name"),
-        candidate=Field("main:splits_scored.test.candidates.0.name"),
-        score=Field("main:splits_scored.test.candidates.0.rmse"),
-        split=Declared("test"),
-        baseline_name=Field("main:splits_scored.test.reference.name"),
-        baseline_score=Field("main:splits_scored.test.reference.rmse"),
-        beats=Compare(),
-        test_arm_spent=Field("main:test_scored", transform="bool"),
-    )
+    base: dict[str, object] = {
+        "repo": "toy",
+        "entry": "",
+        "artifacts": {"main": "reports/scores.json"},
+        "metric": Declared("rmse"),
+        "lower_is_better": True,
+        "model_of_record": Field("main:model.name"),
+        "candidate": Field("main:splits_scored.test.candidates.0.name"),
+        "score": Field("main:splits_scored.test.candidates.0.rmse"),
+        "split": Declared("test"),
+        "baseline_name": Field("main:splits_scored.test.reference.name"),
+        "baseline_score": Field("main:splits_scored.test.reference.rmse"),
+        "beats": Compare(),
+        "test_arm_spent": Field("main:test_scored", transform="bool"),
+    }
     base.update(overrides)
     return Adapter(**base)  # type: ignore[arg-type]
 

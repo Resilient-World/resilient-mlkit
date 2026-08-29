@@ -63,7 +63,7 @@ SUBPROCESS_CEILING_S = 10
 
 def test_pytest_timeout_is_installed_and_registered(pytestconfig: pytest.Config) -> None:
     """The plugin imports AND this very session has it registered."""
-    import pytest_timeout  # noqa: PLC0415
+    import pytest_timeout
 
     assert Path(pytest_timeout.__file__).is_file()
     assert pytestconfig.pluginmanager.hasplugin("timeout"), (

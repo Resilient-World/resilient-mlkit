@@ -21,7 +21,7 @@ def mint() -> str:
     ordering obvious to a human reader; the random half is what makes the
     nonce unforgeable by anything that isn't this process.
     """
-    stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = _dt.datetime.now(_dt.UTC).strftime("%Y%m%dT%H%M%SZ")
     return f"mlkit-{stamp}-{secrets.token_hex(6)}"
 
 

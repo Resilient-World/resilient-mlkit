@@ -64,11 +64,11 @@ class Cell:
         return not self.na_reason
 
     @classmethod
-    def measured(cls, value: Any, source: str) -> "Cell":
+    def measured(cls, value: Any, source: str) -> Cell:
         return cls(value=value, source=source)
 
     @classmethod
-    def missing(cls, reason: str, source: str = "") -> "Cell":
+    def missing(cls, reason: str, source: str = "") -> Cell:
         if not reason.strip():
             raise ValueError(
                 "Cell.missing requires a reason. An unexplained NA looks like "

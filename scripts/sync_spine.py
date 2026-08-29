@@ -26,9 +26,10 @@ from pathlib import Path
 # canonical is the same as none.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from resilient_mlkit.core.repo import PORTFOLIO as REPOS  # noqa: E402
-from resilient_mlkit.core.spine import CANONICAL_FILES, SEED_FILES  # noqa: E402
-from resilient_mlkit.core.spine import has_banner as _has_banner  # noqa: E402
+from resilient_mlkit.core.repo import PORTFOLIO as REPOS
+from resilient_mlkit.core.spine import CANONICAL_FILES, SEED_FILES
+from resilient_mlkit.core.spine import has_banner as _has_banner
+
 
 def is_ours(path: Path) -> bool:
     """True when we may overwrite an existing canonical file at ``path``."""
