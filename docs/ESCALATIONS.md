@@ -318,3 +318,40 @@ leading nonzero, so `0.4.0`.
 own tree still reads `0.2.0`. Three things remain a release decision of record —
 whether this line's major is `0.4.0` or `1.0.0`, which is written down nowhere;
 cutting the tag; and when the eight repos re-pin to it.
+
+---
+
+## E-M09 — D2 and E1 now change verdict on unchanged code, and the version bump collides with an open PR
+
+**Measured by** `.venv/bin/python -m pytest tests/test_decision_controls.py
+tests/test_economics_controls.py -q` on `feat/loop-mlkit-3`, and by the
+before/after tables recorded in the commit messages at `591e25c` (D2) and
+`3647a04` (E1).
+
+Two existing checks change verdict on unchanged repo code. A `placebo_test`
+binding reporting a NaN estimate or interval went from **PASS** to **FAIL**, and
+a `scaling_probe` binding reporting a NaN or infinite point on its curve went
+from **PASS** to **FAIL**. Both are hard stops, and in both cases the pre-repair
+behaviour was that the hard stop could not fire at all against a non-finite
+figure. Neither repair moved a threshold; `FLATNESS_EPSILON`, `GPU_UTIL_FLOOR`,
+`MAX_COVERAGE_TOL` and `MIN_COVERAGE_N` are untouched.
+
+The scale at the top of `CHANGELOG.md` says an existing check changing verdict
+on unchanged code is a **major** release. On the reading recorded in E-M08, that
+is `0.5.0`.
+
+**Cannot be done from here.** PR #6 (`feat/r10-served-contract`) is open and
+already declares `0.5.0` in `resilient_mlkit.__version__` and in its newest
+`CHANGELOG.md` heading, for different content — a new check, R12, which is a
+*minor* event by the same scale. Bumping to `0.5.0` on this branch as well would
+put two open PRs on the same version number and guarantee a conflict in the one
+literal that exists precisely so it cannot disagree with itself (E-M08). So this
+branch deliberately leaves `__version__` at `0.4.0` and adds no CHANGELOG
+heading, and `tests/test_version_declaration.py` stays green either way, because
+it compares the literal to the newest heading rather than requiring a bump.
+
+**Proposed**, for whichever of the two PRs lands second: apply a single bump in
+that merge, covering both PRs' content, with one CHANGELOG heading naming the
+D2/E1 verdict change as the major reason and R12 as the minor one. Whether the
+number is `0.5.0` or `1.0.0` is the same open question E-M08 records and is the
+signatory's to settle. Until then, no tag should be cut from either branch.
