@@ -1,11 +1,11 @@
 {
  "artifact_schema": "resilient-mlkit/spine-drift/1",
  "generated_by": "mlkit spine",
- "mlkit_version": "0.2.0",
- "generated_at_utc": "2026-08-29T03:57:39+00:00",
- "run_nonce": "mlkit-20260829T035739Z-c1210455524f",
+ "mlkit_version": "0.3.1",
+ "generated_at_utc": "2026-08-29T06:37:19+00:00",
+ "run_nonce": "mlkit-20260829T063719Z-7280e5d04366",
  "spine_root": "/Users/david/Downloads/Claude Code/resilient-mlkit/spine",
- "mlkit_git_sha": "14fbe7272d0b076f53a7515dba9bf5924b60d1d2",
+ "mlkit_git_sha": "e261dc14b203c14df54e493b531e31ee1854acd1",
  "canonical_files": [
   "CLAUDE.md",
   "docs/DATA_POLICY.md",
@@ -26,18 +26,18 @@
    "dirty": false
   },
   "fray": {
-   "git_sha": "2c4f3a796604e479a136ce0c1c275983eb15931d",
-   "branch": "feat/r8-record-checkpoint-and-repin",
+   "git_sha": "d5c931c5e11bf2b7df2c7553f82457f211f3f4ae",
+   "branch": "feat/r9-foundation-adapter-and-stress",
    "dirty": false
   },
   "torrent": {
-   "git_sha": "58de276ebe4b9ab5de680c7e13ec8c1c1eb2f594",
-   "branch": "feat/r8-registry-cleanup-and-repin",
+   "git_sha": "35b43c918007a35636b2edf79cceb42c8884feb0",
+   "branch": "feat/r9-attributes-and-declared-scale",
    "dirty": true
   },
   "chokepoint": {
-   "git_sha": "222e138cc777639c4d6a5a4c3bdf2178e8f8c90a",
-   "branch": "feat/r8-serve-integration-and-repin",
+   "git_sha": "79d79cd5679f00702dd8f1fb69fc4b8965e8ee0a",
+   "branch": "feat/r9-operator-surface",
    "dirty": false
   },
   "surge": {
