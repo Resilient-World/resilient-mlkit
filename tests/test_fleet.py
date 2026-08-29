@@ -734,9 +734,9 @@ def test_the_declared_branches_match_the_committed_provenance_table() -> None:
 
 def test_positive_control_a_deleted_branch_note_is_caught() -> None:
     """FIRES: the blackout/triage entries exactly as `main` carried them."""
-    from resilient_mlkit.fleet_adapters import ADAPTERS
-
     import dataclasses
+
+    from resilient_mlkit.fleet_adapters import ADAPTERS
 
     stripped = tuple(
         dataclasses.replace(a, note="") if a.repo in BRANCH_ONLY_EVIDENCE else a
@@ -750,9 +750,9 @@ def test_positive_control_a_deleted_branch_note_is_caught() -> None:
 
 def test_positive_control_a_note_naming_the_wrong_branch_is_caught() -> None:
     """FIRES: a marker is only a marker while it names the right branch."""
-    from resilient_mlkit.fleet_adapters import ADAPTERS
-
     import dataclasses
+
+    from resilient_mlkit.fleet_adapters import ADAPTERS
 
     wrong = tuple(
         dataclasses.replace(a, note="committed on some-other-branch, not on main")

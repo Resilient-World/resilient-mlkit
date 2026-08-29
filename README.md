@@ -9,8 +9,10 @@ that did not come out of a run of this CLI does not exist.
 
 ## Layout
 
-- `src/resilient_mlkit/` — the package. 26 gating checks across 5 phases,
-  plus 5 diagnostic triage checks.
+- `src/resilient_mlkit/` — the package. 27 gating checks across 4 phases, plus
+  5 diagnostic triage checks: 32 in the registry. Counted, not remembered —
+  `len(gating_ids())` and `len(all_check_ids())` on 2026-08-29, which is the
+  same discipline `checks/__init__.py` states in its own docstring.
 - `src/resilient_mlkit/fleet_adapters.py` — one declared adapter per model of
   record, saying which committed artifact and which pointer carries each column
   of the fleet verdict table.
