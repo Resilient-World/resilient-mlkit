@@ -11,6 +11,8 @@ can invalidate a model before a single GPU-hour is bought.
 
 from __future__ import annotations
 
+import math
+
 from ..core.repo import BindingError, Repo
 from ..core.result import CheckResult, CredentialRequired
 from . import RunContext, check
@@ -69,6 +71,30 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
             {**evidence, "halt": True},
         )
 
+    # Everything below this line reasons about an interval that CONTAINS zero,
+    # and a non-finite figure reaches here by failing to be anything at all.
+    # `float()` accepts NaN and the infinities, including as the strings
+    # "nan"/"inf", and every comparison a NaN takes part in is False -- so
+    # `lo > 0`, `hi < 0` and, further down, `half_width >= reference` are all
+    # False together, and a placebo that measured nothing walks past the hard
+    # stop, past the power bar, and out as a PASS. NaN is what a pandas or
+    # numpy estimator returns when a groupby or a reindex misses a stratum.
+    # Same defect class as the R5 row-count guard, and refused the same way:
+    # by name, before the value is reasoned about.
+    non_finite = [
+        name
+        for name, value in (("estimate", estimate), ("ci_low", lo), ("ci_high", hi))
+        if not math.isfinite(value)
+    ]
+    if non_finite:
+        return CheckResult.failed(
+            "D2", PHASE,
+            "placebo_test reported a non-finite " + ", ".join(non_finite)
+            + "; a placebo that did not resolve to a finite estimate and interval "
+            "has not tested anything, and must not be read as a null result",
+            evidence,
+        )
+
     # Containing zero is necessary but nowhere near sufficient. An interval
     # wide enough to contain everything contains zero too, and would sail
     # through the package's self-described strongest check while proving
@@ -87,6 +113,16 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
     reference = abs(float(reference))
     half_width = (hi - lo) / 2.0
     evidence.update({"reference_effect": reference, "ci_half_width": half_width})
+    # The power bar is `half_width >= reference`. A NaN reference makes that
+    # False for every interval, so the requirement would be satisfied by a
+    # figure that does not exist -- the one thing this branch was added to stop.
+    if not math.isfinite(reference):
+        return CheckResult.failed(
+            "D2", PHASE,
+            "reference_effect is not finite; the power requirement cannot be "
+            "satisfied by an effect size that was never measured",
+            evidence,
+        )
     if reference == 0 or half_width >= reference:
         return CheckResult.failed(
             "D2", PHASE,
@@ -122,8 +158,35 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
     nominal, empirical, n = float(out["nominal"]), float(out["empirical"]), int(out["n"])
     # mlkit owns this tolerance. A binding may ask for something stricter but
     # never looser -- a subject that sets its own pass mark sets no pass mark.
-    tol = min(float(out.get("tol", MAX_COVERAGE_TOL)), MAX_COVERAGE_TOL)
+    declared_tol = float(out.get("tol", MAX_COVERAGE_TOL))
+    # `min(nan, x)` returns nan in Python, so a declared tolerance of NaN walks
+    # straight through the clamp above and makes `abs(empirical - nominal) > tol`
+    # False for every input -- the loosest tolerance there is, wearing the
+    # clamp's clothes. Refused before it is clamped, not after.
+    if not math.isfinite(declared_tol):
+        return CheckResult.failed(
+            "D3", PHASE,
+            "coverage declared a non-finite tol; a tolerance that is not a number "
+            "cannot be clamped and would accept any coverage at all",
+            {"nominal": nominal, "empirical": empirical, "n": n, "tol": declared_tol},
+        )
+    tol = min(declared_tol, MAX_COVERAGE_TOL)
     evidence = {"nominal": nominal, "empirical": empirical, "n": n, "tol": tol}
+
+    # Same NaN-comparison defect the D2 guard above refuses: a non-finite
+    # coverage figure makes the tolerance comparison False and returns PASS.
+    non_finite = [
+        name for name, value in (("nominal", nominal), ("empirical", empirical))
+        if not math.isfinite(value)
+    ]
+    if non_finite:
+        return CheckResult.failed(
+            "D3", PHASE,
+            "coverage reported a non-finite " + ", ".join(non_finite)
+            + "; intervals whose coverage did not resolve to a number have not been "
+            "measured, and must not be read as covering",
+            evidence,
+        )
 
     if n < MIN_COVERAGE_N:
         return CheckResult.na(

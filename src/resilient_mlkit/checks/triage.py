@@ -11,6 +11,8 @@ selection research is commissioned for it.
 
 from __future__ import annotations
 
+import math
+
 from ..core import policy
 from ..core.repo import BindingError, Repo
 from ..core.result import CheckResult, CredentialRequired
@@ -75,6 +77,23 @@ def t2_overfit_one_batch(repo: Repo, ctx: RunContext) -> CheckResult:
         "loss_last": last,
         "ratio": (last / first) if first else None,
     }
+    # A loss that diverged to NaN is the single most common way a training run
+    # fails, and it is exactly what this check exists to catch -- but every
+    # comparison a NaN takes part in is False, so `first <= 0` and
+    # `last > 0.1 * first` are False together and the trajectory [2.0, nan]
+    # returned PASS. Same defect class as the D2/E1 hard stops and the R5 row
+    # count, refused the same way: by name, before the value is reasoned about.
+    non_finite = [
+        name for name, value in (("loss_first", first), ("loss_last", last))
+        if not math.isfinite(value)
+    ]
+    if non_finite:
+        return CheckResult.failed(
+            "T2", PHASE,
+            "overfit trajectory is not finite at " + ", ".join(non_finite)
+            + "; a loss that did not resolve to a number has not collapsed, it diverged",
+            evidence,
+        )
     if first <= 0:
         return CheckResult.failed(
             "T2", PHASE, f"initial loss {first} is not positive; loss is misdefined",
@@ -151,7 +170,19 @@ def t4_label_counts(repo: Repo, ctx: RunContext) -> CheckResult:
             "T4", PHASE, "label_counts returned no observed labels"
         )
 
-    total = sum(int(v) for v in counts.values())
+    # int(float('nan')) raises ValueError, which escaped the check entirely and
+    # reached the runner as an unhandled crash carrying a traceback into the
+    # reason field. A count that is not a whole number is a defect this check
+    # should name, not one it should die of.
+    try:
+        total = sum(int(v) for v in counts.values())
+    except (TypeError, ValueError) as exc:
+        return CheckResult.failed(
+            "T4", PHASE,
+            f"label_counts returned a value that is not a whole count "
+            f"({type(exc).__name__}: {exc})",
+            {"counts": {k: repr(v) for k, v in counts.items()}},
+        )
     if total == 0:
         return CheckResult.failed(
             "T4", PHASE, "every observed-label count is zero", {"counts": counts}

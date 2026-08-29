@@ -318,3 +318,88 @@ leading nonzero, so `0.4.0`.
 own tree still reads `0.2.0`. Three things remain a release decision of record —
 whether this line's major is `0.4.0` or `1.0.0`, which is written down nowhere;
 cutting the tag; and when the eight repos re-pin to it.
+
+---
+
+## E-M09 — D2 and E1 now change verdict on unchanged code, and the version bump collides with an open PR
+
+**Measured by** `.venv/bin/python -m pytest tests/test_decision_controls.py
+tests/test_economics_controls.py -q` on `feat/loop-mlkit-3`, and by the
+before/after tables recorded in the commit messages at `591e25c` (D2) and
+`3647a04` (E1).
+
+Two existing checks change verdict on unchanged repo code. A `placebo_test`
+binding reporting a NaN estimate or interval went from **PASS** to **FAIL**, and
+a `scaling_probe` binding reporting a NaN or infinite point on its curve went
+from **PASS** to **FAIL**. Both are hard stops, and in both cases the pre-repair
+behaviour was that the hard stop could not fire at all against a non-finite
+figure. Neither repair moved a threshold; `FLATNESS_EPSILON`, `GPU_UTIL_FLOOR`,
+`MAX_COVERAGE_TOL` and `MIN_COVERAGE_N` are untouched.
+
+The scale at the top of `CHANGELOG.md` says an existing check changing verdict
+on unchanged code is a **major** release. On the reading recorded in E-M08, that
+is `0.5.0`.
+
+**Cannot be done from here.** PR #6 (`feat/r10-served-contract`) is open and
+already declares `0.5.0` in `resilient_mlkit.__version__` and in its newest
+`CHANGELOG.md` heading, for different content — a new check, R12, which is a
+*minor* event by the same scale. Bumping to `0.5.0` on this branch as well would
+put two open PRs on the same version number and guarantee a conflict in the one
+literal that exists precisely so it cannot disagree with itself (E-M08). So this
+branch deliberately leaves `__version__` at `0.4.0` and adds no CHANGELOG
+heading, and `tests/test_version_declaration.py` stays green either way, because
+it compares the literal to the newest heading rather than requiring a bump.
+
+**Proposed**, for whichever of the two PRs lands second: apply a single bump in
+that merge, covering both PRs' content, with one CHANGELOG heading naming the
+D2/E1 verdict change as the major reason and R12 as the minor one. Whether the
+number is `0.5.0` or `1.0.0` is the same open question E-M08 records and is the
+signatory's to settle. Until then, no tag should be cut from either branch.
+
+## E-M10 — four more checks change verdict on unchanged code; every committed T2/R2/D3/E3/R4 PASS is void
+
+**Measured by** `.venv/bin/python -m pytest tests/test_nonfinite_controls.py -q`
+on `feat/loop-mlkit-3` (25 passed), and by the same file run against the tree at
+`2d173a2` before the repair at `b85deb5` (13 failed, 12 passed).
+
+Adversarial verification of the D2/E1 repair drove every remaining numeric check
+in the package with a non-finite measurement. The class the D2/E1 repair names
+does not stop at the two hard stops. Four more checks returned **PASS** on a
+figure that does not exist, and now return **FAIL**:
+
+| Check | Input that passed | Why it passed |
+|---|---|---|
+| T2 | `[2.0, nan]` | `nan > 0.1 * first` is False, and so is `first <= 0` |
+| R2 | same | R2 delegates to T2 and inherited it verbatim |
+| D3 | `empirical = nan` | `abs(nan - nominal) > tol` is False |
+| E3 | `gpu_util = nan` | `nan < GPU_UTIL_FLOOR` is False |
+| R4 | `computed = nan` | `abs(nan - want) > tol` is False |
+
+Two of these are worse than a plain NaN hole. `min(nan, x)` is `nan` in Python,
+so the subject-declared tolerance clamps in D3 and R4 — written so a binding may
+ask for something stricter but never looser — accept a declared `tol` of NaN as
+the loosest tolerance there is. A repo could set its own pass mark to "accept
+anything" using the mechanism built to stop it. Neither existing control file
+caught this, because both exercise the clamp only with finite tolerances.
+
+T2 is the one with operational teeth: a loss that diverged to NaN is the single
+most common way a training run fails, and T2 is the check whose whole job is to
+notice that the model cannot drive one batch down.
+
+No threshold was moved. `FLATNESS_EPSILON`, `GPU_UTIL_FLOOR`, `MAX_COVERAGE_TOL`,
+`MIN_COVERAGE_N`, `MAX_METRIC_TOL` and `MIN_HOLDOUT_GROUPS` are byte-identical to
+`main`.
+
+**Consequence for the portfolio, not settled here.** Any committed PASS for T2,
+R2, D3, E3 or R4 was recorded under a check that could not fire on a non-finite
+measurement, so it does not distinguish "measured and fine" from "measured
+nothing". The same is already true of D2 and E1 per E-M09. **Recommended, not
+run:** `mlkit check --phase triage`, `--phase readiness`, `--phase decision` and
+`--phase economics` across the eight repos, and void any of those five verdicts
+that changes. That is a portfolio re-measurement and a records change, so it is
+the signatory's to authorise, not the agent's.
+
+**Version.** These repairs are the same *major* event E-M09 describes, for the
+same reason, and they fold into the single bump E-M09 proposes for whichever of
+PR #6 and PR #7 lands second. `__version__` is deliberately left at `0.4.0` here
+too. No tag should be cut from either branch until E-M08/E-M09 are settled.

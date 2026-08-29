@@ -298,10 +298,24 @@ def r4_metric_known_answer(repo: Repo, ctx: RunContext) -> CheckResult:
         except (TypeError, ValueError):
             failures.append(f"{name}: 'computed'/'expected' are not numeric")
             continue
+        # A metric that came back NaN reproduces nothing, but every comparison
+        # a NaN takes part in is False, so `abs(got - want) > tol` was False and
+        # the case passed. Same defect class as the D2/E1 hard stops.
+        if not math.isfinite(got) or not math.isfinite(want):
+            failures.append(
+                f"{name}: 'computed'/'expected' are not finite (got {got}, expected {want})"
+            )
+            continue
         # The binding may be stricter than mlkit but never looser. A subject
         # that supplies its own tolerance can pass any check by widening it,
         # which is loosening a threshold with extra steps.
-        tol = min(float(case.get("tol", MAX_METRIC_TOL)), MAX_METRIC_TOL)
+        declared_tol = float(case.get("tol", MAX_METRIC_TOL))
+        # `min(nan, x)` is nan, so a NaN tolerance defeats the clamp entirely
+        # and accepts any disagreement at all. Refused before it is clamped.
+        if not math.isfinite(declared_tol):
+            failures.append(f"{name}: declared tol is not finite ({declared_tol})")
+            continue
+        tol = min(declared_tol, MAX_METRIC_TOL)
         if abs(got - want) > tol:
             failures.append(f"{name}: got {got:.6g}, expected {want:.6g} (tol {tol:g})")
 
