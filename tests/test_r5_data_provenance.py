@@ -255,3 +255,69 @@ def test_positive_control_an_empty_provenance_report_is_never_a_pass(tmp_path):
     result = _run(tmp_path, "def provenance():\n    return {}\n")
     assert result.status is Status.FAIL
     assert "missing splits" in result.reason
+
+
+# -- the same defect class, one step further out ---------------------------
+#
+# The guard above reads a count with `float(raw)` and then tests
+# `n != int(n)`. `float("nan")`, `float("inf")` and the strings "nan"/"inf"
+# all SURVIVE the `float()` call, so they reach `int(n)` -- which raises
+# ValueError for NaN and OverflowError for an infinity, out of the check and
+# past its own diagnosis. That is the exact shape the guard was written to
+# close: the check stops naming the split and kind at fault and names an
+# interpreter error instead.
+#
+# It is not hypothetical arithmetic. NaN is what a pandas/numpy count produces
+# when a groupby or a reindex misses a kind, and this fleet already uses
+# float('nan') as an explicit "could not read this figure" sentinel -- see
+# `absent_metric_encoding` in resilient-blackout's
+# reports/train/weather_failure_all_in_scope_gate.json. A provenance histogram
+# arriving with a NaN in it is a live shape here.
+#
+# A raising check is converted to FAIL by the CLI runner, so no false PASS was
+# ever reachable through this path. The defect is in the reason: "unmeasured"
+# has to be sayable about a count, and an unhandled OverflowError does not say
+# it.
+
+
+def test_positive_control_a_NaN_count_is_refused_by_name_not_by_traceback(tmp_path):
+    """FIRES: and as a diagnosis. NaN is the shape a missing groupby key takes."""
+    result = _run(
+        tmp_path,
+        _binding(CLEAN_TRAIN, '{"real": float("nan"), "synthetic": 0}', CLEAN_TEST),
+    )
+    assert result.status is Status.FAIL
+    assert "val" in result.reason and "real" in result.reason
+    assert "ValueError" not in result.reason
+
+
+def test_positive_control_an_infinite_count_is_refused_by_name(tmp_path):
+    """FIRES: an infinity is not a row count either, and must not overflow out."""
+    result = _run(
+        tmp_path,
+        _binding(CLEAN_TRAIN, '{"real": 100, "synthetic": float("inf")}', CLEAN_TEST),
+    )
+    assert result.status is Status.FAIL
+    assert "val" in result.reason and "synthetic" in result.reason
+    assert "OverflowError" not in result.reason
+
+
+def test_positive_control_the_string_nan_is_refused_by_name(tmp_path):
+    """FIRES: `float("nan")` succeeds on the string too, so a CSV cell reaches int()."""
+    result = _run(tmp_path, _binding(CLEAN_TRAIN, '{"real": "nan"}', CLEAN_TEST))
+    assert result.status is Status.FAIL
+    assert "val" in result.reason and "real" in result.reason
+    assert "ValueError" not in result.reason
+
+
+def test_negative_control_a_large_finite_count_is_still_silent(tmp_path):
+    """SILENT: the pair. The refusal must be of non-finiteness, not of magnitude.
+
+    Without this, "reject anything float() cannot round-trip" would be
+    satisfied by a guard that also rejected a legitimately large corpus.
+    """
+    result = _run(
+        tmp_path,
+        _binding('{"real": 10_000_000_000}', '{"real": 1_000_000}', '{"real": 1_000_000}'),
+    )
+    assert result.status is Status.PASS
