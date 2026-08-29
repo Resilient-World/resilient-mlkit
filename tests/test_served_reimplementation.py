@@ -808,3 +808,151 @@ def test_a_rebind_of_the_imported_name_is_not_a_use():
     )
     findings = sr.scan_source(source, "src/serve/thing.py")
     assert "PROMOTION_VERDICT" in {f.clause for f in findings}
+
+
+# ---------------------------------------------------------------------------
+# E-035-VERIFY. The repair above closed the exemption for the
+# ``from X import f`` spelling and left it open for two others, both of which
+# were forced against the REAL resilient-fray file before these were written:
+#
+#   * ``import X.Y.Z`` binds the ROOT name, so any unrelated read of that root
+#     paid for the import. fray's promotion gate, given a benign
+#     ``import resilient_mlkit.core.result`` and a use of it, went 4 findings
+#     -> 0 on ONE added ``import resilient_mlkit.core.served`` line. That is
+#     E-035's own mutation, unrepaired, at check level (R12 FAIL -> PASS).
+#   * SHADOW-AND-CALL. ``_referenced_names`` skips ``Store`` nodes, but a file
+#     that rebinds the contract's name AND THEN CALLS the rebinding still has a
+#     ``Load`` of it, so it earned the exemption. The control above
+#     (``test_a_rebind_of_the_imported_name_is_not_a_use``) never called the
+#     rebinding, so it did not see this.
+#
+# Each is a FIRES/SILENT pair: the SILENT half is the same import spelling with
+# a real use, because a repair that fired on those would break adoption.
+
+DOTTED_EVASION = "import resilient_mlkit.core.served\n"
+
+#: A file that already touches ``resilient_mlkit`` for an unrelated reason,
+#: which is what made the dotted evasion cost one line rather than two.
+UNRELATED_USE = (
+    "import resilient_mlkit.core.result\n"
+    "\n"
+    "def _ok(cid):\n"
+    "    return resilient_mlkit.core.result.CheckResult.passed(cid, 'x', {})\n"
+    "\n"
+)
+
+
+def test_a_dotted_import_is_not_paid_for_by_an_unrelated_use_of_its_root():
+    """FIRES. ``import pkg.a.b`` must be used as ``pkg.a.b.…``, not as ``pkg``."""
+    for name, source in (("SERVING", SERVING), ("TORRENT", TORRENT)):
+        bare = UNRELATED_USE + textwrap.dedent(source)
+        before = sr.scan_source(bare, "src/serve/thing.py")
+        after = sr.scan_source(DOTTED_EVASION + bare, "src/serve/thing.py")
+        assert before, f"{name} must carry a clause for this control to mean anything"
+        assert len(after) == len(before), (
+            f"{name}: one unused `import {sr.CONTRACT_MODULE}` took findings "
+            f"{len(before)} -> {len(after)} because an unrelated read of the "
+            "root package paid for it (E-035, dotted spelling)"
+        )
+
+
+def test_a_dotted_import_used_as_a_full_chain_still_exempts():
+    """SILENT. The same import line; the variable is the chain that reads it."""
+    used = (
+        DOTTED_EVASION
+        + textwrap.dedent(SERVING)
+        + "\n\ndef decide(comparisons):\n"
+        "    return resilient_mlkit.core.served.challenger_decision(\n"
+        '        comparisons, recorded_bar=RECORDED_BAR, metrics=("mae",)\n'
+        "    )\n"
+    )
+    assert sr.scan_source(used, "src/serve/thing.py") == []
+
+
+def test_a_dotted_import_bound_with_as_still_exempts():
+    """SILENT. ``import X.Y.Z as s`` binds a bare name, and ``s.f(...)`` uses it."""
+    used = (
+        "import resilient_mlkit.core.served as served\n"
+        + textwrap.dedent(SERVING)
+        + "\n\ndef decide(comparisons):\n"
+        "    return served.challenger_decision(\n"
+        '        comparisons, recorded_bar=RECORDED_BAR, metrics=("mae",)\n'
+        "    )\n"
+    )
+    assert sr.scan_source(used, "src/serve/thing.py") == []
+
+
+def test_shadowing_the_contract_name_and_then_calling_it_is_not_a_use():
+    """FIRES. The rebind control above, plus the one line that defeated it.
+
+    ``challenger_decision = _my_gate`` followed by ``challenger_decision(b)``
+    is a local implementation wearing the contract's name and being called;
+    the ``Load`` it produces resolves to the local thing, not to the import.
+    """
+    source = (
+        "from resilient_mlkit.core.served import challenger_decision\n"
+        "\n\ndef _my_gate(block):\n"
+        '    return {"status": "PASS", "promotable": True, "reason": "local"}\n'
+        "\n\nchallenger_decision = _my_gate\n"
+        "\n\ndef go(block):\n    return challenger_decision(block)\n"
+    )
+    findings = sr.scan_source(source, "src/serve/thing.py")
+    assert "PROMOTION_VERDICT" in {f.clause for f in findings}
+
+
+def test_shadowing_control_fires_at_repo_scope_and_through_the_check(tmp_path):
+    """FIRES, at the check the portfolio runs, for both evasions at once."""
+    from resilient_mlkit.checks import RunContext
+    from resilient_mlkit.checks.readiness import r12_served_contract
+    from resilient_mlkit.core.repo import Repo
+    from resilient_mlkit.core.result import Status
+
+    write_repo(
+        tmp_path,
+        {
+            "src/serve/dotted.py": (
+                DOTTED_EVASION + UNRELATED_USE + textwrap.dedent(SERVING)
+            ),
+            "src/serve/shadow.py": (
+                "from resilient_mlkit.core.served import challenger_decision\n"
+                "\n\ndef _my_gate(block):\n"
+                '    return {"status": "PASS", "promotable": True}\n'
+                "\n\nchallenger_decision = _my_gate\n"
+                "\n\ndef go(block):\n    return challenger_decision(block)\n"
+                + textwrap.dedent(TORRENT)
+            ),
+        },
+    )
+    result = r12_served_contract(
+        Repo(name="fixture", path=tmp_path),
+        RunContext(nonce="test-nonce", root=tmp_path),
+    )
+    assert result.status is Status.FAIL
+    findings, _ = sr.scan_repo(tmp_path)
+    assert {f.path for f in findings} == {"src/serve/dotted.py", "src/serve/shadow.py"}
+
+
+def test_a_repo_local_route_taken_by_the_dotted_spelling_still_exempts(tmp_path):
+    """SILENT, one level of indirection out, via ``import serve.contract``.
+
+    The indirection exemption has to survive the dotted-prefix rule too, or the
+    repair would have closed the evasion by breaking the adoption path.
+    """
+    root = write_repo(
+        tmp_path,
+        {
+            "src/serve/contract.py": """
+                from resilient_mlkit.core.served import ServedModel, challenger_decision
+
+                __all__ = ["ServedModel", "challenger_decision"]
+            """,
+            "src/serve/county_yield.py": (
+                "import serve.contract\n"
+                + textwrap.dedent(SERVING)
+                + "\n\ndef decide(c):\n"
+                "    return serve.contract.challenger_decision(c)\n"
+            ),
+        },
+    )
+    findings, _ = sr.scan_repo(root)
+    assert findings == []
