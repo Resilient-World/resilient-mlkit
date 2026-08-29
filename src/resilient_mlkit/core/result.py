@@ -4,6 +4,12 @@ The single most important invariant in this package lives here: a result may
 not claim a number it did not measure, and it may not be unmeasured without
 saying why. Both are enforced structurally in ``__post_init__`` rather than by
 convention, because convention is exactly what fails under deadline pressure.
+
+A third joins them: a PASS may not rest on a number read from the working tree
+under ``core.artifact``'s ``allow_dirty`` escape hatch. A figure that is in
+nobody's git history cannot be fetched by the reader it is quoted to, which
+makes it unfalsifiable in exactly the way a fabricated one is -- see
+``UncommittedRead`` and ``docs/ESCALATIONS.md`` E-M12.
 """
 
 from __future__ import annotations
@@ -85,8 +91,35 @@ _REASON_REQUIRED = {
 }
 
 
+#: Evidence key marking a value that descends from a read of the WORKING TREE
+#: rather than of the repo's committed state -- ``core.artifact.load(...,
+#: allow_dirty=True)``, the diagnosis-only escape hatch.
+#:
+#: The constant lives here rather than in ``core.artifact`` for a dependency
+#: reason and a design reason. The dependency reason: ``core.artifact`` imports
+#: this module, so the reverse import would be a cycle. The design reason: the
+#: marker's whole purpose is to be REFUSED, and this is the module that refuses
+#: it. A marker defined next to what produces it is documentation; a marker
+#: defined next to what rejects it is a gate.
+ALLOW_DIRTY_KEY = "allow_dirty_read"
+
+
 class FabricationError(RuntimeError):
     """Raised when a check tries to report a value it did not measure."""
+
+
+class UncommittedRead(FabricationError):
+    """Raised when a value read from the working tree is offered as a verdict.
+
+    A subclass of ``FabricationError`` on purpose: quoting a number that is in
+    nobody's git history is the same failure as quoting one nobody measured.
+    Both are figures a reader cannot go and check, and the reason a reader
+    cannot check them is the only thing that differs.
+
+    ``docs/ESCALATIONS.md`` E-M12 is the case that named this: a fleet row read
+    out of an untracked, gitignored working-tree file. The instrument recorded
+    the fact in a provenance column and printed the number anyway.
+    """
 
 
 class CredentialRequired(RuntimeError):
@@ -148,6 +181,13 @@ class CheckResult:
             raise FabricationError(
                 f"{self.check_id}: PASS requires evidence. A pass with nothing "
                 "measured behind it is indistinguishable from a fabricated one."
+            )
+        if self.status is Status.PASS and self.evidence.get(ALLOW_DIRTY_KEY):
+            raise UncommittedRead(
+                f"{self.check_id}: PASS may not rest on an --allow-dirty read. The "
+                "evidence descends from working-tree bytes that are not in git at "
+                "HEAD, so nobody can fetch what this passed on. Commit the "
+                "artifact and re-measure, or report NA with the reason."
             )
         if not self.measured_at:
             self.measured_at = _dt.datetime.now(_dt.UTC).isoformat(

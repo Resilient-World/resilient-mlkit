@@ -43,6 +43,19 @@ def _git(cwd: Path, *args: str) -> None:
     subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True)
 
 
+def _commit(repo: Repo, message: str = "edit") -> None:
+    """Land the working tree in git.
+
+    Several controls below rewrite an artifact and re-read it. Since
+    ``core.artifact.load`` reads ``HEAD:<relpath>`` rather than the working tree
+    (``docs/ESCALATIONS.md`` E-M12), an edit that is not committed is not an
+    edit the reader can see -- which is the point of the change and is itself
+    asserted, both ways, in ``tests/test_committed_reads.py``.
+    """
+    _git(repo.path, "add", "-A")
+    _git(repo.path, "commit", "-qm", message)
+
+
 ARTIFACT = {
     "model": {"name": "toy ridge"},
     "splits_scored": {
@@ -397,24 +410,36 @@ def test_a_committed_artifact_is_recorded_as_committed(toy_repo: Repo) -> None:
     assert ref.found and ref.committed_at_head and not ref.dirty and not ref.off_checkout
 
 
-def test_an_uncommitted_artifact_is_flagged(toy_repo: Repo) -> None:
+def test_an_uncommitted_artifact_is_refused_not_merely_flagged(toy_repo: Repo) -> None:
     """FIRES: a figure read from a file git does not have is not reproducible.
 
     This is the control for the finding this command was written to make --
     resilient-choco's head sidecar is gitignored and has never been committed.
+
+    Named "…_is_flagged" until committed reads landed, when flagging turned out
+    to be the whole defect: the flag was computed, printed in a provenance
+    column, and the number served anyway. The assertions below are the old ones
+    plus the refusal, never fewer.
     """
     ref = load(toy_repo, "reports/uncommitted.json")
-    assert ref.found
     assert not ref.committed_at_head
-    assert ref.sha256
+    assert not ref.found, "an artifact on no ref must not present as found"
+    assert "not committed at HEAD" in ref.error
+    assert "reports/uncommitted.json" in ref.error
+    assert ref.document is None, "the document of an uncommitted file was parsed"
+    assert not ref.sha256, "hashing it would put an unfetchable sha in the table"
 
 
-def test_an_edited_artifact_is_flagged_dirty(toy_repo: Repo) -> None:
+def test_an_edited_artifact_is_flagged_dirty_and_refused(toy_repo: Repo) -> None:
     """FIRES: working-tree bytes that differ from the committed blob."""
     path = toy_repo.path / "reports" / "scores.json"
     path.write_text(json.dumps({**ARTIFACT, "test_scored": False}))
     ref = load(toy_repo, "reports/scores.json")
-    assert ref.found and ref.committed_at_head and ref.dirty
+    assert ref.committed_at_head and ref.dirty
+    # …and the two recorded facts now decide, rather than annotate.
+    assert not ref.found
+    assert "not committed at HEAD" in ref.error
+    assert ref.document is None
 
 
 def test_an_artifact_only_in_a_linked_worktree_is_found_and_flagged(toy_repo: Repo) -> None:
@@ -459,6 +484,7 @@ def test_a_float_is_printed_at_full_precision_not_rounded(toy_repo: Repo) -> Non
     doc = json.loads(path.read_text())
     doc["splits_scored"]["test"]["candidates"][0]["rmse"] = 1.056759999999
     path.write_text(json.dumps(doc))
+    _commit(toy_repo, "a figure with more digits than a table usually keeps")
     assert "1.056759999999" in markdown_table([read_row(toy_repo, _adapter())])
 
 
@@ -623,6 +649,12 @@ def test_the_reader_follows_the_artifact_when_the_recorded_figure_changes(
     Read twice off the same declaration with the file changed in between. If any
     figure were baked into the adapter or cached across reads, the two scores
     would agree -- and the second would be quietly wrong.
+
+    The edit is COMMITTED between the two reads, and that is now load-bearing
+    rather than incidental: the reader follows the artifact's committed state,
+    so an uncommitted edit is deliberately invisible to it. The half of that
+    claim this test does not make -- that the uncommitted edit changes nothing
+    downstream -- is made in ``tests/test_committed_reads.py``.
     """
     adapter = _adapter()
     before = read_row(toy_repo, adapter)
@@ -631,6 +663,7 @@ def test_the_reader_follows_the_artifact_when_the_recorded_figure_changes(
     document = json.loads(path.read_text())
     document["splits_scored"]["test"]["candidates"][0]["rmse"] = 74.16097783177521
     path.write_text(json.dumps(document))
+    _commit(toy_repo, "the recorded figure changes")
 
     after = read_row(toy_repo, adapter)
     assert before.score.value != after.score.value, (
