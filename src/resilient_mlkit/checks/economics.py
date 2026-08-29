@@ -151,6 +151,16 @@ def e3_efficiency_floor(repo: Repo, ctx: RunContext) -> CheckResult:
         "dataloader_bound": dataloader_bound,
     }
 
+    # `nan < GPU_UTIL_FLOOR` is False, so a utilisation figure that did not
+    # resolve cleared the floor -- the same defect class the E1 guard above
+    # refuses. A profiler that reported nothing has not reported 100%.
+    if not math.isfinite(util):
+        return CheckResult.failed(
+            "E3", PHASE,
+            "efficiency reported a non-finite gpu_util; a utilisation that did not "
+            "resolve to a number has not been measured and cannot clear the floor",
+            evidence,
+        )
     if util < GPU_UTIL_FLOOR:
         remedy = (
             "the dataloader is the bottleneck; the remedy is FSx for Lustre or "

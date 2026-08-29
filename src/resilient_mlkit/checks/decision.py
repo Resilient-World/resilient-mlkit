@@ -158,8 +158,35 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
     nominal, empirical, n = float(out["nominal"]), float(out["empirical"]), int(out["n"])
     # mlkit owns this tolerance. A binding may ask for something stricter but
     # never looser -- a subject that sets its own pass mark sets no pass mark.
-    tol = min(float(out.get("tol", MAX_COVERAGE_TOL)), MAX_COVERAGE_TOL)
+    declared_tol = float(out.get("tol", MAX_COVERAGE_TOL))
+    # `min(nan, x)` returns nan in Python, so a declared tolerance of NaN walks
+    # straight through the clamp above and makes `abs(empirical - nominal) > tol`
+    # False for every input -- the loosest tolerance there is, wearing the
+    # clamp's clothes. Refused before it is clamped, not after.
+    if not math.isfinite(declared_tol):
+        return CheckResult.failed(
+            "D3", PHASE,
+            "coverage declared a non-finite tol; a tolerance that is not a number "
+            "cannot be clamped and would accept any coverage at all",
+            {"nominal": nominal, "empirical": empirical, "n": n, "tol": declared_tol},
+        )
+    tol = min(declared_tol, MAX_COVERAGE_TOL)
     evidence = {"nominal": nominal, "empirical": empirical, "n": n, "tol": tol}
+
+    # Same NaN-comparison defect the D2 guard above refuses: a non-finite
+    # coverage figure makes the tolerance comparison False and returns PASS.
+    non_finite = [
+        name for name, value in (("nominal", nominal), ("empirical", empirical))
+        if not math.isfinite(value)
+    ]
+    if non_finite:
+        return CheckResult.failed(
+            "D3", PHASE,
+            "coverage reported a non-finite " + ", ".join(non_finite)
+            + "; intervals whose coverage did not resolve to a number have not been "
+            "measured, and must not be read as covering",
+            evidence,
+        )
 
     if n < MIN_COVERAGE_N:
         return CheckResult.na(
