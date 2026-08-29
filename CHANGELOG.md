@@ -70,6 +70,22 @@ either shape moves from PASS to FAIL. Neither shape can produce a correct pass,
 so this is a defect repair rather than a tightening, and no repo is known to
 report either. Recorded here so an upgrade is not a surprise.
 
+**A third, of the same class, found by adversarially re-running the above.**
+The count guard those two defects produced reads `float(raw)` and then tests
+`n != int(n)`. `float("nan")`, `float("inf")` and the strings `"nan"` / `"inf"`
+all survive the `float()` call and reach `int()`, which raises `ValueError` for
+a NaN and `OverflowError` for an infinity — out of the check, past its own
+diagnosis. `math.isfinite` is now tested first, so those four shapes are
+refused as malformed counts naming the split and the kind. No false PASS was
+ever reachable here: the CLI runner converts a raising check into a FAIL. The
+defect was in the reason, which named an interpreter error instead of the split
+and kind at fault — the exact behaviour the guard was written to end. NaN is
+what a pandas or numpy count becomes when a groupby or a reindex misses a kind,
+and this fleet already uses `float('nan')` as an explicit "could not read this
+figure" sentinel, so it is a live shape rather than an argument about types.
+A large finite count (`10_000_000_000`) still passes, so the refusal is of
+non-finiteness and not of magnitude.
+
 ### Coverage for the checks that gate promotion
 
 `tests/` held eight files against 29 modules, and the gaps were not where a
