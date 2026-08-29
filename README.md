@@ -13,6 +13,14 @@ that did not come out of a run of this CLI does not exist.
   5 diagnostic triage checks: 32 in the registry. Counted, not remembered —
   `len(gating_ids())` and `len(all_check_ids())` on 2026-08-29, which is the
   same discipline `checks/__init__.py` states in its own docstring.
+- `src/resilient_mlkit/measurement.py` — **the import that replaces the hand
+  copies.** The repo-facing `Measured` / `Unmeasured` gate vocabulary, over the
+  canonical six-state `Status` re-exported from `core.result` (identity, not a
+  fourth definition). blackout's `validation/unmeasured.py`, triage's
+  `measurement.py` and choco's `promotion_gate.py` / `validation/_report.py`
+  each wrote this out by hand in three states, because until now there was
+  nothing importable at a gate site. Converging them is the repo's own change,
+  not one made from here.
 - `src/resilient_mlkit/fleet_adapters.py` — one declared adapter per model of
   record, saying which committed artifact and which pointer carries each column
   of the fleet verdict table.
@@ -67,8 +75,15 @@ writes nothing, and exits 2 — nothing read that way can reach a verdict row.
 | `PASS` | Measured, and correct. Requires non-empty evidence. |
 | `FAIL` | Measured, and wrong. |
 | `NA` | Could not be measured here, with a reason. Never a pass. |
+| `DEFERRED` | Wired and exercised; stops at a credential the signatory supplies. Never a pass. |
 | `STALE` | Measured at a different git SHA than the one checked out. |
 | `ESCALATED` | Reserved to the human signatory. |
+
+`DEFERRED` was missing from this table while `core/result.py` defined six
+statuses and its docstring argued at length for why the sixth must not be
+folded into `NA`. Added when `measurement.py` was exported, because the
+document a repo reads before adopting the vocabulary should not describe five
+sixths of it.
 
 Three of the readiness checks import nothing and walk source with `ast`, which
 is what lets them see code no binding exposes: **R10** `FABRICATED_DEFAULTS`

@@ -77,6 +77,18 @@ six repos carry a `champion.json`, a registry entry or a `models_of_record.json`
 repos, and in blackout's case the gate is currently refusing the candidate, so
 what to register is a decision.
 
+**CLOSED FOR TORRENT, 2026-08-29 (TORRENT-RECORD).** resilient-torrent wrote
+the record itself: `models/hydrology_ridge/model.json` is committed on its
+`main` (`promoted_at` 2026-08-29, re-emitted under `TORRENT-L4-PATHS`, verified
+read-only with `git cat-file -e main:<path>` and byte-identical at that
+checkout's HEAD). The fleet adapter now reads `record:served_model` and
+torrent's two `model_of_record` cells are measured, not prose —
+`reports/fleet_verdicts_torrent_record/` carries the before/after regeneration.
+**The blackout half of this item is untouched and remains open.** Note what the
+delay cost: the stale `Absent` reason went on asserting, in mlkit's own source,
+that torrent had committed no such artifact, for as long as nobody re-checked
+it. An `Absent` expires like a pointer and nothing in the tool notices.
+
 ---
 
 ## E-M04 — the canonical spine has not been synced since it last changed
@@ -630,3 +642,60 @@ open colleague PRs (choco #160, blackout #129, triage #94). Under CLAUDE.md
 rule 12 the convergence decision is the signatory's. Nothing in this branch
 changes any model repo: the scanner reads files and runs read-only `git`
 commands, and no champion record anywhere was rewritten.
+
+---
+
+## E-M15 — `portfolio/FLEET_VERDICTS.md` can no longer be regenerated as a side effect
+
+**Measured 2026-08-29** with `mlkit portfolio` (v0.5.0) against the eight
+checkouts as they then stood, compared against the committed table generated
+`2026-08-29T06:40:14+00:00` at mlkit `034122f`.
+
+The committed table records the eight repos at the branches they had checked
+out when it was written — arabica at `feat/observed-panel-and-fabrication-gates`,
+blackout at `e021-decision`, triage at `e028-decision`, torrent at
+`feat/r9-attributes-and-declared-scale`. Most have since moved, several to
+`main`, and the artifacts the adapters name did not all move with them.
+Measured cell by cell over the two JSON payloads (comparing each cell's
+`value`, since the 0.4.0 payload predates the `allow_dirty_read` field and a
+whole-dict comparison reports every cell as moved): **twelve cells' values
+differ between the committed table and a regeneration today.** Two are this
+branch's repair. The other ten were moved by the world:
+
+* **six choco cells** go NA — E-M12's uncommitted artifact, unreadable since
+  committed reads landed;
+* **two blackout `model_of_record` cells** go NA, because
+  `reports/train/weather_failure_all_in_scope_gate.json` is not on the branch
+  that repo now has checked out;
+* **two torrent `test_arm_spent` cells** move 1 → 5, because torrent's
+  `reports/holdout_reads.jsonl` grew from 754 bytes to 36,787.
+
+Measured coverage falls from 103 cells to 97, and triage's champion is now read
+from a linked worktree rather than from its checkout.
+
+Two consequences, and neither is fixable from here:
+
+1. **Regenerating in place is now its own change, not a by-product.** Doing it
+   inside this branch would have bundled the ten unrelated cell movements
+   above — a measured-coverage drop from 103 cells to 97 — into a change about
+   a measurement primitive, where nobody would read them. This branch therefore
+   leaves `portfolio/FLEET_VERDICTS.md` byte-identical and puts the
+   before/after regeneration under `reports/fleet_verdicts_torrent_record/`
+   instead, where the two arms were run back to back against one identical set
+   of checkouts (`repos_read` identical between the arms, asserted in
+   `CELL_DIFF.txt`).
+2. **`tests/test_fleet.py::test_the_declared_branches_match_the_committed_provenance_table`
+   holds `BRANCH_ONLY_EVIDENCE` against the branch column of the committed
+   table.** A regeneration moves that column and the control fails — correctly:
+   the adapters' branch notes were written for `e021-decision` and
+   `e028-decision` and the world has moved off them. The repair is to
+   re-measure where blackout's and triage's evidence now lives and rewrite the
+   notes to match, which is a claim about two repos that both carry open
+   colleague PRs (blackout #129, triage #94).
+
+**Recommended, not done here**: one deliberate regeneration commit that
+re-measures the branch dependence first, updates the adapter notes and
+`BRANCH_ONLY_EVIDENCE` from that measurement, and then writes the table — with
+the ten moved cells read and explained one by one rather than absorbed. It is
+not urgent and it is not a gate change; it is a re-reading, and it should not
+be done in the same breath as anything else.

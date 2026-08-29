@@ -1,0 +1,16 @@
+rows before/after: 12 12 | same row keys: True
+
+2 cell(s) moved between the two runs:
+  torrent/melstm-10ep-n8-val / model_of_record
+     before: {"value": null, "na_reason": "no committed JSON artifact in resilient-torrent declares a model of record, and two committed artifacts positively say why not: model_mesh/CURRENT_STATE.json records `current_maturity` as 's
+     after : {"value": "ridge_with_observed_discharge", "na_reason": null, "source": "models/hydrology_ridge/model.json#served_model", "allow_dirty_read": false}
+  torrent/ridge-vs-melstm-val / model_of_record
+     before: {"value": null, "na_reason": "no committed JSON artifact in resilient-torrent declares a model of record; see the melstm-10ep-n8-val row", "source": null, "allow_dirty_read": false}
+     after : {"value": "ridge_with_observed_discharge", "na_reason": null, "source": "models/hydrology_ridge/model.json#served_model", "allow_dirty_read": false}
+
+NON-TORRENT cells moved: []
+counts before: {'rows': 12, 'cells_measured': 95, 'cells_na': 13}
+counts after : {'rows': 12, 'cells_measured': 97, 'cells_na': 11}
+artifact aliases changed for torrent/melstm-10ep-n8-val: +['record'] -[]
+artifact aliases changed for torrent/ridge-vs-melstm-val: +['record'] -[]
+repos_read identical: True
