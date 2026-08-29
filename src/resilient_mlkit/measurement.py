@@ -85,14 +85,30 @@ Stated plainly, because "purely a rename" would be a claim, and it is false:
   exactly that). An NA still emits no *figure for the gate* — ``value`` is
   ``None`` — so nothing downstream can copy a number out of it.
 * **Reasons are redacted and length-bounded** on the way in, by
-  ``core.result.redact``. A gate that interpolates an exception into its reason
-  no longer has to remember rule 13.
+  ``core.result.redact`` — and so are ``gate_description`` and ``notes``, the
+  two free-text fields this module adds that ``CheckResult`` does not have and
+  core's redaction therefore never sees. A gate that interpolates an exception
+  into any of the three no longer has to remember rule 13.
 * **``passed`` is derived, never assigned.** In all three copies ``passed`` is
   a constructor argument that ``__post_init__`` then corrects. Here it is a
   read-only property of the status, so "NA that passed" is not a state that can
   be built and then fixed; it cannot be spelled. The PASS constructor is
   therefore called ``Measured.ok``, leaving ``passed`` to mean the question a
   reader asks rather than a value a caller sets.
+
+  A read-only ``passed`` is not on its own enough, and the first version of
+  this module stopped there. ``m.status = Status.PASS`` on an NA reached
+  ``passed``, ``render()`` and ``to_dict()`` without passing a single refusal,
+  yielding an evidence-free PASS still carrying the NA's reason — the same
+  forbidden state, spelled through a different field. ``__setattr__`` now
+  re-validates through ``CheckResult`` before the assignment lands, so every
+  field that decides legality is checked on the way out as well as on the way
+  in. **The one hole left is in-place mutation of the metrics dict**
+  (``m.metrics["allow_dirty_read"] = True``): the guard sees rebinding, not
+  mutation. ``to_result()`` still refuses it, so nothing that reaches a
+  portfolio row escapes — but a gate that only calls ``render()`` would print
+  it. Closing that needs an immutable mapping and is left stated rather than
+  half-done.
 
 USAGE
 -----
@@ -171,6 +187,12 @@ REPO_GATE_PHASE = "repo-gate"
 #: it". Everything else is a statement about why one did not, and the
 #: distinction is the whole reason NA must not render like PASS.
 MEASURED_STATUSES = frozenset({Status.PASS, Status.FAIL})
+
+#: Fields whose value decides whether the outcome is structurally legal, and
+#: which are therefore re-validated through ``CheckResult`` when assigned after
+#: construction. ``gate_description`` and ``notes`` are absent on purpose: they
+#: carry no verdict, and they are redacted rather than refused.
+_REVALIDATED = frozenset({"name", "phase", "status", "reason", "metrics"})
 
 #: How each status renders as a leading token. Six distinct tokens, and the
 #: four non-verdict ones each say what kind of not-measured they are, so a
@@ -252,7 +274,39 @@ class Measured:
         self.status = result.status
         self.reason = result.reason
         self.metrics = dict(result.evidence)
-        self.notes = list(self.notes)
+        # `gate_description` and `notes` are fields this module ADDS -- they do
+        # not exist on `CheckResult`, so core.result's redaction never sees
+        # them, and both are printed by `to_dict`. A gate that interpolates an
+        # exception into a note would otherwise carry a credential into a
+        # transcript, which CLAUDE.md rule 13 makes a stopping point. Redacted
+        # here for the same reason `reason` is redacted there: at the boundary,
+        # once, rather than at every call site that has to remember.
+        self.gate_description = redact(self.gate_description)
+        self.notes = [redact(n) for n in self.notes]
+        object.__setattr__(self, "_constructed", True)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Re-apply core.result's refusals to any field assigned after construction.
+
+        Without this, the invariant is only enforced on the way in. ``passed``
+        is a read-only property, so ``m.passed = True`` raises -- but
+        ``m.status = Status.PASS`` on an NA reached ``passed``, ``render()``
+        and ``to_dict()`` unchecked, producing an evidence-free PASS wearing
+        the NA's reason. That is precisely the state this module claims cannot
+        be spelled, arrived at by spelling one field instead of another.
+
+        Validation happens BEFORE the assignment lands, so a refused write
+        leaves the outcome exactly as it was rather than half-corrected.
+        """
+        if getattr(self, "_constructed", False) and name in _REVALIDATED:
+            CheckResult(  # raises FabricationError / UncommittedRead
+                check_id=value if name == "name" else self.name,
+                phase=value if name == "phase" else self.phase,
+                status=value if name == "status" else self.status,
+                reason=value if name == "reason" else self.reason,
+                evidence=dict(value if name == "metrics" else self.metrics),
+            )
+        object.__setattr__(self, name, value)
 
     # -- what a reader of the outcome asks it ------------------------------
 

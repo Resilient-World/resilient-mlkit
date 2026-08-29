@@ -310,3 +310,99 @@ def test_raising_is_the_alternative_to_a_substituted_default() -> None:
     with pytest.raises(Unmeasured):
         correlation(0.0)
     assert correlation(1.0) == 0.5, "SILENT: a measurable input still measures"
+
+
+# ------------------------------------------------------------------ MX-9 / MX-10
+# Added by adversarial verification of this branch (VERIFY-MX9, VERIFY-MX10).
+# Both controls FAIL against the first version of measurement.py and pass here.
+
+
+def test_mx9_status_cannot_be_reassigned_into_an_evidence_free_pass() -> None:
+    """FIRES: the forbidden state, spelled through `status` instead of `passed`.
+
+    `passed` is a read-only property, which stops `m.passed = True`. It does
+    not stop `m.status = Status.PASS`, and before the `__setattr__` guard that
+    assignment produced an NA that reported `passed is True`, rendered as
+    `PASS ... - <the NA's reason>` and carried no metrics at all.
+    """
+    na = Measured.unmeasured("coverage", reason="no scored rows")
+    with pytest.raises(FabricationError, match="PASS requires evidence"):
+        na.status = Status.PASS
+    # Refused BEFORE the write: the outcome is unchanged, not half-corrected.
+    assert na.status is Status.NA
+    assert na.passed is False
+    assert not na.render().startswith("PASS")
+
+
+def test_mx9_a_pass_cannot_be_reassigned_onto_an_allow_dirty_read() -> None:
+    """FIRES: rebinding metrics onto a PASS re-applies the uncommitted-read refusal."""
+    ok = Measured.ok("coverage", metrics={"coverage": 0.91})
+    with pytest.raises(UncommittedRead):
+        ok.metrics = {"coverage": 0.91, ALLOW_DIRTY_KEY: True}
+    assert ok.metrics == {"coverage": 0.91}
+
+
+def test_mx9_reassigning_a_reason_away_from_a_non_pass_is_refused() -> None:
+    """FIRES: an NA may not be emptied of the reason that makes it honest."""
+    na = Measured.unmeasured("coverage", reason="no scored rows")
+    with pytest.raises(FabricationError, match="requires a reason"):
+        na.reason = ""
+    assert na.reason == "no scored rows"
+
+
+def test_mx9_negative_control_a_legal_reassignment_still_lands() -> None:
+    """SILENT: the guard re-validates; it does not freeze the object.
+
+    Same field, same object, same kind of write as the three FIRES above --
+    the only difference is that the result is a legal one. Without this half,
+    the guard is consistent with "refuse every assignment".
+    """
+    na = Measured.unmeasured("coverage", reason="no scored rows")
+    na.reason = "no scored rows: the calibration split is empty"
+    assert na.reason == "no scored rows: the calibration split is empty"
+    na.status = Status.FAIL  # legal: FAIL needs a reason, and it has one
+    assert na.status is Status.FAIL and na.passed is False
+    ok = Measured.ok("coverage", metrics={"coverage": 0.91})
+    ok.metrics = {"coverage": 0.93, "n_rows": 40}
+    assert ok.metrics == {"coverage": 0.93, "n_rows": 40} and ok.passed is True
+    # And the fields that carry no verdict are not guarded at all.
+    ok.notes = ["re-read after the split was rebuilt"]
+    assert ok.notes == ["re-read after the split was rebuilt"]
+
+
+_LEAKY = "Authorization: Bearer ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
+
+def test_mx10_the_fields_this_module_adds_are_redacted_too() -> None:
+    """FIRES: `gate_description` and `notes` do not exist on CheckResult.
+
+    core.result redacts `reason` and nothing else, because `reason` is the only
+    free text it has. These two are this module's own additions and both reach
+    `to_dict()`, so before this they were an unredacted route from an
+    interpolated exception to a transcript -- CLAUDE.md rule 13.
+    """
+    out = Measured.unmeasured(
+        "coverage",
+        reason="no rows",
+        gate_description=f"gate {_LEAKY}",
+        notes=[f"note {_LEAKY}", "clean note"],
+    ).to_dict()
+    assert "ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA" not in out["gate"]
+    assert "<redacted>" in out["gate"]
+    assert not any("ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA" in n for n in out["notes"])
+
+
+def test_mx10_negative_control_clean_free_text_survives_intact() -> None:
+    """SILENT: redaction removes credentials, not prose.
+
+    Same two fields, same call, text that carries no secret -- so the control
+    above is not satisfied by a function that blanks everything.
+    """
+    out = Measured.unmeasured(
+        "coverage",
+        reason="no rows",
+        gate_description="empirical coverage >= 0.9",
+        notes=["read from reports/val/coverage.json"],
+    ).to_dict()
+    assert out["gate"] == "empirical coverage >= 0.9"
+    assert out["notes"] == ["read from reports/val/coverage.json"]
