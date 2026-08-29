@@ -68,9 +68,21 @@ def _all_passing() -> dict[str, CheckResult]:
 
 
 def test_the_gating_set_is_the_four_non_triage_phases() -> None:
-    """Pinned because widening or narrowing it silently redefines READY."""
+    """Pinned because widening or narrowing it silently redefines READY.
+
+    The literal moved from 26 to 27 when R12 (``SERVED_CONTRACT``) joined the
+    readiness phase. That is what this tripwire is for: adding a gating check
+    redefines READY for every repo, and it should not be possible to do it
+    without editing this line and saying so. R12 is a gating check on purpose —
+    a repo whose serving path defines "promotable" for itself is not ready to
+    train against a bar it can reinterpret.
+
+    This is the ONLY place the number is written. The READY message below reads
+    it back from ``gating_ids()`` rather than repeating it, because two copies
+    of a count is how the version literal went stale in E-M08.
+    """
     ids = gating_ids()
-    assert len(ids) == 26
+    assert len(ids) == 27
     assert set(PHASE_ORDER["triage"]).isdisjoint(ids), "triage diagnoses; it does not gate"
     for cid in HUMAN_ONLY:
         assert cid in ids, f"{cid} is reserved to the signatory and must still gate"
@@ -83,7 +95,7 @@ def test_negative_control_every_gating_check_passing_is_READY(repo: Repo) -> Non
     """SILENT: the one input that may produce READY. Without it nothing below means anything."""
     state = resolve(repo, _all_passing())
     assert state.state == READY
-    assert "all 26 gating checks pass" in state.reason
+    assert f"all {len(gating_ids())} gating checks pass" in state.reason
 
 
 def test_positive_control_one_missing_gating_result_is_not_READY(repo: Repo) -> None:

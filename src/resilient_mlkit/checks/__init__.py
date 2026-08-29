@@ -1,8 +1,14 @@
 """The check registry.
 
-Twenty-seven checks across five phases. The registry is the single place that
+Thirty-two checks across five phases. The registry is the single place that
 knows what exists, what phase it belongs to, and -- importantly -- what order
 it runs in, because for readiness that order is not numerical.
+
+That count was "twenty-seven" until R12 was added, and it had been wrong by
+four since well before this branch: the registry held thirty-one. It is
+corrected here by COUNTING (``len(_REGISTRY)`` after ``load_all()``), not by
+remembering, which is the only way a number in a docstring is ever worth
+anything.
 """
 
 from __future__ import annotations
@@ -71,10 +77,20 @@ PHASES = ("triage", "selection", "readiness", "decision", "economics")
 #: recorded after an R11 FAIL is a pass counted with a broken ruler. Running
 #: it first means the readiness table reads in the order the defects
 #: compound. R8 stays last: it reports.
+#:
+#: R12 runs fourth, with the other two ast walks, for the cost reason only. It
+#: imports nothing and reads no data, so it belongs in the cheap group; unlike
+#: R11 it has no ordering DEPENDENCY on a later check, because nothing
+#: downstream counts anything by what R12 adjudicates. Its placement here is
+#: therefore a scheduling choice and not an argument, and it deliberately
+#: leaves R10's and R11's relative positions — and every existing check's
+#: behaviour — untouched.
 PHASE_ORDER: dict[str, list[str]] = {
     "triage": ["T1", "T2", "T3", "T4", "T5"],
     "selection": ["S1", "S2", "S3", "S4", "S5"],
-    "readiness": ["R9", "R10", "R11", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"],
+    "readiness": [
+        "R9", "R10", "R11", "R12", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8",
+    ],
     "decision": ["D1", "D2", "D3", "D4", "D5"],
     "economics": ["E1", "E2", "E3", "E4", "E5"],
 }
