@@ -32,6 +32,7 @@ ruler somebody drew.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from ..core import environment, fabricated_targets, fabrication, policy, report
@@ -345,6 +346,16 @@ def r5_data_provenance(repo: Repo, ctx: RunContext) -> CheckResult:
                 n = float(raw)
             except (TypeError, ValueError):
                 malformed.append(f"{split}.{kind}={raw!r} is not a number")
+                continue
+            # `float()` accepts NaN and the infinities, including as the
+            # strings "nan"/"inf", and `int()` then raises out of the check --
+            # ValueError for a NaN, OverflowError for an infinity. That is the
+            # same defect this guard exists to close, one step further out:
+            # the check stops naming the split and the kind and names an
+            # interpreter error instead. NaN in particular is what a pandas or
+            # numpy count becomes when a groupby or a reindex misses a kind.
+            if not math.isfinite(n):
+                malformed.append(f"{split}.{kind}={raw!r} is not a finite row count")
                 continue
             if n != int(n) or n < 0:
                 malformed.append(
