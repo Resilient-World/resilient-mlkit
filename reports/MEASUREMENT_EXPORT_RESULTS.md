@@ -169,3 +169,49 @@ No check threshold, gate file, holdout or `Status` semantic was edited. No test
 expectation in this suite was edited; the 133 pre-registered control pairs
 still pass, still 133. No CI, IAM, billing or cost-incurring action was taken —
 those are the signatory's (CLAUDE.md rule 12). No model repo was written to.
+
+---
+
+## Addendum — adversarial verification, 2026-08-29 (VERIFY-MX9, VERIFY-MX10)
+
+This branch was re-verified by running, not by reading. Every figure above
+reproduces digit for digit: all 14 sha256s in this document, the CELL_DIFF
+(2 cells moved, both `torrent/model_of_record`, **non-torrent cells moved: []**,
+95 → 97 measured, 13 → 11 NA, 12 rows, `repos_read` identical between arms),
+the 18 declared `(repo, path)` pairs (14 on `main`, 17 on some ref, choco's
+the one that resolves nowhere), torrent's record artifact
+(`c93f50d40c7e…`, 6,969 bytes, byte-identical on `main:` and `HEAD:`,
+`served_model` == `row_parity_ridge_vs_melstm_val.json` `left.name`), and the
+four protected files. The 133 pre-registered control pairs and the 129-test
+regression set were re-run **at the branch point with `PYTHONPATH` forced at
+that tree** — 133 and 129 there, 133 and 129 here.
+
+Verification found two defects in `measurement.py` and fixed them in commit
+`230c6a9`; both are additive tightenings inside the new module.
+
+1. **VERIFY-MX9.** `passed` is read-only, but `Measured` is a mutable
+   dataclass: `na.status = Status.PASS` produced an evidence-free PASS
+   carrying the NA's reason, reaching `passed`, `render()` and `to_dict()`
+   without meeting one refusal. `__setattr__` now re-validates through
+   `CheckResult` before the write lands. In-place mutation of the metrics
+   dict remains outside the guard and is now stated in the docstring rather
+   than implied away.
+2. **VERIFY-MX10.** `gate_description` and `notes` are fields this module
+   adds, do not exist on `CheckResult`, and reached `to_dict()` unredacted —
+   against the docstring's claim that adopting it retires rule 13 for a gate's
+   free text. Both are redacted at construction now.
+
+Six control pairs were added (MX-9 ×4, MX-10 ×2) and proved non-vacuous: run
+against `637e3be`'s `measurement.py` with `PYTHONPATH` forced at that tree,
+the four FIRES fail and the two negative controls pass.
+
+Superseding the two file digests in the table above, which the fix moved:
+
+| File | sha256 at `230c6a9` |
+|---|---|
+| `src/resilient_mlkit/measurement.py` | `b037caa6b2f1b2d35ee70d284427ba8aeec0cbb42e12545c12ab9202b67aa0f3` |
+| `tests/test_measurement_primitive.py` | `2377c4ba50619fb3e1761f21c34f94ff11bb421d380dffb4e3d7ca4b2098d1bf` |
+
+`tests/test_measurement_primitive.py` is now **41 passed** (35 + 6);
+`tests/test_torrent_model_of_record.py` is unchanged at **8 passed**. The four
+protected files are still byte-identical to `main`, re-measured after the fix.
