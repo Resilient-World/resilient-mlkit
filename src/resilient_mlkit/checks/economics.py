@@ -13,6 +13,8 @@ an I/O problem is the most common way a credit allocation evaporates.
 
 from __future__ import annotations
 
+import math
+
 from ..core.repo import BindingError, Repo
 from ..core.result import CheckResult, CredentialRequired
 from . import RunContext, check
@@ -47,6 +49,23 @@ def e1_scaling_probe(repo: Repo, ctx: RunContext) -> CheckResult:
     if missing:
         return CheckResult.failed(
             "E1", PHASE, "scaling curve missing fractions: " + ", ".join(str(m) for m in missing)
+        )
+
+    # A fraction that is present but did not resolve to a number is not a
+    # point on a curve. `float()` accepts NaN and the infinities, including as
+    # the strings "nan"/"inf"; NaN is truthy, so it takes the dividing branch
+    # below, and `nan <= FLATNESS_EPSILON` is False -- which switches this hard
+    # stop off entirely. An infinity is worse: the gain reads +inf and the
+    # flattest possible probe is reported as the steepest. Refused by naming
+    # the fraction, the same way R5 refuses a non-finite row count.
+    non_finite = [str(frac) for frac in sorted(curve) if not math.isfinite(curve[frac])]
+    if non_finite:
+        return CheckResult.failed(
+            "E1", PHASE,
+            "scaling curve is not finite at fraction(s) " + ", ".join(non_finite)
+            + "; a probe that did not resolve to a number at every fraction has not "
+            "measured a curve, and must not be read as a rising one",
+            {"curve": curve, "non_finite_at": non_finite},
         )
 
     at10, at25 = curve[0.10], curve[0.25]
