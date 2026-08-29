@@ -17,15 +17,77 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 Not yet tagged; the session lead cuts it after the adopters' verifiers pass.
 The heading is written at the version the code declares.
 
-**Why `0.5.0` and not `0.4.1`.** The scale at the top of this file makes a
-**minor** release one where "a new check exists". R12 is new; no existing check
-changes verdict on unchanged code, and a test asserts that the readiness order
-with R12 removed is byte-identical to the order before this branch.
+**A retraction first, because it is the reason this entry reads differently.**
+These notes were written on `feat/r10-served-contract` (PR #6), where the
+release really was one new check and nothing else, and they said so in a
+sentence asserting that no check's verdict moved. PR #7 then merged into the
+same `main` (`21f7e6f`, landing after `9118b0e`) the non-finite repairs that
+`docs/ESCALATIONS.md` E-M09 and E-M10 record, and that sentence stopped being
+true before the tag was cut. It is withdrawn here rather than quietly dropped,
+and `tests/test_version_declaration.py` now FIRES on it: the newest entry may
+not restate it, and must name at least one of the checks whose verdict moved.
 
-R12 does change one thing every repo sees: the gating set goes from 26 checks
-to 27, so READY now requires one more PASS. That is what adding a gating check
-means, and the tripwire in `tests/test_promotion_state.py` had to be edited by
-hand to permit it.
+### The principal event: seven checks change verdict on unchanged repo code
+
+By the scale at the top of this file that is a **major** release, and it is
+what a consumer upgrading to this version needs to read first. In every case a
+binding reporting a figure that does not exist — `nan` or `inf`, which is what
+a pandas or numpy count becomes when a groupby or a reindex misses a kind, and
+what a diverged training loss reports — was waved through by the comparison
+written to catch it.
+
+| check | what now FAILS that used to PASS | recorded in |
+|---|---|---|
+| D2 | a `placebo_test` estimate or interval that is NaN | E-M09 |
+| E1 | a `scaling_probe` curve carrying a NaN or infinite point | E-M09 |
+| T2 | a loss curve like `[2.0, nan]`: `nan > 0.1 * first` is False, and so is `first <= 0` | E-M10 |
+| R2 | the same input; R2 delegates to T2 and inherited it verbatim | E-M10 |
+| D3 | `empirical = nan`: `abs(nan - nominal) > tol` is False | E-M10 |
+| E3 | `gpu_util = nan`: `nan < GPU_UTIL_FLOOR` is False | E-M10 |
+| R4 | `computed = nan`: `abs(nan - want) > tol` is False | E-M10 |
+
+D2 and E1 are hard stops, so until this release both hard stops were unable to
+fire against a measurement that does not exist. Two of the others are worse
+than a plain hole: `min(nan, x)` is `nan` in Python, so the subject-declared
+tolerance clamps in D3 and R4 — written so a binding may ask for something
+stricter but never looser — accepted a declared `tol` of NaN as the loosest
+tolerance there is. A repo could set its own pass mark to "accept anything"
+using the mechanism built to stop it.
+
+**No threshold was moved.** `FLATNESS_EPSILON`, `GPU_UTIL_FLOOR`,
+`MAX_COVERAGE_TOL`, `MIN_COVERAGE_N`, `MAX_METRIC_TOL` and `MIN_HOLDOUT_GROUPS`
+are byte-identical to `v0.4.0`. The controls are in
+`tests/test_decision_controls.py`, `tests/test_economics_controls.py` and
+`tests/test_nonfinite_controls.py`; the last of those was run against the tree
+before the repair, where 13 of its 25 cases failed.
+
+**What it costs the portfolio, and who pays it.** Any committed PASS for D2,
+E1, T2, R2, D3, E3 or R4 was recorded under a check that could not fire on a
+non-finite measurement, so it does not distinguish "measured and fine" from
+"measured nothing". Re-running those phases across the eight repos and voiding
+the verdicts that move is a portfolio re-measurement and a records change,
+reserved to the signatory: E-M10 records it as recommended-and-not-run, and
+nothing in this release does it.
+
+**Why the number is still `0.5.0`.** Not because the reason above is minor —
+because `0.5.0` is already what a major bump from `0.4.0` looks like under the
+reading E-M08 recorded (on a `0.x` line the minimal reading of major is the
+leading nonzero). The number this entry was written at does not move; its
+justification does. It was claimed here as a minor release for R12, and it is a
+major release for the seven checks above, with R12 the minor half of the same
+tag. Whether this line's major should instead be `1.0.0` is the open question
+E-M08 and E-M09 record, and it is the signatory's to settle — restated as
+E-M11. **No tag is cut from this branch.**
+
+### R12 `SERVED_CONTRACT`, the minor half of the same release
+
+A new check exists, which is a **minor** event by the same scale, and it is
+described in full below. It does change one thing every repo sees: the gating
+set goes from 26 checks to 27, so READY now requires one more PASS. That is
+what adding a gating check means, and the tripwire in
+`tests/test_promotion_state.py` had to be edited by hand to permit it. A test
+also asserts that the readiness order with R12 removed is byte-identical to the
+order before that branch.
 
 ### One definition of "served" — `core/served.py`
 

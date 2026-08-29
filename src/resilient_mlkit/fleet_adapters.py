@@ -14,6 +14,34 @@ and it is the finding, not a gap in the tool.
 Every path below was resolved against the repo checkouts on 2026-08-28; the
 adapters carry no figures, so a pointer that later moves reports NA naming the
 pointer rather than serving a stale number.
+
+WHERE THE EVIDENCE LIVES
+------------------------
+An adapter names a path, not a branch, and a reader of this file alone would
+assume the path is on the repo's ``main``. For three entries it is not, and each
+says so in its note: surge's artifacts sit in a linked worktree rather than on
+the branch that repo has checked out, and blackout's two entries and triage's
+read artifacts committed only on ``e021-decision`` and ``e028-decision``.
+Measured read-only on 2026-08-29 with ``git cat-file -e <ref>:<path>`` in each
+repo's own clone -- no checkout, no fetch, nothing written: present on those
+branches, absent on each repo's ``main``. ``portfolio/FLEET_VERDICTS.md``
+records the same fact in its provenance table;
+``tests/test_fleet.py::test_every_branch_only_adapter_says_its_evidence_is_not_on_main``
+holds the two in agreement.
+
+One correction to an earlier reading of that probe, which claimed the other six
+repos' artifacts were "all present on their own ``main``". Re-measured the same
+way on 2026-08-29 over the distinct ``(repo, path)`` pairs these adapters
+declare -- 16 of 17 resolve on the ref their note implies -- but the
+seventeenth, ``choco``'s ``main`` artifact
+``models/observed_production_head.meta.json`` is committed on NO ref in that
+clone -- ``git -C resilient-choco log --all -- <path>`` is empty and
+``git check-ignore -v`` reports ``.gitignore:82:/models/*``. It exists only in
+choco's working tree, so the choco row of the fleet table was read from an
+untracked file. That is a different defect from branch dependence (there is no
+branch to name), it is not what ``BRANCH_ONLY_EVIDENCE`` encodes, and choco has
+an open colleague PR, so it is recorded here and escalated rather than
+"fixed" by inventing a note for it.
 """
 
 from __future__ import annotations
@@ -273,6 +301,13 @@ ADAPTERS: tuple[Adapter, ...] = (
         baseline_score=Field("main:measurements.test.rmse_persistence"),
         beats=Compare(),
         test_arm_spent=Field("main:measurements.test.reads_of_this_arm"),
+        note=(
+            "BRANCH-DEPENDENT: this artifact is committed on `e028-decision`, the "
+            "branch resilient-triage had checked out when the fleet table was "
+            "generated, and it is NOT on that repo's `main` -- do not read this "
+            "row as main-committed evidence. The provenance table in "
+            "portfolio/FLEET_VERDICTS.md records the branch and the sha256"
+        ),
     ),
     # --------------------------------------------------------------- blackout
     Adapter(
@@ -304,7 +339,10 @@ ADAPTERS: tuple[Adapter, ...] = (
             "model of record is SERVED but not REGISTERED: the same gate artifact "
             "records `registry_state.n_versions: 0` with the note that nothing has "
             "ever been registered for this model, so a promotion would have nothing "
-            "to move"
+            "to move. BRANCH-DEPENDENT: both artifacts are committed on "
+            "`e021-decision`, the branch resilient-blackout had checked out when "
+            "the fleet table was generated, and neither is on that repo's `main` -- "
+            "do not read this row as main-committed evidence"
         ),
     ),
     Adapter(
@@ -339,7 +377,11 @@ ADAPTERS: tuple[Adapter, ...] = (
         test_arm_spent=Field("main:read_at"),
         note=(
             "like-for-like: both sides on the 89,774-row persistence subset, which "
-            "is the only frame in which the two are comparable"
+            "is the only frame in which the two are comparable. BRANCH-DEPENDENT: "
+            "both artifacts are committed on `e021-decision`, the branch "
+            "resilient-blackout had checked out when the fleet table was generated, "
+            "and neither is on that repo's `main` -- do not read this row as "
+            "main-committed evidence"
         ),
     ),
 )

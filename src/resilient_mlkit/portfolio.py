@@ -10,10 +10,22 @@ are the whole point of this module:
   ``docs/ESCALATIONS.md``.
 * **READY-TO-TRAIN** — every gating check passes.
 
-The gating set is S1–S5, R1–R11, D1–D5, E1–E5: twenty-six checks. Triage
-(T1–T5) is deliberately outside it -- triage diagnoses and reorders the queue,
-it does not gate. A triage FAIL still blocks, because a measured failure blocks
-wherever it is found; it simply is not part of the "everything passes" test.
+The gating set is every check the registry places in the four non-triage
+phases, and it is DERIVED rather than listed: ``gating_ids()`` reads
+``checks.PHASE_ORDER``, and the size of the set is whatever that returns. No
+count is written here on purpose. This docstring used to list the phases and
+end with a remembered total -- "S1-S5, R1-R11, D1-D5, E1-E5: twenty-six" -- and
+it went on saying it after R12 joined ``PHASE_ORDER``, so the module that
+defines the gating set described a set one check smaller than the one it
+returns. ``checks/__init__.py``'s own docstring
+records the rule that prevents it: a count is obtained by counting, never by
+remembering. ``tests/test_promotion_state.py`` now holds any count of checks
+stated in this file against ``len(gating_ids())``.
+
+Triage (T1–T5) is deliberately outside the gating set -- triage diagnoses and
+reorders the queue, it does not gate. A triage FAIL still blocks, because a
+measured failure blocks wherever it is found; it simply is not part of the
+"everything passes" test.
 
 Worth stating plainly, because it surprises people: READY-TO-TRAIN is not
 reachable by the agent. S5, D1, D4, D5, E4 and E5 are reserved to the human
@@ -101,10 +113,11 @@ def resolve(repo: Repo, results: dict[str, CheckResult]) -> RepoState:
     # and nobody has escalated it, the repo is still mid-flight -- calling that
     # terminal would be the portfolio lying about its own coverage.
     #
-    # Precedence matters here and is easy to get backwards. Six checks are
-    # human-only and ALWAYS report ESCALATED, so letting escalation win would
-    # make every repo read AWAITING-SIGNOFF -- "done, just needs a signature" --
-    # the moment it has run its phases, however little was actually measured.
+    # Precedence matters here and is easy to get backwards. The checks the
+    # registry marks `human_only` ALWAYS report ESCALATED, so letting escalation
+    # win would make every repo read AWAITING-SIGNOFF -- "done, just needs a
+    # signature" -- the moment it has run its phases, however little was
+    # actually measured.
     # Unmeasured work outranks a pending signature.
     if missing or na:
         outstanding = len(missing) + len(na)

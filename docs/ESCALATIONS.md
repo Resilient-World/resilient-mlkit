@@ -403,3 +403,102 @@ the signatory's to authorise, not the agent's.
 same reason, and they fold into the single bump E-M09 proposes for whichever of
 PR #6 and PR #7 lands second. `__version__` is deliberately left at `0.4.0` here
 too. No tag should be cut from either branch until E-M08/E-M09 are settled.
+
+---
+
+## E-M11 — the v0.5.0 heading is reconciled; the number itself is still the signatory's
+
+**Measured by** `.venv/bin/python -m pytest tests/test_version_declaration.py -q
+--timeout=180` on `feat/loop-mlkit-4` (python 3.14.6, pytest 9.1.1): **2 failed,
+15 passed** against the `CHANGELOG.md` committed at `25cd618` (which is `main`'s
+byte for byte), and **17 passed** after the heading was corrected.
+
+**What was wrong.** `main` at `21f7e6f` carried a `v0.5.0` entry written on
+`feat/r10-served-contract` (PR #6), where the release was one new check, R12,
+and its body asserted that no check's verdict moved on unchanged code. PR #7
+merged into the same `main` the non-finite repairs E-M09 (D2, E1) and E-M10 (T2,
+R2, D3, E3, R4) record as doing exactly that. By the scale at the top of
+`CHANGELOG.md` the release is **major**, and its only release note denied it.
+`tests/test_version_declaration.py` compared the heading's NUMBER to
+`__version__` and could not see a body that contradicted the tree.
+
+**Done here (E-M09's prescribed reconciliation).** The `v0.5.0` body now names
+the seven verdict-changing checks as the release's principal event, carries the
+withdrawal of the claim rather than dropping it, and states that voiding the
+affected committed verdicts is E-M10's signatory-reserved re-measurement. Two
+new controls hold it: the newest entry may not restate the withdrawn claim, and
+it must name at least one of the seven check ids.
+
+**Not done here, and reserved.** The NUMBER is unchanged at `0.5.0`, because
+`0.5.0` is already what a major bump from `0.4.0` looks like under E-M08's
+recorded reading (on a `0.x` line the minimal reading of major is the leading
+nonzero), so the correction is to the justification and not to the version.
+`resilient_mlkit.__version__` is untouched at `0.5.0` and the two agree.
+
+Three things remain a release decision of record and are **not** an agent's:
+
+1. whether this line's major is `0.5.0` or `1.0.0` — the same open question
+   E-M08 and E-M09 record, now with two rounds of major content behind it;
+2. cutting the tag, which no branch in this round does;
+3. E-M10's fleet re-measurement, and the voiding of any committed T2, R2, D2,
+   D3, E1, E3 or R4 PASS that moves — a records change across eight repos.
+
+**Proposed**: settle (1) before (2), because the tag the eight repos re-pin to
+is the first artifact that makes the answer permanent. If the answer is `1.0.0`,
+it is one edit to `__version__` and one heading, and the control added here
+keeps the two from drifting apart while it is made.
+
+## E-M12 — the choco fleet row was read from a file committed on no branch at all
+
+**Raised by** the adversarial verification of `feat/loop-mlkit-4`, while
+re-measuring that branch's own claim that "the other six repos' declared
+artifacts are all present on their own `main`".
+
+**Measured** read-only on 2026-08-29 in each repo's own clone -- `git cat-file
+-e <ref>:<path>`, `git log --all -- <path>`, `git check-ignore -v`; no
+checkout, no fetch, nothing written. Over the 17 distinct `(repo, path)` pairs
+`src/resilient_mlkit/fleet_adapters.py` declares, 16 resolve on the ref the
+adapter implies. The seventeenth does not:
+
+    resilient-choco  models/observed_production_head.meta.json
+      main                       -> ABSENT
+      any ref (`log --all`)      -> no commit touches this path
+      check-ignore               -> .gitignore:82:/models/*
+      working tree               -> present, 39172 bytes
+
+That path is the `main:` artifact of the `choco` adapter, and every choco cell
+in `portfolio/FLEET_VERDICTS.md` that resolves through it -- candidate, score,
+split, baseline score, test-arm-spent -- was therefore read from an untracked,
+gitignored working-tree file. The adjacent `served:`
+artifact (`models/observed_production_persistence.meta.json`) IS committed on
+choco's `main`, which is why the row looks half-provenanced rather than
+obviously unbacked.
+
+**Why this is not the same defect as the branch dependence** already recorded
+in `fleet_adapters.py`. blackout's and triage's evidence is committed, on a
+named branch, with a sha256 in the provenance table; a reader can resolve it.
+choco's cannot be resolved from any ref, so there is no branch to name and
+`BRANCH_ONLY_EVIDENCE` is the wrong place for it. The verifier's new control
+`test_negative_control_a_repo_whose_evidence_is_on_main_needs_no_note` is
+silent on choco for exactly that reason, and correctly so -- it measures notes,
+not provenance.
+
+**Not done here, and why.**
+
+1. No note was invented for the choco adapter. The honest note would assert
+   where the evidence lives, and it lives nowhere resolvable; writing one would
+   be the fabrication this repo's rules exist to stop.
+2. `resilient-choco` has an open colleague PR (#160). Nothing in that repo was
+   read except through `git cat-file`/`log`/`check-ignore`, and nothing was
+   written. Whether the file should be committed, DVC-tracked, or the row
+   withdrawn is that repo's decision, not this one's.
+3. No control was added that shells out to sibling clones. `fleet_adapters.py`
+   declares paths, not clones; a test that requires seven checkouts to be
+   present would fail in CI for a reason that has nothing to do with the
+   defect.
+
+**Proposed**, for the signatory: fold the choco row into E-M10's authorised
+fleet re-measurement rather than patching it separately, and treat the choco
+verdict as unprovenanced until its `main:` artifact resolves from a ref. A
+committed figure whose artifact exists on no branch is not distinguishable from
+one nobody can check.
