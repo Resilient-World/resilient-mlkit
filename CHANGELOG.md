@@ -213,6 +213,69 @@ read-only throughout. `scripts/scan_served_contract.py` exists precisely so the
 fleet can be measured without the phase runner writing its finding lists into
 the repos it measured.
 
+### Committed reads: `mlkit portfolio` can no longer quote a number that is not in git
+
+A **report and CLI surface** change, which is minor on the scale at the top of
+this file, added to this entry because `v0.5.0` is not yet cut. No check's
+threshold moved and no check in `PHASE_ORDER` changes verdict: nothing in
+`checks/` reads through `core/artifact.py`.
+
+`core.artifact.load()` obtained artifact bytes with `path.read_bytes()` and then
+RECORDED whether git agreed — `committed_at_head` and `dirty` were computed, put
+on the ref, and printed in `fleet.provenance_block`'s own column. `docs/ESCALATIONS.md`
+E-M12 is what that disclosure bought: the `choco` row of
+`portfolio/FLEET_VERDICTS.md` — candidate, score, split, baseline score,
+test-arm-spent — was read out of `models/observed_production_head.meta.json`, a
+file committed on no ref at all in that clone. The provenance column said `NO`
+beside a number, and a reader reads the number first.
+
+Bytes now come from `git cat-file blob HEAD:<relpath>`, and the two recorded
+facts became the input to a refusal instead of a footnote:
+
+| case | before | now |
+|---|---|---|
+| committed, clean | number, flagged `yes` | number — byte-identical, same sha256 |
+| dirty against HEAD | working-tree number, flagged `YES` | `NA (not committed at HEAD: …)` |
+| on disk, on no ref | working-tree number, flagged `NO` | `NA (not committed at HEAD: …)` |
+| in no tree at all | `NA (artifact not found …)` | unchanged, and kept distinct |
+
+**What a consumer sees.** Any fleet row whose declared artifact is not committed
+in the repo that owns it turns from a figure into an NA carrying the file's
+path. As of the last read that is choco's `main:` artifact and no other. The
+number was never fetchable by anyone reading the table; what changes is that the
+table now says so in the cell rather than in a column beside it.
+
+**The escape hatch cannot escape.** `load(..., allow_dirty=True)` and
+`mlkit portfolio --allow-dirty` read the working tree for local diagnosis and
+mark everything that descends from the read — `ArtifactRef.allow_dirty_read`,
+`Cell.allow_dirty`, `CheckResult.evidence["allow_dirty_read"]`. The marker
+survives derivation in `_compare`, and four paths refuse it:
+`CheckResult.__post_init__` for a PASS, `portfolio.resolve()`,
+`fleet.markdown_table()` and `FleetRow.to_dict()`. The CLI prints cells one per
+line, writes nothing and exits 2.
+
+**`core/result.py` gains a third structural invariant** beside PASS-requires-evidence
+and NA-requires-reason: a PASS may not rest on an allow-dirty read
+(`UncommittedRead`, a subclass of `FabricationError` — a figure in nobody's git
+history is unfalsifiable in the same way as one nobody measured). The six-status
+enum is unchanged and no existing invariant was relaxed.
+
+**`mlkit portfolio`'s provenance table gains a `read from` column** (`HEAD` or
+`working tree`). The `Repos as they were read` table is untouched.
+
+Controls: `tests/test_committed_reads.py`, 20 in five pairs, each proven by
+mutation — reverting `load()` to working-tree reads fails 7, disabling
+`refuse_uncommitted` fails 3, dropping the PASS invariant 1, laundering the
+marker in `_compare` 1. Four controls in `tests/test_fleet.py` that rewrote an
+artifact without committing it now commit it, and the two git-standing controls
+assert the refusal on top of the flag they already asserted; assertions were
+added and none removed.
+
+`portfolio/FLEET_VERDICTS.md`, `portfolio/FLEET_VERDICTS.json` and
+`portfolio/MODEL_QUALITY.md` are byte-identical to `main` — the fleet was not
+re-run, and re-measuring it under the new read semantics is E-M10's
+signatory-reserved work.
+
 ## v0.4.0 — 2026-08-28
 
 Not yet tagged. The heading is written at the version the code declares, not
