@@ -435,6 +435,33 @@ def test_CR5_a_cell_from_a_diagnosis_read_still_renders_for_a_human(
     assert row.score.allow_dirty
 
 
+def test_CR5_the_cli_diagnosis_path_prints_and_refuses(
+    toy_repo: Repo, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """SILENT on printing, FIRES on the exit code: the CLI's half of the hatch.
+
+    ``_fleet_diagnosis`` is what ``--allow-dirty`` runs instead of building a
+    table. Exercised directly rather than through ``main()`` because the command
+    resolves the eight real checkouts, and reading the live fleet is not
+    authorised in this iteration. What is asserted is the whole of what this
+    function promises: the figure is visible, and the exit status is not green.
+    """
+    from resilient_mlkit.cli import _fleet_diagnosis
+
+    _dirty(toy_repo)
+    row = read_row(toy_repo, _adapter(), allow_dirty=True)
+    code = _fleet_diagnosis([row])
+    captured = capsys.readouterr()
+
+    assert code == 2, "a diagnosis that exits green is a diagnosis CI reads as a pass"
+    assert str(WORKING_TREE_RMSE) in captured.out, "the hatch printed nothing"
+    assert "WORKING TREE" in captured.out
+    assert "may not be quoted" in captured.err
+    assert "|" not in captured.out, (
+        "the diagnosis rendered as a table, which is the shape people paste"
+    )
+
+
 def test_CR5_a_marked_cell_declares_itself_in_its_own_dict(toy_repo: Repo) -> None:
     """SILENT: the marker is on the Cell, not inferred from context.
 

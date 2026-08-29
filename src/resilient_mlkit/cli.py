@@ -202,6 +202,12 @@ def cmd_fleet(args: argparse.Namespace) -> int:
     by hand. This command reads those artifacts instead, so a wrong digit stops
     being invisible.
 
+    Every figure is read from the repo's COMMITTED state (``HEAD:<relpath>``),
+    not from its working tree. An artifact that is on disk and on no ref reports
+    NA naming the file, which is what ``docs/ESCALATIONS.md`` E-M12 cost when it
+    did not. ``--allow-dirty`` reads the working tree for local diagnosis and
+    then refuses to emit anything, exiting 2.
+
     Not to be confused with ``mlkit check --portfolio``, which reports each
     repo's terminal readiness state. This one reports model quality.
     """
