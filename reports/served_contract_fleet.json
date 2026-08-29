@@ -1,9 +1,9 @@
 {
   "report_type": "served_contract_fleet_scan",
   "question": "which repos decide a served-model contract clause locally instead of routing through resilient_mlkit.core.served?",
-  "generated_at": "2026-08-29T07:40:48.995044+00:00",
-  "mlkit_version": "0.4.0",
-  "mlkit_git_sha": "239b6a6cf32074ef720502e1ea48c4a44d1e21a8",
+  "generated_at": "2026-08-29T07:44:38.071760+00:00",
+  "mlkit_version": "0.5.0",
+  "mlkit_git_sha": "14b2e6c96ff03fd2a91b1e5a477f16dedb1e281a",
   "python": "3.14.6",
   "portfolio_root": "/Users/david/Downloads/Claude Code",
   "contract_module": "resilient_mlkit.core.served",
