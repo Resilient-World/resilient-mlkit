@@ -12,6 +12,145 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v0.5.0 — 2026-08-29
+
+Not yet tagged; the session lead cuts it after the adopters' verifiers pass.
+The heading is written at the version the code declares.
+
+**Why `0.5.0` and not `0.4.1`.** The scale at the top of this file makes a
+**minor** release one where "a new check exists". R12 is new; no existing check
+changes verdict on unchanged code, and a test asserts that the readiness order
+with R12 removed is byte-identical to the order before this branch.
+
+R12 does change one thing every repo sees: the gating set goes from 26 checks
+to 27, so READY now requires one more PASS. That is what adding a gating check
+means, and the tripwire in `tests/test_promotion_state.py` had to be edited by
+hand to permit it.
+
+### One definition of "served" — `core/served.py`
+
+The fleet had converged on one definition of *ready* and grown three of
+*served*. Measured 2026-08-29:
+
+* `resilient-chokepoint/src/resilient_chokepoint/mlops/champion_challenger.py`
+  (267 lines) and `resilient-torrent/src/torrent/mlops/champion_challenger.py`
+  (160 lines) — same filename, different SHAs, overlapping-but-not-identical
+  APIs;
+* per-product serving modules in chokepoint, fray and triage;
+* eleven further files across fray and chokepoint carrying promotion logic.
+
+The divergence was not cosmetic. `torrent/.../champion_challenger.py:128` maps
+a zero baseline to a deviation of `0.0`, which clears the tolerance and
+**promotes**; `chokepoint/.../champion_challenger.py:209-218` returns `NA` on
+the identical condition. And two implementations hold the verdict as a bare
+bool — `torrent ChallengerResult:39` (`promote`) and
+`fray registry/models_of_record.py:177` (`clears`) — so an unmeasured
+comparison and a measured loss are the same value, distinguishable only by
+surrounding prose.
+
+`core/served.py` is the **intersection** of what the four implementations
+actually do, not a superset:
+
+* `ServedModel` + `verify_at_load` — self-hash recomputed and refused on
+  mismatch; pinned data hashed on disk and refused on mismatch.
+* `ChallengerDecision` — `PASS` / `FAIL` / `NA`, where `promotable` is a
+  *property* of the status and cannot be set apart from it, an `NA` is refused
+  if it carries any skill number, and a `PASS` is refused if it lacks one.
+* `ServeArms` — the arm policy as **data**. triage and fray close `test` and
+  refuse it; chokepoint *requires* `test` to decide. A contract hard-coding
+  "test is forbidden" would make a correct gate unadoptable.
+
+Deliberately absent: a metric (five appear across the fleet as *the* decision
+metric), and a router (`ShadowRouter` exists twice with opposite production
+semantics — chokepoint's returns the champion's result, torrent's returns the
+challenger's — and three repos have none).
+
+**The digest is the fleet's, not a new one.** `canonical_payload_sha256` is
+byte-for-byte the computation the three serving modules already perform.
+Verified by execution, not by reading: `scripts/verify_served_hash_parity.py`
+recomputes the digest for every committed champion artifact in the portfolio
+and compares it to the hash each repo's own local function wrote. Measured
+2026-08-29 on python 3.14.6, **5 artifacts compared, 5 matched, 0 differed**
+(fray ×2, chokepoint ×2, triage ×1; the other three repos pin no artifact yet).
+A contract that changed the digest would have invalidated all of them, and the
+fix would have looked like "update the recorded hash".
+
+### R12 `SERVED_CONTRACT` — no local re-implementation of the served model
+
+R11's question one layer up. Walks every `.py` in the repo (serving code lives
+under `scripts/` and `benchmarks/` in three of the target repos, outside the
+declared `[source] trees`) and reports a file that decides a contract clause
+without importing `resilient_mlkit.core.served`. The exemption is an **import**,
+at one level of indirection — the depth R11 already uses for taint through
+module-local helpers.
+
+**Four detectors were narrowed or deleted by measurement.** Every one of these
+was found by running the scanner across the eight repos and reading what it
+named, not by reviewing it:
+
+* SERVE_ARM matched `arm` as a **substring** and reported four files across
+  choco, arabica and blackout on the words *farm* (`farm_size_col`,
+  `farm_panel_parquet_path`) and *warming* (`_IPCC_WARMING`). Now token-bounded,
+  and an inline refusal must additionally name a train/val/test arm or a
+  declared arm policy — `chokepoint/.../forecasting/corridor_pooling.py:525`
+  asserts an *ensemble's* arm ordering, which is a different sense of the word.
+* SELF_HASH required the `json.dumps` to sit inside the `sha256` call's own
+  subtree, so assigning it to a local first defeated the detector. The evasion
+  was a newline; the rule is scope-based now.
+* SELF_HASH also now requires the payload's **own hash field to be excluded**
+  before hashing. Without that it reported `surge mlops/reproducibility.py:34`
+  and `governance/audit_trail.py:176`, which fingerprint a run config and an
+  audit row. A digest stored inside the object it covers must omit itself;
+  nothing else needs to, and that is precisely the clause.
+* The SELF_HASH **function-name list was deleted**, not trimmed. It found
+  nothing the shape rule missed and produced two false positives on names
+  alone: `torrent api/routers/v4_avoided_loss.py:29` (`_canonical_hash`, a
+  request cache key) and `blackout mlops/checkpoint_sidecar.py:87`
+  (`artifact_sha256`, a chunked file hash).
+
+**And one blind spot was closed the same way.** The name vocabulary was silent
+on `arabica registry/backbone_promotion.py:40` — *"whether challenger backbone
+model qualifies for promotion over champion"* — because nobody had listed
+`evaluate_backbone_gate`. Chasing names loses. The rule is now structural: a
+function emitting both `"PASS"` and `"FAIL"` whose **declaration** (module
+path, class, own name) sits in a promotion context. Declaration and not body —
+matching any identifier in scope reported two validation scripts that merely
+*call* a helper with `gate` in its name.
+
+R12 across the eight repos, 2026-08-29, python 3.14.6, from
+`reports/served_contract_fleet.json`:
+
+| repo | verdict | findings | files named | walked |
+|---|---|---|---|---|
+| choco | FAIL | 2 | 1 | 398 |
+| arabica | FAIL | 4 | 1 | 375 |
+| fray | FAIL | 22 | 4 | 217 |
+| torrent | FAIL | 7 | 2 | 533 |
+| chokepoint | FAIL | 30 | 7 | 272 |
+| surge | PASS | 0 | 0 | 328 |
+| triage | FAIL | 14 | 7 | 416 |
+| blackout | FAIL | 2 | 2 | 241 |
+
+Both `champion_challenger.py` files are named, as is every `promotion_gate.py`
+and all three per-product serving modules — the motivating finding, located
+mechanically.
+
+**surge's PASS is adjudicated, not assumed.** The pre-registration for this
+round recorded that a PASS would be evidence of a blind scanner rather than of
+a clean repo, because nothing has adopted the contract yet. surge has no
+champion/challenger comparison at all: `grep -rl` for
+`champion|challenger|promotable` over its `src/` and `scripts/` returns
+nothing, and `mlops/model_registry.py:109` `promote()` is a registry *stage
+transition* — it moves a version to production and decides nothing. surge
+PASSes because it has no served-model contract to converge, which is a
+different fact from having adopted one, and its first serving path will need to
+import the contract.
+
+**No adopter repo was edited.** `resilient-triage` is a colleague repo and was
+read-only throughout. `scripts/scan_served_contract.py` exists precisely so the
+fleet can be measured without the phase runner writing its finding lists into
+the repos it measured.
+
 ## v0.4.0 — 2026-08-28
 
 Not yet tagged. The heading is written at the version the code declares, not

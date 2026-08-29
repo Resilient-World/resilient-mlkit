@@ -3,7 +3,7 @@
 <!-- CANONICAL. Authored once in resilient-mlkit/spine/ and synced to all 8
      repos. -->
 
-Eleven checks. `mlkit check --phase readiness` runs them **in the order below,
+Twelve checks. `mlkit check --phase readiness` runs them **in the order below,
 which is not numerical**. Run them one at a time and commit after each with the
 check ID in the message.
 
@@ -14,14 +14,15 @@ check ID in the message.
 | 1 | **R9** `LICENCE_GATE` | Cheapest check in the phase and the most decisive. A licence defect makes every downstream result moot, and it is the one defect class that gets *more* expensive the longer you train. It is also the only check that runs on every commit rather than every loop. Running it first costs seconds and can save the phase. |
 | 2 | **R10** `FABRICATED_DEFAULTS` | A pure `ast` walk — no imports, no data, no network — so it is the cheapest check after R9, and decisive in the widest sense: a fabricated default invalidates every figure downstream of it, including the ones the other readiness checks measure. It also has to precede R1–R7, because those go through declared bindings and cannot see the code R10 reads. |
 | 3 | **R11** `FABRICATED_TARGETS` | The same kind of walk, so the same cost. It runs before **R5** specifically: R5 counts rows by the provenance field R11 adjudicates, so an R5 PASS recorded after an R11 FAIL is a pass counted with a broken ruler. |
-| 4 | **R1** `CHECKPOINT_PROVENANCE` | Static. Answers "do we know what these weights are" before anything loads them. |
-| 5 | **R2** `OVERFIT_ONE_BATCH` | The cheapest check that can prove the model is wired up at all. A model that cannot overfit one batch has a defect no amount of data will fix. |
-| 6 | **R3** `BLOCKED_SPLITS` | Cheap, and if the splits leak, every metric measured after this point is meaningless. |
-| 7 | **R4** `METRIC_KNOWN_ANSWER` | Cheap. If the metric cannot reproduce an analytically known value, it cannot evaluate a model either. |
-| 8 | **R5** `DATA_PROVENANCE` | More expensive, and the most decisive of the data checks. |
-| 9 | **R6** `DETERMINISM` | Requires two full runs, so it comes after the checks that would have invalidated them. |
-| 10 | **R7** `REMOTE_PARITY` | Asserts region and image pinning; meaningless until the local path is known good. |
-| 11 | **R8** `REPORT` | Reports on the ten above, so it is necessarily last. |
+| 4 | **R12** `SERVED_CONTRACT` | The third `ast` walk, so the same cost again. It has no ordering *dependency* — nothing downstream counts anything by what R12 adjudicates — so its place here is the cost argument alone. |
+| 5 | **R1** `CHECKPOINT_PROVENANCE` | Static. Answers "do we know what these weights are" before anything loads them. |
+| 6 | **R2** `OVERFIT_ONE_BATCH` | The cheapest check that can prove the model is wired up at all. A model that cannot overfit one batch has a defect no amount of data will fix. |
+| 7 | **R3** `BLOCKED_SPLITS` | Cheap, and if the splits leak, every metric measured after this point is meaningless. |
+| 8 | **R4** `METRIC_KNOWN_ANSWER` | Cheap. If the metric cannot reproduce an analytically known value, it cannot evaluate a model either. |
+| 9 | **R5** `DATA_PROVENANCE` | More expensive, and the most decisive of the data checks. |
+| 10 | **R6** `DETERMINISM` | Requires two full runs, so it comes after the checks that would have invalidated them. |
+| 11 | **R7** `REMOTE_PARITY` | Asserts region and image pinning; meaningless until the local path is known good. |
+| 12 | **R8** `REPORT` | Reports on the eleven above, so it is necessarily last. |
 
 The governing principle is cheapest-and-most-decisive-first: order by how much
 downstream work a failure invalidates, divided by what the check costs to run.
@@ -67,6 +68,34 @@ R11 is **not satisfiable by relabelling a stamp you have not verified.** If the
 rows really are observed, the draw feeding them is the defect; fix the data
 path. If they are not, say `synthetic` and let R5 count them honestly.
 Findings land in `reports/fabricated_targets.md`.
+
+**R12 `SERVED_CONTRACT`** — no repo defines "served" for itself. Four
+questions belong to `resilient_mlkit.core.served` and to nothing else: is this
+the artifact that was measured, is this the data it was measured on, may this
+challenger be promoted, and which arm may be served.
+
+**Why this is a check and not a style note.** Measured 2026-08-29 the fleet had
+converged on one definition of *ready* — these checks — and grown three of
+*served*, including two files with the same name (`mlops/champion_challenger.py`
+in chokepoint and in torrent), different SHAs, and overlapping-but-not-identical
+APIs. The divergence was not cosmetic. `torrent/.../champion_challenger.py:128`
+maps a zero baseline to a deviation of `0.0`, which clears the tolerance and
+**promotes**; `chokepoint/.../champion_challenger.py:209-218` returns `NA` on
+the identical condition. Two repos, one situation, opposite verdicts. That is
+rule 7's stated failure mode one layer up: three definitions of "served" is the
+same as none.
+
+**The exemption is an import, not a name.** A file that imports the contract —
+or imports a module in the same repo that does — is silent whatever shapes it
+carries. Adopting is what clears R12; renaming is not, and a repo may keep a
+thin typed wrapper over `ServedModel` because the wrapper imports it.
+
+**What a green R12 does not claim.** That the serving path is correct. R12 is
+an `ast` walk: it sees that a file routes through the contract, never that it
+routes through it *correctly*. A file that imports `core.served` and then
+ignores the decision it returns is silent here and is a defect; closing that
+gap is the adopter's own served-report reproduction. Findings land in
+`reports/served_contract.md`.
 
 **R1 `CHECKPOINT_PROVENANCE`** — every checkpoint has a URI, a content hash,
 and a licence URL. A checkpoint you cannot hash is a checkpoint you cannot
