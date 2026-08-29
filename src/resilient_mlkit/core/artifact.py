@@ -59,17 +59,32 @@ row. An allow-dirty number is usable in a terminal and structurally unable to
 land in a row.
 
 Two further refusals -- ``CheckResult.__post_init__`` for a marked PASS and
-``portfolio.resolve()`` -- are FORWARD GUARDS, and this comment used to overstate
-them by saying the mark "propagates to ``CheckResult.evidence``". It does not,
-and no code here makes it. Nothing under ``checks/`` imports this module: the
-fleet reader and the check pipeline are disjoint call graphs, so today no input
-can put ``ALLOW_DIRTY_KEY`` into a ``CheckResult``. Those two guards therefore
-fire only on evidence a caller constructs by hand, and their controls in
-``tests/test_committed_reads.py`` construct exactly that. They are kept because
-the first check that learns to read an artifact will need them and will not
-think to add them -- but a guard with no producer is not evidence that the
-verdict path is closed, and describing it as one is the disclosure-shaped error
-this module was rewritten to stop making.
+``portfolio.resolve()`` for a marked anything-else -- guard the CHECK pipeline,
+and they now have a producer. They did not always. This comment first overstated
+them ("the mark propagates to ``CheckResult.evidence``"), then, correctly,
+recorded that it did not: nothing under ``checks/`` imported this module, the
+fleet reader and the check pipeline were disjoint call graphs, and no input the
+shipped package could produce put ``ALLOW_DIRTY_KEY`` into a ``CheckResult``.
+The guards fired only on evidence a caller built by hand.
+
+The producer was written rather than the guards deleted, because the missing
+piece was not the guards. It was that ``checks/selection.py`` read
+``docs/selection.yaml`` with ``Path.read_text()`` and S1-S4 emitted PASS from the
+working tree -- the E-M12 shape itself, in the check pipeline of the tool that
+exists to refuse it. That read now comes through :func:`load`, ``RunContext``
+carries ``allow_dirty`` from ``mlkit check --allow-dirty``, and every S1-S4
+result descending from a marked read carries ``ALLOW_DIRTY_KEY`` in its
+evidence. So:
+
+* an uncommitted register with no flag is an NA naming the file;
+* with ``--allow-dirty`` it is a diagnosis, and the PASS is refused where it is
+  constructed;
+* a marked FAIL or NA renders, is stored, and is refused by
+  ``portfolio.resolve()`` when a terminal state is asked for.
+
+Both refusals are exercised end to end through ``mlkit check`` by the CR7
+controls in ``tests/test_committed_reads.py``. The reachability control there
+asserts that a producer exists, which is the inverse of the control it replaced.
 
 WORKTREES
 ---------
@@ -100,6 +115,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from .repo import Repo
 from .result import ALLOW_DIRTY_KEY, UncommittedRead
@@ -419,16 +436,25 @@ def refuse_uncommitted(marked: bool, what: str) -> None:
 
 
 def _parse(data: bytes, relpath: str) -> Any:
-    """JSON, or a list of records for ``.jsonl``.
+    """JSON, a list of records for ``.jsonl``, or a YAML document.
 
     Takes BYTES rather than a path, because after committed reads the bytes are
     a git blob and there may be no file on disk carrying them. JSONL is here
     because two repos record their test-arm ledger that way, and a ledger's
     value is entirely in its line count.
+
+    YAML is here because the CHECK pipeline's register -- ``docs/selection.yaml``
+    -- is YAML, and until this reader could parse it the pipeline had to read
+    that file itself with ``Path.read_text()``. That is the E-M12 shape: S1-S4
+    emitted PASS from working-tree bytes with no committed-read discipline at
+    all. ``yaml.safe_load`` only; the loader that executes tags is not a reader,
+    it is an interpreter.
     """
     text = data.decode("utf-8", errors="strict")
     if relpath.endswith(".jsonl"):
         return [json.loads(line) for line in text.splitlines() if line.strip()]
+    if relpath.endswith((".yaml", ".yml")):
+        return yaml.safe_load(text)
     return json.loads(text)
 
 

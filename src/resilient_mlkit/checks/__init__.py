@@ -30,6 +30,16 @@ class RunContext:
     #: Set when the caller knows there is no network / no AWS, so that checks
     #: report NA with an accurate reason instead of a confusing timeout.
     offline: bool = False
+    #: ``mlkit check --allow-dirty``. A check that reads a repo artifact reads
+    #: it from COMMITTED state; this is the diagnosis-only escape hatch that
+    #: lets it read the working tree instead, and it is not free. Every result
+    #: descending from such a read carries
+    #: ``evidence[core.result.ALLOW_DIRTY_KEY]``, and that marker is refused by
+    #: ``CheckResult.__post_init__`` (for a PASS) and by ``portfolio.resolve``
+    #: (for everything else). The flag buys a diagnosis and structurally cannot
+    #: buy a verdict, which is the same bargain ``mlkit fleet --allow-dirty``
+    #: already makes for the fleet table.
+    allow_dirty: bool = False
     timeout: float = 20.0
     #: Results already produced in this run, keyed by check id. The runner
     #: fills this as it goes so that a reporting check (R8) can summarise the

@@ -28,6 +28,8 @@ Three pairings carry the weight.
 
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -45,17 +47,44 @@ from resilient_mlkit.core.repo import Repo
 from resilient_mlkit.core.result import Status
 
 
-def _repo(tmp_path, document: Any | None) -> Repo:
-    """A repo whose `docs/selection.yaml` is `document`, or absent when None."""
+def _git(cwd: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True)
+
+
+def _repo(tmp_path, document: Any | None, *, commit: bool = True) -> Repo:
+    """A git repo whose COMMITTED `docs/selection.yaml` is `document`.
+
+    The register is committed rather than merely written, because S1-S4 now read
+    it through ``core.artifact`` -- from ``HEAD:docs/selection.yaml``, not from
+    the working tree. Before that, these fixtures wrote the file and the checks
+    parsed it off disk, so every control here was measuring a verdict reached on
+    bytes in nobody's git history: the ``docs/ESCALATIONS.md`` E-M12 shape, in
+    the test suite of the tool that exists to refuse it.
+
+    Nothing about what the controls ASSERT changed; the fixture became a repo.
+    ``commit=False`` is the uncommitted register, used by the controls that
+    exercise the refusal itself.
+    """
     (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "t@example.invalid")
+    _git(tmp_path, "config", "user.name", "t")
+    (tmp_path / ".mlkit-anchor").write_text("anchor\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-qm", "anchor")
     if document is not None:
         text = document if isinstance(document, str) else yaml.safe_dump(document)
         (tmp_path / "docs" / "selection.yaml").write_text(text)
+        if commit:
+            _git(tmp_path, "add", "-A")
+            _git(tmp_path, "commit", "-qm", "register")
     return Repo(name="fixturerepo", path=tmp_path)
 
 
-def _ctx(tmp_path, *, offline: bool = True) -> RunContext:
-    return RunContext(nonce="test-nonce", root=tmp_path, offline=offline)
+def _ctx(tmp_path, *, offline: bool = True, allow_dirty: bool = False) -> RunContext:
+    return RunContext(
+        nonce="test-nonce", root=tmp_path, offline=offline, allow_dirty=allow_dirty
+    )
 
 
 def _full_spec(**overrides: Any) -> dict[str, Any]:

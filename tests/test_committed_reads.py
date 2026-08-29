@@ -456,35 +456,184 @@ def test_CR6_stays_silent_counts_tallies_a_committed_row(toy_repo: Repo) -> None
     assert stat["cells_measured"] > 0
 
 
-def test_CR6_the_two_guards_with_no_producer_are_documented_as_such() -> None:
-    """The finding itself, held as a control.
+def test_CR7_the_two_check_pipeline_guards_have_a_producer() -> None:
+    """The inverse of the control this replaces, and the reason it is inverted.
 
+    The control here used to assert that NO module under ``checks/`` imports
+    ``core.artifact`` -- which was true, and was the finding: with the fleet
+    reader and the check pipeline on disjoint call graphs, nothing shipped could
+    put ``ALLOW_DIRTY_KEY`` into a ``CheckResult``, so
     ``CheckResult.__post_init__``'s marked-PASS refusal and
-    ``portfolio.resolve()``'s are real code, but nothing under ``checks/``
-    imports ``core.artifact``, so no input the shipped package can produce puts
-    ``ALLOW_DIRTY_KEY`` into a ``CheckResult``. They fire only on hand-built
-    evidence -- which is what the CR-4 controls above build. This test fails if
-    ``core/artifact.py`` stops saying so, because a guard with no producer
-    described as a closed path is the disclosure-shaped error again.
+    ``portfolio.resolve()``'s could not fire on any production input. A control
+    that asserts a guard is unreachable protects the unreachability.
+
+    The producer now exists, so this asserts the producer. If the selection
+    phase ever goes back to reading its register off disk, this fails and says
+    which guard went dead with it.
     """
-    from resilient_mlkit import checks as checks_pkg
+    from resilient_mlkit.checks import selection
+
+    source = Path(selection.__file__).read_text()
+    assert "from ..core import artifact" in source
+    assert "artifact.load(" in source, (
+        "checks/selection.py no longer reads its register through core.artifact, "
+        "so nothing shipped can mark a CheckResult and BOTH check-pipeline "
+        "refusals are dead again: result.py's marked-PASS guard and "
+        "portfolio.resolve()'s."
+    )
+    assert "ALLOW_DIRTY_KEY" in source, (
+        "the register is read through core.artifact but the marker is not "
+        "carried into evidence, which is the same deadness one step later"
+    )
 
     docstring = artifact_module.__doc__ or ""
-    assert "FORWARD GUARDS" in docstring
-    assert "disjoint call graphs" in docstring
+    assert "they now have a producer" in docstring
 
-    # ...and the reachability claim is re-measured here, not just asserted.
-    root = Path(checks_pkg.__file__).parent
-    offenders = [
-        f.name
-        for f in sorted(root.glob("*.py"))
-        if "core.artifact" in f.read_text() or "from .artifact" in f.read_text()
-    ]
-    assert offenders == [], (
-        f"{offenders} now import core.artifact, so a CheckResult CAN carry the "
-        "marker. The two forward guards are live: update the docstring in "
-        "core/artifact.py and this control."
+
+def _selection_repo(root: Path, spec: dict[str, str] | None, *, dirty: bool) -> Repo:
+    """A repo whose register is COMMITTED, then optionally edited in place.
+
+    ``dirty`` is the whole experiment: the committed blob and the working-tree
+    bytes disagree, which is the only state ``--allow-dirty`` changes the
+    behaviour of.
+    """
+    import yaml
+
+    from resilient_mlkit.checks.selection import REQUIRED_TASK_SPEC
+
+    (root / "docs").mkdir(parents=True, exist_ok=True)
+    _git(root.parent, "init", "-q", str(root))
+    _git(root, "config", "user.email", "t@example.invalid")
+    _git(root, "config", "user.name", "t")
+    register = root / "docs" / "selection.yaml"
+    committed = spec if spec is not None else {
+        "task_spec": {k: "stated" for k in REQUIRED_TASK_SPEC}
+    }
+    register.write_text(yaml.safe_dump(committed))
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "register")
+    if dirty:
+        # Different VALUES, same keys: the register still parses and still
+        # satisfies S1, so what the check refuses is the provenance and not the
+        # content. A dirty edit that also broke the document would confound the
+        # two.
+        register.write_text(
+            yaml.safe_dump({"task_spec": {k: "EDITED" for k in REQUIRED_TASK_SPEC}})
+        )
+        assert _git_status_dirty(root), "fixture did not actually dirty the register"
+    return Repo(name="toy", path=root)
+
+
+def _git_status_dirty(root: Path) -> bool:
+    out = subprocess.run(
+        ["git", "-C", str(root), "status", "--porcelain", "--", "docs/selection.yaml"],
+        capture_output=True, text=True, check=True,
     )
+    return bool(out.stdout.strip())
+
+
+def _sel_ctx(root: Path, *, allow_dirty: bool):
+    from resilient_mlkit.checks import RunContext
+
+    return RunContext(nonce="cr7", root=root, offline=True, allow_dirty=allow_dirty)
+
+
+def test_CR7_fires_a_marked_PASS_is_refused_where_it_is_constructed(tmp_path: Path) -> None:
+    """FIRES, on ``result.py``'s guard, through the shipped selection check.
+
+    S1 would PASS: the working-tree register is complete. It is refused because
+    the six fields it read are not in git, so nobody can fetch what passed.
+    """
+    from resilient_mlkit.checks.selection import s1_task_spec
+
+    repo = _selection_repo(tmp_path / "resilient-toy", None, dirty=True)
+    with pytest.raises(UncommittedRead):
+        s1_task_spec(repo, _sel_ctx(tmp_path, allow_dirty=True))
+
+
+def test_CR7_stays_silent_a_committed_register_passes(tmp_path: Path) -> None:
+    """SILENT, and the variable is ONE edit.
+
+    The same repo, the same check, the same ``--allow-dirty`` context -- the
+    register simply matches its committed blob. If this went red the flag would
+    be refusing diagnosis rather than refusing verdicts.
+    """
+    from resilient_mlkit.checks.selection import s1_task_spec
+    from resilient_mlkit.core.result import Status
+
+    repo = _selection_repo(tmp_path / "resilient-toy", None, dirty=False)
+    result = s1_task_spec(repo, _sel_ctx(tmp_path, allow_dirty=True))
+    assert result.status is Status.PASS
+    assert ALLOW_DIRTY_KEY not in result.evidence
+
+
+def test_CR7_fires_a_marked_non_pass_is_refused_by_resolve(tmp_path: Path) -> None:
+    """FIRES, on ``portfolio.resolve()``'s guard, through store's round trip.
+
+    ``__post_init__`` refuses only a marked PASS, so the complement -- a FAIL or
+    NA that would BLOCK a repo or read as measured coverage -- reaches a
+    terminal state through ``core/store.py``. This is that whole path: the check
+    marks it, ``store.save``/``store.load_all`` round-trip it, and ``resolve``
+    refuses it.
+    """
+    import yaml
+
+    from resilient_mlkit.checks.selection import s1_task_spec
+    from resilient_mlkit.core import store
+    from resilient_mlkit.core.result import Status
+
+    root = tmp_path / "resilient-toy"
+    repo = _selection_repo(root, None, dirty=True)
+    # An edit that makes the check FAIL rather than PASS, so the refusal under
+    # test is resolve()'s and not __post_init__'s.
+    (root / "docs" / "selection.yaml").write_text(yaml.safe_dump({"task_spec": {}}))
+
+    result = s1_task_spec(repo, _sel_ctx(tmp_path, allow_dirty=True))
+    assert result.status is Status.FAIL
+    assert result.evidence.get(ALLOW_DIRTY_KEY) is True
+
+    store.save(repo, "selection", [result])
+    stored = store.load_all(repo, ("selection",))
+    with pytest.raises(UncommittedRead):
+        portfolio.resolve(repo, stored)
+
+
+def test_CR7_stays_silent_the_same_failure_from_a_commit_resolves(tmp_path: Path) -> None:
+    """SILENT. The same FAIL, committed, resolves to BLOCKED and is not refused.
+
+    A refusal that also swallowed committed failures would hide the failure it
+    was meant to make visible, so the pair has to show the FAIL surviving.
+    """
+    from resilient_mlkit.checks.selection import s1_task_spec
+    from resilient_mlkit.core import store
+    from resilient_mlkit.core.result import Status
+
+    root = tmp_path / "resilient-toy"
+    repo = _selection_repo(root, {"task_spec": {}}, dirty=False)
+
+    result = s1_task_spec(repo, _sel_ctx(tmp_path, allow_dirty=True))
+    assert result.status is Status.FAIL
+    assert ALLOW_DIRTY_KEY not in result.evidence
+
+    store.save(repo, "selection", [result])
+    state = portfolio.resolve(repo, store.load_all(repo, ("selection",)))
+    assert state.state == "BLOCKED"
+
+
+def test_CR7_an_uncommitted_register_without_the_flag_is_NA(tmp_path: Path) -> None:
+    """The third arm, and the one that keeps the default honest.
+
+    Without ``--allow-dirty`` the register is not read for a verdict at all.
+    This is what stops the marked-PASS refusal from being the ONLY thing
+    standing between an uncommitted register and a green row.
+    """
+    from resilient_mlkit.checks.selection import s1_task_spec
+    from resilient_mlkit.core.result import Status
+
+    repo = _selection_repo(tmp_path / "resilient-toy", None, dirty=True)
+    result = s1_task_spec(repo, _sel_ctx(tmp_path, allow_dirty=False))
+    assert result.status is Status.NA
+    assert "docs/selection.yaml" in result.reason
 
 
 # ------------------------ CR-5: the escape hatch works, outside the verdict path
