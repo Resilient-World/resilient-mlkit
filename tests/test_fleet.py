@@ -264,6 +264,73 @@ def test_compare_refuses_non_numeric_operands(toy_repo: Repo) -> None:
     assert not row.beats.present
 
 
+# --------------------------------- asserted-verdict corroboration controls
+#
+# Three of the twelve rows do not DERIVE `beats bar?` -- they point at a boolean
+# the repo publishes itself (fray x2, surge). Read alone, that boolean resolves
+# whether or not the score does, so a row could render `score: NA` beside
+# `beats bar?: yes`, and it could contradict the two figures printed beside it
+# without a reader ever seeing the disagreement. An asserted verdict is
+# therefore admitted only when this row's own score and baseline reproduce it.
+#
+# Measured on the real fleet when this was added: all three asserted booleans
+# ARE reproduced by the figures, so no verdict in the committed table changed --
+# only the `source` string, which now records the corroboration.
+
+
+def test_an_asserted_verdict_the_figures_reproduce_is_admitted(toy_repo: Repo) -> None:
+    """SILENT: the artifact says True, and 1.0 < 1.5 says True too."""
+    row = read_row(toy_repo, _adapter(beats=Field("main:test_scored")))
+    assert row.beats.value is True
+    assert "corroborated by this row's own figures" in row.beats.source
+
+
+def test_an_asserted_verdict_the_figures_contradict_is_NA(toy_repo: Repo) -> None:
+    """FIRES: same asserted True, but read as higher-is-better the two figures
+    give False. Printing either alone would hide the disagreement."""
+    row = read_row(
+        toy_repo, _adapter(beats=Field("main:test_scored"), lower_is_better=False)
+    )
+    assert not row.beats.present
+    assert "CONTRADICTION" in row.beats.na_reason
+    assert row.score.value == 1.0  # the figures are still reported
+
+
+def test_an_asserted_verdict_that_cannot_be_corroborated_is_NA_not_a_pass(
+    toy_repo: Repo,
+) -> None:
+    """FIRES: this is the hole. The asserted boolean resolves fine, but with no
+    baseline there is nothing to check it against, so it must not render as a
+    pass beside an NA."""
+    row = read_row(
+        toy_repo,
+        _adapter(
+            beats=Field("main:test_scored"),
+            baseline_score=Absent("this repo records no bar for this head"),
+        ),
+    )
+    assert not row.beats.present
+    assert "UNMEASURED here, not a pass" in row.beats.na_reason
+
+
+def test_corroboration_can_never_turn_an_NA_into_a_pass(toy_repo: Repo) -> None:
+    """SILENT: an asserted verdict that is itself NA stays NA, with its own
+    reason intact. The corroboration step only ever removes passes."""
+    row = read_row(toy_repo, _adapter(beats=Field("main:no_such_field")))
+    assert not row.beats.present
+    assert "CONTRADICTION" not in row.beats.na_reason
+
+
+def test_a_derived_verdict_is_untouched_by_the_corroboration_step(
+    toy_repo: Repo,
+) -> None:
+    """SILENT: `Compare()` rows never went through an assertion, so nothing here
+    may change them. Without this, the two paths could drift apart."""
+    row = read_row(toy_repo, _adapter())
+    assert row.beats.value is True
+    assert row.beats.source.startswith("derived:")
+
+
 # ------------------------------------------------- declared-label controls
 
 

@@ -285,7 +285,12 @@ def read_row(repo: Repo, adapter: Adapter) -> FleetRow:
     if isinstance(adapter.beats, Compare):
         beats = _compare(score, baseline_score, adapter.lower_is_better)
     else:
-        beats = _read(adapter.beats, refs, column="beats")
+        beats = _corroborated_beats(
+            _read(adapter.beats, refs, column="beats"),
+            score,
+            baseline_score,
+            adapter.lower_is_better,
+        )
 
     anchors = {"score": adapter.score, "baseline": adapter.baseline_score}
 
@@ -344,6 +349,54 @@ def _compare(score: Cell, baseline: Cell, lower_is_better: bool) -> Cell:
     direction = "lower is better" if lower_is_better else "higher is better"
     return Cell.measured(
         verdict, f"derived: {a!r} vs {b!r} ({direction}); both read from the artifacts above"
+    )
+
+
+def _corroborated_beats(
+    asserted: Cell, score: Cell, baseline: Cell, lower_is_better: bool
+) -> Cell:
+    """A verdict a repo ASSERTS, admitted only if this table's own figures agree.
+
+    Some repos publish the comparison as a boolean field of their own rather
+    than leaving it to be derived, and an adapter may point at that field. That
+    is a fact worth reading -- it is the repo's recorded verdict -- but reading
+    it ALONE lets two failures through, and both are the failure this table
+    exists to remove:
+
+    * **PASS where nothing could be measured.** The asserted boolean resolves
+      whether or not the score does, so a row could render ``score: NA`` beside
+      ``beats bar?: yes``. "Nobody could check this" and "this cleared the bar"
+      must not render identically.
+    * **PASS that contradicts the numbers on the same row.** If the repo says
+      ``true`` and the two figures this table read say ``false``, printing
+      either one alone hides a disagreement that a reader needs to see.
+
+    So an asserted verdict is passed through only when the derivation from the
+    score and the baseline on this same row REPRODUCES it. Otherwise the cell is
+    NA with the reason, which is strictly more conservative than what it
+    replaces: this function can turn an asserted pass into NA, and can never
+    turn an NA into a pass.
+    """
+    if not asserted.present:
+        return asserted
+    derived = _compare(score, baseline, lower_is_better)
+    if not derived.present:
+        return Cell.missing(
+            f"the artifact asserts beats={asserted.value!r}, but this table cannot "
+            f"corroborate it: {derived.na_reason}. A verdict this reader cannot check "
+            "against the two figures it read is UNMEASURED here, not a pass",
+            source=asserted.source,
+        )
+    if bool(derived.value) != bool(asserted.value):
+        return Cell.missing(
+            f"CONTRADICTION: the artifact asserts beats={asserted.value!r}, but the "
+            f"two figures on this row give {derived.value!r} ({derived.source}). "
+            "Reporting either alone would hide the disagreement",
+            source=asserted.source,
+        )
+    return Cell.measured(
+        asserted.value,
+        f"{asserted.source}; corroborated by this row's own figures ({derived.source})",
     )
 
 
