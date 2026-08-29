@@ -11,9 +11,9 @@ This file does NOT replace `portfolio/MODEL_QUALITY.md`. That document carries
 the adjudication and the refutation checks — judgement, which is not a field
 lookup. This one carries the arithmetic, so the two can disagree in public.
 
-- generated: `2026-08-29T06:36:37+00:00`
-- run nonce: `mlkit-20260829T063635Z-e2cdcc5a0eb9`
-- mlkit: `0.3.1` at `d814606389d45e2b5ad493acf72b9611422bcf2e`
+- generated: `2026-08-29T06:40:14+00:00`
+- run nonce: `mlkit-20260829T064012Z-f5def062dd8c`
+- mlkit: `0.4.0` at `034122f406eed97742f7f70851dafa7566cc2f84`
 - rows: **12**, cells measured: **103**, cells NA-with-reason: **5**
 
 ## Repos as they were read
@@ -23,10 +23,10 @@ lookup. This one carries the arithmetic, so the two can disagree in public.
 | arabica | `feat/observed-panel-and-fabrication-gates` | `bb69ee283a3d` | clean |
 | blackout | `e021-decision` | `ed80086937e1` | clean |
 | choco | `review/observed-labels-fixes` | `d0a0357b400c` | clean |
-| chokepoint | `feat/r9-operator-surface` | `bfad3de6af36` | DIRTY |
-| fray | `feat/r9-foundation-adapter-and-stress` | `d5c931c5e11b` | clean |
+| chokepoint | `feat/r9-operator-surface` | `287e048806d5` | DIRTY |
+| fray | `feat/r9-foundation-adapter-and-stress` | `d5c931c5e11b` | DIRTY |
 | surge | `feat/observed-corpus-and-fabrication-gates` | `9eab2fe80177` | clean |
-| torrent | `feat/r9-attributes-and-declared-scale` | `35b43c918007` | clean |
+| torrent | `feat/r9-attributes-and-declared-scale` | `a655a747c64e` | clean |
 | triage | `e028-decision` | `f44430853eac` | clean |
 
 ## Verdicts
@@ -62,14 +62,14 @@ as it stands rather than normalised into a shape no repo actually uses.
 | fray/spatial_infill | `reports/validation/models_of_record.json` (main) | `a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc` | 20541 | yes | no | checkout @ `feat/r9-foundation-adapter-and-stress` `d5c931c5e11b` |
 | fray/forecast_available | `reports/validation/models_of_record.json` (main) | `a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc` | 20541 | yes | no | checkout @ `feat/r9-foundation-adapter-and-stress` `d5c931c5e11b` |
 | fray/forecast_available | `reports/validation/weather_covariate_extension.json` (test_artifact) | `803412d7cf3875caebcbba632b959b8716e4fb8df675501dc06ed1689f5e8b3d` | 34480 | yes | no | checkout @ `feat/r9-foundation-adapter-and-stress` `d5c931c5e11b` |
-| torrent/melstm-10ep-n8-val | `reports/train/seed_summary_n8_val.json` (main) | `7d0c1d9ee48e98f0e216d0a8aa252565864b70e2ccef03bb3fb6f771c158ddd4` | 17468 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `35b43c918007` |
-| torrent/melstm-10ep-n8-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `35b43c918007` |
-| torrent/ridge-vs-melstm-val | `reports/train/row_parity_ridge_vs_melstm_val.json` (main) | `28fd9ace2517f5329ee9ff0c79a22c7dd389eaa5a586a739ccead2a85d416aad` | 1289 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `35b43c918007` |
-| torrent/ridge-vs-melstm-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `35b43c918007` |
-| torrent/ridge-vs-melstm-val | `reports/train/linear_reference_val_recheck.json` (left) | `fb8234d825df2b25a36da2c07a4aa59ec4bb003f2573eb828014c11b74a1f2e1` | 28618 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `35b43c918007` |
-| torrent/ridge-vs-melstm-val | `reports/train/melstm_f_s1234_val.json` (right) | `615d5c9638ec6e2173e3336efcfd7dbd0a432e2f0d09d7d1d21e52b9d0f0d85a` | 38145 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `35b43c918007` |
-| chokepoint/level-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r9-operator-surface` `bfad3de6af36` |
-| chokepoint/direction-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r9-operator-surface` `bfad3de6af36` |
+| torrent/melstm-10ep-n8-val | `reports/train/seed_summary_n8_val.json` (main) | `7d0c1d9ee48e98f0e216d0a8aa252565864b70e2ccef03bb3fb6f771c158ddd4` | 17468 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| torrent/melstm-10ep-n8-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| torrent/ridge-vs-melstm-val | `reports/train/row_parity_ridge_vs_melstm_val.json` (main) | `28fd9ace2517f5329ee9ff0c79a22c7dd389eaa5a586a739ccead2a85d416aad` | 1289 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| torrent/ridge-vs-melstm-val | `reports/holdout_reads.jsonl` (ledger) | `f3f431a499855b549be77544828555c33dfd95ab7da8e2f05b3573f02172145c` | 754 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| torrent/ridge-vs-melstm-val | `reports/train/linear_reference_val_recheck.json` (left) | `fb8234d825df2b25a36da2c07a4aa59ec4bb003f2573eb828014c11b74a1f2e1` | 28618 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| torrent/ridge-vs-melstm-val | `reports/train/melstm_f_s1234_val.json` (right) | `615d5c9638ec6e2173e3336efcfd7dbd0a432e2f0d09d7d1d21e52b9d0f0d85a` | 38145 | yes | no | checkout @ `feat/r9-attributes-and-declared-scale` `a655a747c64e` |
+| chokepoint/level-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r9-operator-surface` `287e048806d5` |
+| chokepoint/direction-head | `models/episode_response/champion.json` (main) | `c03ffc16660bbb6fa6b9aff09d8613a3a2729aa377aa4afadd76f2cd955fbcae` | 11250 | yes | no | checkout @ `feat/r9-operator-surface` `287e048806d5` |
 | surge | `data/model_registry/per_lead_anchor_ols/model.json` (main) | `3e8bf748277471e49e416572fd45afb042915f6577a3d2a6391345138331673d` | 17713 | yes | no | worktree `/Users/david/Downloads/Claude Code/resilient-surge/.worktrees/pr55` @ `feat/surgeistm-lora-finetune` `de37eddfbea7` |
 | surge | `data/model_registry/index.json` (index) | `cecdc5ecb66ed458719af2c29076abe97178072aa89d7808fe3f6a3c5ce93643` | 2639 | yes | no | worktree `/Users/david/Downloads/Claude Code/resilient-surge/.worktrees/pr55` @ `feat/surgeistm-lora-finetune` `de37eddfbea7` |
 | surge | `reports/holdout_reads.jsonl` (ledger) | `db3eec7008b6ea476a6b58be1ca886174cf202615d5841484602ab693cb30ab6` | 1735 | yes | no | worktree `/Users/david/Downloads/Claude Code/resilient-surge/.worktrees/pr55` @ `feat/surgeistm-lora-finetune` `de37eddfbea7` |

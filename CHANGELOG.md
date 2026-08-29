@@ -12,13 +12,21 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
-## v0.3.1 — 2026-08-28
+## v0.4.0 — 2026-08-28
 
 Not yet tagged. The heading is written at the version the code declares, not
 retitled from "Unreleased" after a tag is cut — that retitling step is what
 went missing at `v0.3.0`, and `tests/test_version_declaration.py` now fails the
 suite whenever the newest heading here and `resilient_mlkit.__version__`
 disagree.
+
+**Why `0.4.0` and not the `0.3.1` `docs/ESCALATIONS.md` E-M08 proposed.** That
+proposal predates this round's content. The scale at the top of this file says a
+**major** release is one where "an existing check changes verdict on unchanged
+code", and two checks below do exactly that. On a `0.x` line the minimal reading
+of major is the leading nonzero, so `0.4.0`. Whether this line's major is
+`0.4.0` or `1.0.0` is not written down anywhere and is the signatory's to
+settle — recorded in E-M08 rather than decided here.
 
 ### The version is declared once
 
@@ -27,11 +35,80 @@ each carried their own `0.2.0` literal, and `v0.3.0` was tagged with all three
 still unbumped (`docs/ESCALATIONS.md` E-M08). `pyproject.toml` now reads the
 value through `[tool.setuptools.dynamic]` and `cli` imports it, so there is one
 literal in the repo. Verified by execution against this branch: `pip install -e
-. --no-deps` then `pip show resilient-mlkit` reports `Version: 0.3.1`, and
-`mlkit --version` prints `mlkit 0.3.1`.
+. --no-deps` then `pip show resilient-mlkit` reports `Version: 0.4.0`, and
+`mlkit --version` prints `mlkit 0.4.0`.
 
 The `v0.3.0` tag is unchanged and still ships `0.2.0` in its own tree; that is
 recorded in the entry below and is not repaired by this bump.
+
+### Two silent defects in readiness checks, found by writing their controls
+
+Neither was found by reading the code. Both were found by writing a control
+pair — a case the check must fire on beside one it must stay silent on — and
+watching the positive case pass.
+
+**R3 counted the letters of a string as sites.** `set(map(str, v))` accepts a
+`str` and iterates it by character, so a `splits` binding returning `{"train":
+"abc", "val": "de", "test": "fg"}` was reported PASS with `n_train=3, n_val=2,
+n_test=2`: three disjoint "groups" above the holdout floor, and nothing about
+the data measured. It failed loudly on long strings, which share characters, and
+silently on short ones — so it only misbehaved where it did damage. R3 now
+refuses a `str` or `bytes` split by name rather than coercing it; tuples, sets
+and generators are unaffected.
+
+**R5 did arithmetic on proportions as though they were row counts.** `int()`
+truncates, so `{"real": 1.5, "synthetic": 0.5}` in `val` cleared the taint test
+(`int(0.5) == 0`) and then satisfied "at least one real row" (`int(1.5) == 1`):
+a val split one third simulated, reported PASS against the one invariant
+`CLAUDE.md` calls non-negotiable. `{"real": 100, "synthetic": -5}` passed for the
+same reason. R5 now validates the histogram as whole non-negative row counts
+first and refuses what it cannot read; `100.0` and `"100"` are still accepted, so
+a counter arriving as float64 or out of a CSV cell is unaffected.
+
+Both are verdict changes on unchanged repo code — a repo whose binding returns
+either shape moves from PASS to FAIL. Neither shape can produce a correct pass,
+so this is a defect repair rather than a tightening, and no repo is known to
+report either. Recorded here so an upgrade is not a surprise.
+
+### Coverage for the checks that gate promotion
+
+`tests/` held eight files against 29 modules, and the gaps were not where a
+coverage percentage would have pointed. R3 and R5 had no tests at all; R11 had a
+thoroughly tested scanner inside an untested check; and `portfolio.resolve` —
+the function that turns results into READY-TO-TRAIN — had none.
+
+Five new suites, every check in FIRES/SILENT pairs, because a check that fires
+on everything is as useless as one that fires on nothing and only the pair tells
+them apart. The pairings that carry the weight:
+
+* a synthetic row in `val` FIRES / a wholly synthetic `train` split is SILENT —
+  simulated training data is legitimate, and a check that fired on it would be
+  switched off, taking the val/test invariant with it;
+* a one-group holdout FIRES / a two-group holdout is SILENT — the floor is what
+  stops holdout narrowing arriving as a green check;
+* R11 FAILS on a fabrication under `scripts/` while R10 PASSES on the same repo
+  — measured on one fixture, and it is R11's whole reason for existing;
+* an NA beside an ESCALATED is IN-PROGRESS / an ESCALATED alone is
+  AWAITING-SIGNOFF — falsified by inverting the precedence in `portfolio.py`,
+  which turned both controls red, and restored.
+
+### `mlkit portfolio` — four NA cells were the adapter, not the repo
+
+Every `NA` reason was re-read against the repo's committed artifacts and
+classified: field genuinely absent, or adapter looking in the wrong place.
+Measured on the fleet as checked out on 2026-08-29: **cells NA-with-reason 9 →
+5, cells measured 99 → 103**, rows unchanged at 12. `fray/forecast_available`'s
+test-arm count, `torrent/ridge-vs-melstm-val`'s split and both `blackout` rows'
+model of record were all present in artifacts the row already named or sat
+beside. The five that remain are genuinely absent and say so more precisely.
+
+### `mlkit spine` — the 16 drifts classified
+
+No behaviour change; the classification is recorded in `docs/ESCALATIONS.md`
+E-M04. All 16 are an unsynced spine and none is a repo diverging, on two
+measured grounds: one deployed sha256 per file shared by all eight repos, and
+every changed line traceable to a spine-side commit here. Nothing was synced —
+that is a fleet-wide write.
 
 ## v0.3.0 — 2026-08-28
 

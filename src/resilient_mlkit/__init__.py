@@ -16,5 +16,5 @@ from .core.result import CheckResult, CredentialRequired, Status
 #: the copy: ``pyproject.toml`` reads it through ``[tool.setuptools.dynamic]``
 #: and ``cli`` imports it, so a bump is one edit and a mismatch is
 #: unconstructible rather than merely discouraged.
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 __all__ = ["CheckResult", "CredentialRequired", "Status", "__version__"]

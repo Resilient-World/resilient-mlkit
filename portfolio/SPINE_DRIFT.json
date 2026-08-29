@@ -1,11 +1,11 @@
 {
  "artifact_schema": "resilient-mlkit/spine-drift/1",
  "generated_by": "mlkit spine",
- "mlkit_version": "0.3.1",
- "generated_at_utc": "2026-08-29T06:37:19+00:00",
- "run_nonce": "mlkit-20260829T063719Z-7280e5d04366",
+ "mlkit_version": "0.4.0",
+ "generated_at_utc": "2026-08-29T06:40:15+00:00",
+ "run_nonce": "mlkit-20260829T064014Z-37158f11fe35",
  "spine_root": "/Users/david/Downloads/Claude Code/resilient-mlkit/spine",
- "mlkit_git_sha": "e261dc14b203c14df54e493b531e31ee1854acd1",
+ "mlkit_git_sha": "034122f406eed97742f7f70851dafa7566cc2f84",
  "canonical_files": [
   "CLAUDE.md",
   "docs/DATA_POLICY.md",
@@ -28,17 +28,17 @@
   "fray": {
    "git_sha": "d5c931c5e11bf2b7df2c7553f82457f211f3f4ae",
    "branch": "feat/r9-foundation-adapter-and-stress",
-   "dirty": false
-  },
-  "torrent": {
-   "git_sha": "35b43c918007a35636b2edf79cceb42c8884feb0",
-   "branch": "feat/r9-attributes-and-declared-scale",
    "dirty": true
   },
-  "chokepoint": {
-   "git_sha": "79d79cd5679f00702dd8f1fb69fc4b8965e8ee0a",
-   "branch": "feat/r9-operator-surface",
+  "torrent": {
+   "git_sha": "a655a747c64e944bb3bd9322ca7ee4a99c726b5d",
+   "branch": "feat/r9-attributes-and-declared-scale",
    "dirty": false
+  },
+  "chokepoint": {
+   "git_sha": "287e048806d54b24c91eed9d1abe7b82e2394456",
+   "branch": "feat/r9-operator-surface",
+   "dirty": true
   },
   "surge": {
    "git_sha": "9eab2fe801776d3fbad064900c204dac5d1e0f48",

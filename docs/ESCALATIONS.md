@@ -290,7 +290,7 @@ entry so a reader of the tag finds the caveat next to the release notes.
 to bump `main` so the next tag is correct. What was done: the version is now
 declared once, in `resilient_mlkit.__version__`; `pyproject.toml` reads it via
 `[tool.setuptools.dynamic]` and `cli` imports it, so the three literals that
-disagreed inside `v0.3.0` are one literal that cannot. `main` declares `0.3.1`.
+disagreed inside `v0.3.0` are one literal that cannot. `main` declares `0.4.0` — see below on why not `0.3.1`.
 Measured by execution on this branch:
 
 ```
@@ -306,6 +306,15 @@ CHANGELOG heading and FIRES on both shapes that produced this escalation: a
 second `__version__` literal in a module, and a newest heading reading
 `Unreleased` rather than a version.
 
+**The bump is `0.4.0`, not the `0.3.1` proposed above, and that is a
+deviation worth reading.** The proposal predates this round's content. Two
+readiness checks now change verdict on unchanged repo code (R3 on a `str`
+split, R5 on a fractional or negative provenance count — both previously silent
+PASSes, see the CHANGELOG), and the scale at the top of `CHANGELOG.md` calls
+that a **major** release. On a `0.x` line the minimal reading of major is the
+leading nonzero, so `0.4.0`.
+
 **Still open, and still the signatory's:** the `v0.3.0` tag is untouched and its
-own tree still reads `0.2.0`. Cutting `v0.3.1` from `main`, and deciding when
-the eight repos re-pin to it, remains a release decision of record.
+own tree still reads `0.2.0`. Three things remain a release decision of record —
+whether this line's major is `0.4.0` or `1.0.0`, which is written down nowhere;
+cutting the tag; and when the eight repos re-pin to it.
