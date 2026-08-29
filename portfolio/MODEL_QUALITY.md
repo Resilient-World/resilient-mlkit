@@ -20,7 +20,7 @@ registers as the production predictor.
 | resilient-arabica | RMSE **1.056760**, skill **+0.0257** (unchanged; read spent) | expanding per-unit prior mean **1.084686** | **Yes** | **Yes — the 11-feature history ridge**, with model card; GRU promotion bar now wired to it | **Yes** — round-2 hardening verified: Surigao 0.001 ha is the PSA-published value (checked at source, px API, 2026-08-23), win chain intact on the feature branch |
 | resilient-triage | test RMSE **173.408**, skill **+0.0546** vs persistence **183.423** (2nd read; arm CLOSED at two, not re-read in round three) | previous-week persistence | **Yes** | **Yes — cbdiff_pois PROMOTED AND SERVED** (round three): `champion.json`, self-hash `ec8bd643…` verified by me, behind `/v1/weekly-mortality/*`; persistence demoted to *recorded bar* behind a challenger gate that returns NA rather than PASS on an unmeasured comparison | **Yes** — all three E-029 preconditions discharged on measurement; converged fit moves val skill by **3.33e-16** and LOCO by **9.21e-15**, so the suspension clause did not trigger; serving path reproduces val RMSE at absolute difference **0.0** through a different code path |
 | resilient-torrent | **two separate answers, both val**: ME-LSTM at 10 epochs, n=8 seeds, mean **0.2226**, 95% interval *on the mean* **[0.1996, 0.2455]**; the same config at 30 declared epochs, n=3, mean **0.3734**, interval **[0.3106, 0.4363]** | `persistence_lag3` val **0.26484** | **10 epochs: No — 0 of 8 draws, whole interval below the bar. 30 epochs: Yes — 3 of 3, whole interval above.** Neither beats the repo's own ridge (**0.4521**, same 65 rows, `same_rows: true`) | **The ridge is the model of record** (E-030) — not the network. No ME-LSTM promotion; test arm left unspent | **Yes** — interval is correctly on the MEAN, with the range printed beside it and an explicit note that it is *not* a prediction interval for the next seed. Two of its own claims retracted in-tree mid-round |
-| resilient-fray | TEST MAE **82.754** (forecast_available, neighbour-extended) / **71.359** (spatial_infill) | `persistence_t_minus_1` **113.067** | **Yes, both tracks, both metrics** | **Yes — both track winners registered** as models of record, hash-pinned, bar enforced in code | **Yes** — I re-hashed both checkpoints on disk myself (match); prereg → val-select → single test read commit order verified |
+| resilient-fray | **SUPERSEDED — do not quote this row for `forecast_available`.** It reads TEST MAE **82.754** (forecast_available, neighbour-extended) / **71.359** (spatial_infill). `mlkit portfolio` measured fray's committed record on 2026-08-29 as **74.16097783177521** for `forecast_available`; the `71.359` for `spatial_infill` still matches. See *Does the machine agree with the hand transcription?* below and **E-M06** | `persistence_t_minus_1` **113.067** | **Yes, both tracks, both metrics** (the machine confirms `beats` still true for both, against the same floor) | **Yes — both track winners registered** as models of record, hash-pinned, bar enforced in code | **STALE for `forecast_available`.** The belief recorded here — *"I re-hashed both checkpoints on disk myself (match); prereg → val-select → single test read commit order verified"* — was formed against the winner that has since been replaced. It is left standing, unedited and marked, because re-adjudicating fray's new record is judgement and was **not** performed here. `spatial_infill` is unaffected |
 | resilient-blackout | in-scope extension test ROC AUC **0.6776** vs planning anchor **0.6412** (single sealed read, *cited* in round three, not re-run); persistence **0.6899** on the shared subset | persistence **0.6899** (not like-for-like: needs the outage feed E-021 reserves) | **Beats its anchor (+0.0364); still loses to persistence by 0.0096** | **No — THE PROMOTION GATE REFUSED**, and was left refusing. `weather_failure_v1.joblib` (13 columns, mtime 2026-08-21) is still what ships | **Yes, and the refusal is the round's best result** — the gate refuses the *shipped* model with an **identical failing set and identical mapped metrics**, which proves the refusal is about the gate, not the candidate (E-022) |
 | resilient-chokepoint | train LOCO advantage **−0.0398 mtpd** (p=0.498); design's in-sample oracle ceiling **+0.0527**, below the claimed **+0.0580** scale-matched; coarsened target T2 AUC **0.7143** vs its own reference **0.6984**, p=0.610 | operational `scale_x_train_mean_depth` (T2: `corridor_scale_only`) | **No, and now stronger than "unestablished": the claim as made is ABOVE the design's information ceiling**, so no episode count produces it. Coarsening the target did not rescue it | **No promotion**; the operational baseline remains the served predictor and the bar | **Yes** — and it is the only repo that separates *absent* from *underpowered* by measurement rather than by assertion (see round three) |
 | resilient-surge | NN holdout **0.175095 m** | `per_lead_anchor_ols` **0.163736 m** | **No** | **Yes — the OLS itself promoted**: registry production slot, sha256-verified fail-closed serve path, gate strengthened to refuse NN checkpoints on their own holdout warnings | **Yes** — no new test read spent (ledger still 3), warnings recorded in the artifact, not suppressed |
@@ -845,10 +845,58 @@ bytes at HEAD.
 
 ## Does the machine agree with the hand transcription?
 
-Yes, everywhere the two overlap. Of 23 numeric
-figures the generated table carries, **18** appear verbatim in the text
-above at four or more decimal places and **4** at three; **zero**
-contradict it. The hand transcription of this table was arithmetically correct.
+**No longer — and catching that is the entire reason this command exists.**
+
+Measured 2026-08-29 against `portfolio/FLEET_VERDICTS.json` as regenerated at
+mlkit `036683e`. Of the **23** numeric figures the generated table carries,
+**21** are found in the prose above and **2** are not:
+
+| figure | machine reads | prose says | verdict |
+|---|---|---|---|
+| `fray/forecast_available` score | `74.16097783177521` | `82.754` | **CONTRADICTED** |
+| `chokepoint/direction-head` baseline score | `0.3482142857142857` | — | omitted, not contradicted |
+
+The second was already known and is listed as "not quoted above" in the table
+below. The first is new, and it is a real divergence rather than a rounding.
+
+**What happened.** resilient-fray moved its `forecast_available` model of record
+to the verified weather-covariate winner (fray `87a1dbe`, *"SERVE-3/PROMOTE: the
+verified weather winner gets a checkpoint, so it can be served"*). The record now
+reads:
+
+- candidate `forecast_available+nbr+wx_prior/hgb/leaves=127/lr=0.05/iter=400`
+- TEST MAE `74.16097783177521`, against the same `persistence_t_minus_1` floor
+  of `113.06701205090663`
+
+The prose above still describes the superseded
+`forecast_available+nbr/k=15/hgb/leaves=63/lr=0.1/iter=300` at `82.754`. Nothing
+in mlkit was edited to follow it: the adapter declares a pointer, the pointer
+resolved against the new bytes, and the figure changed by itself. A hand-copied
+table would have gone on reporting `82.754` indefinitely, and every re-read of it
+would have confirmed the wrong number.
+
+**Provenance caveat, stated rather than buried.** `mlkit portfolio` reads the
+working tree. At the time of this run fray's
+`reports/validation/models_of_record.json` was DIRTY, and the generated table
+records that in its `dirty` column. The figure itself is *not* affected: checked
+directly, `tracks.forecast_available.test.mae_lb_ac` is
+`74.16097783177521` in fray's `HEAD` and in its working tree alike. The
+uncommitted part of that file is the checkpoint block — `path`, `sha256` and an
+`identity_check` for the newly serialised `.joblib` — which is fray's in-flight
+promote work and no part of any figure quoted here.
+
+**Two things are owed and neither was done here.**
+
+1. The adjudication in the summary table at the top of this file — including
+   *"I re-hashed both checkpoints on disk myself (match)"* — was performed
+   against the **superseded** winner. It does not transfer. This file is not
+   rewritten to pretend it does: re-adjudicating fray's new record means
+   verifying fray's own promote artifact and its checkpoint hash, which is a
+   judgement, and judgement is not a field lookup.
+2. Raised as **E-M06** in `docs/ESCALATIONS.md`.
+
+Everything below this line still stands: on the other 21 figures the hand
+transcription was arithmetically correct.
 
 | figure | measured, full precision | appears above as |
 |---|---|---|
@@ -872,7 +920,7 @@ contradict it. The hand transcription of this table was arithmetically correct.
 | `blackout/vs-persistence` baseline score | `0.689877078726717` | `0.68988` |
 | `fray/spatial_infill` score | `71.35922343344701` | `71.359` |
 | `fray/spatial_infill` baseline score | `113.06701205090663` | `113.067` |
-| `fray/forecast_available` score | `82.75377957333798` | `82.754` |
+| `fray/forecast_available` score | `74.16097783177521` | `82.754` — **CONTRADICTED**, see above |
 | `fray/forecast_available` baseline score | `113.06701205090663` | `113.067` |
 | `chokepoint/direction-head` baseline score | `0.3482142857142857` | not quoted above |
 

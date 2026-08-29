@@ -127,3 +127,82 @@ someone else's in-flight work. Committing it from this task would collide with
 whoever wrote it.
 
 **Proposed**: whoever owns that working tree commits it.
+
+---
+
+## E-M06 — fray's model of record moved; the portfolio adjudication did not
+
+**Measured by** `mlkit portfolio` on 2026-08-29 (`portfolio/FLEET_VERDICTS.md`,
+regenerated at mlkit `036683e`), reconciled against `portfolio/MODEL_QUALITY.md`
+by search: of 23 machine-read figures, 21 are found in that document's prose and
+**1 is contradicted** by it. (The 23rd, `chokepoint/direction-head` baseline
+`0.3482142857142857`, is an omission already noted in that file, not a conflict.)
+
+| | machine reads | `MODEL_QUALITY.md` says |
+|---|---|---|
+| `fray/forecast_available` candidate | `forecast_available+nbr+wx_prior/hgb/leaves=127/lr=0.05/iter=400` | `forecast_available+nbr/k=15/hgb/leaves=63/lr=0.1/iter=300` |
+| `fray/forecast_available` TEST MAE | `74.16097783177521` | `82.754` |
+| bar (`persistence_t_minus_1`) | `113.06701205090663` | `113.067` — agrees |
+
+resilient-fray restated the record at `87a1dbe` (*"SERVE-3/PROMOTE: the verified
+weather winner gets a checkpoint, so it can be served"*). Read from
+`reports/validation/models_of_record.json`, pointer
+`tracks.forecast_available.test.mae_lb_ac`. **No mlkit adapter was edited**: the
+pointer resolved against the new bytes and the figure moved on its own, which is
+the property the command was built for and the first live confirmation of it.
+
+**Provenance caveat.** `mlkit portfolio` reads the working tree, and fray's copy
+of that file was DIRTY at read time; the generated table records this. The figure
+is unaffected — `74.16097783177521` in fray's `HEAD` and working tree alike. The
+uncommitted portion is the checkpoint block (`path`, `sha256`, `identity_check`)
+from fray's in-flight promote work.
+
+**What is stale.** `MODEL_QUALITY.md`'s adjudication for fray, *"I re-hashed both
+checkpoints on disk myself (match); prereg → val-select → single test read commit
+order verified"*, was formed against the superseded winner and does not transfer
+to the new one. The row is marked SUPERSEDED and the belief left standing and
+unedited, because overwriting another adjudicator's verdict from here would be
+the same failure in the other direction.
+
+**Cannot be done from here**: re-adjudicating means verifying fray's own promote
+artifact (`reports/validation/weather_covariate_extension.promote.json`) and the
+checkpoint hash it claims, then deciding whether the new record is believed. That
+is a judgement, and `mlkit portfolio` deliberately regenerates only the measured
+columns.
+
+**Proposed**: whoever owns the portfolio adjudication re-runs it for
+`fray/forecast_available` against the new record. `spatial_infill` is unaffected
+(`71.35922343344701`, still matching the prose).
+
+---
+
+## E-M07 — the CI lint gate had no committed definition (FIXED HERE; recorded for the fleet)
+
+**Measured by execution** on 2026-08-29 at mlkit `8647be9`, with this repo's own
+venv:
+
+```
+.venv/bin/ruff --version                 -> ruff 0.16.5
+.venv/bin/ruff check src tests scripts   -> Found 36 errors
+```
+
+against a workflow header claiming `-> all checks passed` for that exact command.
+`.github/workflows/ci.yml` installed `ruff>=0.4` and ran it at DEFAULTS. Ruff's
+default rule set ships with the release, so the floor meant the gate's definition
+was whatever the runner downloaded that day, not what the repo committed. Four of
+the 36 were `RUF100 unused noqa` on suppressions written for rules the current
+defaults do not enable — the declarations had gone stale in place and nothing
+could see it.
+
+**Fixed in this repo** (`504d487`): all 36 findings repaired in `src/`, `tests/`
+and `scripts/` with none suppressed and no `[tool.ruff]` select added; `ruff` and
+`mypy` pinned exactly; `tests/test_ci_workflow.py` added, which FIRES on the
+workflow as committed at `8647be9` (`['ruff>=0.4', 'mypy>=1.9']`) and is SILENT
+on the repaired one.
+
+**Recorded here because it is not this repo's problem alone.** Any repo in the
+fleet whose CI floors a linter and runs it at defaults has the same latent
+defect: a gate that changes meaning without a diff. **Cannot be done from here** —
+checking or changing eight other repos' workflows is eight writes into those
+repos. **Proposed**: each repo runs its own linter at its own pinned version and
+compares the finding count against what its CI comments claim.

@@ -4,9 +4,9 @@
 model repo.** `scripts/sync_spine.py` is the only writer, and it still refuses
 to overwrite a file it did not author.
 
-- generated: `2026-08-28T20:59:13+00:00`
-- run nonce: `mlkit-20260828T205913Z-fc65ad0ad0c9`
-- spine: `/Users/david/Downloads/Claude Code/resilient-mlkit/spine` at mlkit `a04c60c1d9746afa3a3ea0dcd2e73945e1458c15`
+- generated: `2026-08-29T02:31:04+00:00`
+- run nonce: `mlkit-20260829T023104Z-7354a849e03a`
+- spine: `/Users/david/Downloads/Claude Code/resilient-mlkit/spine` at mlkit `036683e15caf38d3f59f1a8d1d940982bd1211f3`
 - canonical files compared per repo: **6**
 - verdicts: **DRIFTED** 16, **IN-SYNC** 32
 

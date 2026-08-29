@@ -2,10 +2,10 @@
  "artifact_schema": "resilient-mlkit/spine-drift/1",
  "generated_by": "mlkit spine",
  "mlkit_version": "0.2.0",
- "generated_at_utc": "2026-08-28T20:59:13+00:00",
- "run_nonce": "mlkit-20260828T205913Z-fc65ad0ad0c9",
+ "generated_at_utc": "2026-08-29T02:31:04+00:00",
+ "run_nonce": "mlkit-20260829T023104Z-7354a849e03a",
  "spine_root": "/Users/david/Downloads/Claude Code/resilient-mlkit/spine",
- "mlkit_git_sha": "a04c60c1d9746afa3a3ea0dcd2e73945e1458c15",
+ "mlkit_git_sha": "036683e15caf38d3f59f1a8d1d940982bd1211f3",
  "canonical_files": [
   "CLAUDE.md",
   "docs/DATA_POLICY.md",
@@ -26,19 +26,19 @@
    "dirty": false
   },
   "fray": {
-   "git_sha": "847bd7cfcc5735ffe3d80d222395bf2cc9a5355b",
+   "git_sha": "87a1dbee64d22ca83a08827e753d99671c5e5258",
    "branch": "feat/r6-serving-and-uncertainty",
-   "dirty": false
+   "dirty": true
   },
   "torrent": {
-   "git_sha": "ac52ab6676d2a4c49b3310f19640a2775da2436b",
+   "git_sha": "b6b88af2f18226975e966b540698a14b79aa89f3",
    "branch": "feat/r6-attributes-and-scale",
    "dirty": true
   },
   "chokepoint": {
-   "git_sha": "6112f87f2b3ccc5cae0cd44f4c00a169a34d972c",
+   "git_sha": "80f16a776864869b3b7e9117ce40bd692c44592f",
    "branch": "feat/r6-horizon-ladder-and-uq",
-   "dirty": true
+   "dirty": false
   },
   "surge": {
    "git_sha": "9eab2fe801776d3fbad064900c204dac5d1e0f48",

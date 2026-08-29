@@ -2,10 +2,10 @@
  "artifact_schema": "resilient-mlkit/fleet-verdicts/1",
  "generated_by": "mlkit portfolio",
  "mlkit_version": "0.2.0",
- "generated_at_utc": "2026-08-28T20:54:40+00:00",
- "run_nonce": "mlkit-20260828T205434Z-e5ab199ea393",
+ "generated_at_utc": "2026-08-29T02:31:03+00:00",
+ "run_nonce": "mlkit-20260829T023101Z-b6b256c36679",
  "root": "/Users/david/Downloads/Claude Code",
- "mlkit_git_sha": "0a776b8ac54d2312896191d668b079457d7763f1",
+ "mlkit_git_sha": "036683e15caf38d3f59f1a8d1d940982bd1211f3",
  "repos_read": {
   "arabica": {
    "git_sha": "bb69ee283a3d9f336c4e72d9dc08bdc00f42a6bd",
@@ -23,14 +23,14 @@
    "dirty": false
   },
   "chokepoint": {
-   "git_sha": "6112f87f2b3ccc5cae0cd44f4c00a169a34d972c",
+   "git_sha": "80f16a776864869b3b7e9117ce40bd692c44592f",
    "branch": "feat/r6-horizon-ladder-and-uq",
-   "dirty": true
+   "dirty": false
   },
   "fray": {
-   "git_sha": "ff5550d002ea0ee1acd5d58352ff4753ef65090b",
+   "git_sha": "87a1dbee64d22ca83a08827e753d99671c5e5258",
    "branch": "feat/r6-serving-and-uncertainty",
-   "dirty": false
+   "dirty": true
   },
   "surge": {
    "git_sha": "9eab2fe801776d3fbad064900c204dac5d1e0f48",
@@ -38,7 +38,7 @@
    "dirty": false
   },
   "torrent": {
-   "git_sha": "6d59ed8a49dcc60d1fe5aa09760dfd24135e245f",
+   "git_sha": "b6b88af2f18226975e966b540698a14b79aa89f3",
    "branch": "feat/r6-attributes-and-scale",
    "dirty": true
   },
@@ -251,13 +251,13 @@
      "repo": "fray",
      "relpath": "reports/validation/models_of_record.json",
      "path": "/Users/david/Downloads/Claude Code/resilient-fray/reports/validation/models_of_record.json",
-     "sha256": "dff258e6c1bbbb175609ff290e7eed69034f3c6daf14d73abed8edaefb2d3a1e",
-     "bytes": 11041,
+     "sha256": "a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc",
+     "bytes": 20541,
      "worktree": null,
      "branch": "feat/r6-serving-and-uncertainty",
-     "git_sha": "ff5550d002ea0ee1acd5d58352ff4753ef65090b",
+     "git_sha": "87a1dbee64d22ca83a08827e753d99671c5e5258",
      "committed_at_head": true,
-     "dirty": false,
+     "dirty": true,
      "error": null
     }
    },
@@ -272,17 +272,17 @@
     "source": "declared, corroborated by score pointer main:tracks.forecast_available.test.mae_lb_ac"
    },
    "model_of_record": {
-    "value": "forecast_available+nbr/k=15/hgb/leaves=63/lr=0.1/iter=300",
+    "value": "forecast_available+nbr+wx_prior/hgb/leaves=127/lr=0.05/iter=400",
     "na_reason": null,
     "source": "reports/validation/models_of_record.json#tracks.forecast_available.candidate"
    },
    "candidate": {
-    "value": "forecast_available+nbr/k=15/hgb/leaves=63/lr=0.1/iter=300",
+    "value": "forecast_available+nbr+wx_prior/hgb/leaves=127/lr=0.05/iter=400",
     "na_reason": null,
     "source": "reports/validation/models_of_record.json#tracks.forecast_available.candidate"
    },
    "score": {
-    "value": 82.75377957333798,
+    "value": 74.16097783177521,
     "na_reason": null,
     "source": "reports/validation/models_of_record.json#tracks.forecast_available.test.mae_lb_ac"
    },
@@ -316,13 +316,13 @@
      "repo": "fray",
      "relpath": "reports/validation/models_of_record.json",
      "path": "/Users/david/Downloads/Claude Code/resilient-fray/reports/validation/models_of_record.json",
-     "sha256": "dff258e6c1bbbb175609ff290e7eed69034f3c6daf14d73abed8edaefb2d3a1e",
-     "bytes": 11041,
+     "sha256": "a241acede88876d847794767b71d53d898dc2bc270153634bda1e960741b07cc",
+     "bytes": 20541,
      "worktree": null,
      "branch": "feat/r6-serving-and-uncertainty",
-     "git_sha": "ff5550d002ea0ee1acd5d58352ff4753ef65090b",
+     "git_sha": "87a1dbee64d22ca83a08827e753d99671c5e5258",
      "committed_at_head": true,
-     "dirty": false,
+     "dirty": true,
      "error": null
     }
    },
@@ -385,7 +385,7 @@
      "bytes": 17468,
      "worktree": null,
      "branch": "feat/r6-attributes-and-scale",
-     "git_sha": "6d59ed8a49dcc60d1fe5aa09760dfd24135e245f",
+     "git_sha": "b6b88af2f18226975e966b540698a14b79aa89f3",
      "committed_at_head": true,
      "dirty": false,
      "error": null
@@ -398,7 +398,7 @@
      "bytes": 754,
      "worktree": null,
      "branch": "feat/r6-attributes-and-scale",
-     "git_sha": "6d59ed8a49dcc60d1fe5aa09760dfd24135e245f",
+     "git_sha": "b6b88af2f18226975e966b540698a14b79aa89f3",
      "committed_at_head": true,
      "dirty": false,
      "error": null
@@ -463,7 +463,7 @@
      "bytes": 1289,
      "worktree": null,
      "branch": "feat/r6-attributes-and-scale",
-     "git_sha": "6d59ed8a49dcc60d1fe5aa09760dfd24135e245f",
+     "git_sha": "b6b88af2f18226975e966b540698a14b79aa89f3",
      "committed_at_head": true,
      "dirty": false,
      "error": null
@@ -476,7 +476,7 @@
      "bytes": 754,
      "worktree": null,
      "branch": "feat/r6-attributes-and-scale",
-     "git_sha": "6d59ed8a49dcc60d1fe5aa09760dfd24135e245f",
+     "git_sha": "b6b88af2f18226975e966b540698a14b79aa89f3",
      "committed_at_head": true,
      "dirty": false,
      "error": null
@@ -541,7 +541,7 @@
      "bytes": 11250,
      "worktree": null,
      "branch": "feat/r6-horizon-ladder-and-uq",
-     "git_sha": "6112f87f2b3ccc5cae0cd44f4c00a169a34d972c",
+     "git_sha": "80f16a776864869b3b7e9117ce40bd692c44592f",
      "committed_at_head": true,
      "dirty": false,
      "error": null
@@ -606,7 +606,7 @@
      "bytes": 11250,
      "worktree": null,
      "branch": "feat/r6-horizon-ladder-and-uq",
-     "git_sha": "6112f87f2b3ccc5cae0cd44f4c00a169a34d972c",
+     "git_sha": "80f16a776864869b3b7e9117ce40bd692c44592f",
      "committed_at_head": true,
      "dirty": false,
      "error": null
