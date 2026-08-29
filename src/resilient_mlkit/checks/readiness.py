@@ -196,7 +196,28 @@ def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
     except BindingError as exc:
         return CheckResult.na("R3", PHASE, str(exc))
     try:
-        splits = {str(k): set(map(str, v)) for k, v in dict(fn()).items()}
+        raw = dict(fn())
+        # A str (or bytes) is iterable, so `set(map(str, v))` accepts one and
+        # silently splits it into CHARACTERS. That is not a type quibble: a
+        # binding returning {"train": "abc", "val": "de", "test": "fg"} was
+        # reported PASS with n_train=3, n_val=2, n_test=2 -- the letters of
+        # 'abc' counted as three sites, disjoint, above the holdout floor, and
+        # indistinguishable in the table from a real blocked split. It fails
+        # loudly on long strings, which share characters, and silently on
+        # short ones, so the defect appears only where it does damage.
+        # Refused explicitly rather than coerced: mlkit does not get to decide
+        # that one string means one group.
+        stringy = {str(k): type(v).__name__ for k, v in raw.items() if isinstance(v, str | bytes)}
+        if stringy:
+            return CheckResult.failed(
+                "R3", PHASE,
+                "splits must map each split to a collection of group ids, but "
+                + ", ".join(f"{k} is a {t}" for k, t in sorted(stringy.items()))
+                + "; a string would be iterated by character and counted as one "
+                "group per letter",
+                {"non_collection_splits": stringy},
+            )
+        splits = {str(k): set(map(str, v)) for k, v in raw.items()}
     except CredentialRequired:
         raise
     except Exception as exc:  # noqa: BLE001
