@@ -1,0 +1,156 @@
+"""SV-2-PHASE-EXIT — the phase's denominator is PHASE_ORDER, not what ran.
+
+``cmd_check`` derived both the printed fraction and the exit code from the
+results it happened to collect. Numerator and denominator therefore came from
+the same source and agreed by construction, so the comparison carried no
+information: a readiness phase that lost a check to an import error printed
+``11/11 PASS`` and exited ``0``. The fraction looked like coverage and was a
+tautology.
+
+Two guards now stand between that and a green build, and both are exercised
+here in a control pair:
+
+* ``_run_phase`` emits a FAIL for any declared id whose result did not come
+  back from the loop, in ``PHASE_ORDER`` position;
+* ``cmd_check`` compares the number of results aggregated against
+  ``len(phase_ids(phase)) * len(repos)`` and exits ``1`` on a mismatch, before
+  the status ladder is consulted.
+
+The positive halves force each guard by making the loop lose a result. The
+negative halves prove neither fires on a complete run, and that the complete
+run's exit code is the one the pre-change build produced.
+
+No model repo is read or written: every run here uses a fixture ``Repo`` on a
+temp path, and ``store.save`` is redirected to the same temp path.
+"""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from resilient_mlkit import cli
+from resilient_mlkit.checks import PHASE_ORDER, RunContext, phase_ids
+from resilient_mlkit.cli import LOST_RESULT_REASON, _run_phase, cmd_check
+from resilient_mlkit.core.repo import Repo
+from resilient_mlkit.core.result import Status
+
+PHASE = "readiness"
+
+
+def _make_repo(root: Path, name: str = "fixture") -> Repo:
+    path = root / f"resilient-{name}"
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "-C", str(path), "init", "-q"], check=True)
+    return Repo(name=name, path=path)
+
+
+@pytest.fixture
+def repo(tmp_path: Path) -> Repo:
+    return _make_repo(tmp_path)
+
+
+def _args(root: Path) -> argparse.Namespace:
+    return argparse.Namespace(
+        root=str(root), repo="arabica", portfolio=False, phase=PHASE,
+        offline=True, timeout=5.0,
+    )
+
+
+@pytest.fixture
+def one_repo_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> argparse.Namespace:
+    """A cmd_check invocation wired to exactly one fixture repo under tmp_path."""
+    fixture = _make_repo(tmp_path, "arabica")
+    monkeypatch.setattr(cli, "discover", lambda root: [fixture])
+    monkeypatch.setattr(cli, "find_root", lambda *a, **k: tmp_path)
+    return _args(tmp_path)
+
+
+# -- _run_phase: the per-result guard ------------------------------------
+
+
+def test_run_phase_returns_one_result_per_declared_id(repo: Repo) -> None:
+    """Negative half: a complete run needs no synthesis and carries no lost row."""
+    ctx = RunContext(nonce="TEST", root=repo.path.parent, offline=True, timeout=5.0)
+    results = _run_phase(repo, PHASE, ctx)
+    assert [r.check_id for r in results] == PHASE_ORDER[PHASE]
+    assert [r for r in results if r.reason == LOST_RESULT_REASON] == []
+
+
+def test_run_phase_fails_the_id_whose_result_went_missing(
+    repo: Repo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Positive half: force the loop to drop R5's result; get a FAIL in R5's slot.
+
+    The drop is injected at ``for_phase`` -- the loop is handed a spec list with
+    R5 removed -- which is precisely the shape the old ``if cid in _REGISTRY``
+    filter produced.
+    """
+    real = cli.for_phase
+
+    def lossy(phase: str):
+        return [s for s in real(phase) if s.check_id != "R5"]
+
+    monkeypatch.setattr(cli, "for_phase", lossy)
+
+    ctx = RunContext(nonce="TEST", root=repo.path.parent, offline=True, timeout=5.0)
+    results = _run_phase(repo, PHASE, ctx)
+
+    # Length and ORDER are both restored, not just the count.
+    assert [r.check_id for r in results] == PHASE_ORDER[PHASE]
+    lost = next(r for r in results if r.check_id == "R5")
+    assert lost.status is Status.FAIL
+    assert lost.reason == LOST_RESULT_REASON
+    assert "R5" not in lost.evidence["produced"]
+    # Nothing else was disturbed.
+    assert [r.check_id for r in results if r.reason == LOST_RESULT_REASON] == ["R5"]
+
+
+# -- cmd_check: the exit-code guard --------------------------------------
+
+
+def test_complete_phase_does_not_exit_incomplete(
+    one_repo_run: argparse.Namespace, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Negative half: a complete run reaches the status ladder, not the guard.
+
+    On a fixture repo with no bindings every readiness check reports NA or
+    ESCALATED, so the ladder's answer is 3. What matters is that it is the
+    LADDER's answer: the incompleteness guard stayed silent.
+    """
+    code = cmd_check(one_repo_run)
+    err = capsys.readouterr().err
+    assert "INCOMPLETE" not in err
+    assert code == 3
+
+
+def test_lost_check_exits_one(
+    one_repo_run: argparse.Namespace,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Positive half: a phase that cannot account for every declared check exits 1.
+
+    ``_run_phase`` is replaced wholesale so that the guard being tested is
+    ``cmd_check``'s own denominator comparison and not the backstop inside
+    ``_run_phase``. Without the comparison this run prints ``11/12`` and returns
+    3 -- incomplete, which reads as "unmeasured", not as "failed".
+    """
+    real = cli._run_phase
+
+    def lossy(repo: Repo, phase: str, ctx: RunContext):
+        return [r for r in real(repo, phase, ctx) if r.check_id != "R5"]
+
+    monkeypatch.setattr(cli, "_run_phase", lossy)
+
+    code = cmd_check(one_repo_run)
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "INCOMPLETE" in captured.err
+    # The message has to state both sides of the comparison or it is not
+    # actionable: how many came back, and how many the phase declares.
+    assert f"{len(phase_ids(PHASE)) - 1} result(s)" in captured.err
+    assert f"{len(phase_ids(PHASE))} declared check(s)" in captured.err

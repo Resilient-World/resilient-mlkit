@@ -19,7 +19,7 @@ from pathlib import Path
 
 from . import __version__
 from . import checks as checks_pkg
-from .checks import PHASE_ORDER, PHASES, RunContext, for_phase
+from .checks import PHASES, RunContext, for_phase, phase_ids
 from .core import nonce as nonce_mod
 from .core import policy, store
 from .core.repo import PORTFOLIO, Repo, discover, find_root
@@ -56,8 +56,27 @@ def _select_repos(args: argparse.Namespace, root: Path) -> list[Repo]:
     return found
 
 
+#: What a phase run says when it finished holding fewer results than the phase
+#: declares checks. A constant so the emitter and the control match on one
+#: sentence. Distinct from ``checks.UNREGISTERED_REASON``, which is about an id
+#: that never registered; this one is about a registered id whose result did
+#: not come back from the loop.
+LOST_RESULT_REASON = (
+    "declared in PHASE_ORDER and produced no result in this run; the phase loop "
+    "returned fewer results than the phase declares checks"
+)
+
+
 def _run_phase(repo: Repo, phase: str, ctx: RunContext) -> list[CheckResult]:
-    """Run one phase against one repo, in the phase's prescribed order."""
+    """Run one phase against one repo, in the phase's prescribed order.
+
+    Returns exactly ``len(phase_ids(phase))`` results. The denominator of a
+    phase is what ``PHASE_ORDER`` declares, never what the loop happened to
+    produce: if the two disagree the difference is emitted as FAIL rows rather
+    than shrinking the fraction the run prints. This is a backstop behind
+    ``for_phase``, which already yields one spec per declared id -- it catches
+    the case where a spec runs and its result is nonetheless not here.
+    """
     results: list[CheckResult] = []
     for spec in for_phase(phase):
         try:
@@ -80,6 +99,28 @@ def _run_phase(repo: Repo, phase: str, ctx: RunContext) -> list[CheckResult]:
         result.nonce = ctx.nonce
         ctx.prior[result.check_id] = result
         results.append(result)
+
+    declared = phase_ids(phase)
+    produced = {r.check_id for r in results}
+    if produced.issuperset(declared):
+        return results
+    for cid in declared:
+        if cid in produced:
+            continue
+        lost = CheckResult.failed(
+            cid, phase, LOST_RESULT_REASON,
+            {"declared_in": "checks.PHASE_ORDER", "produced": sorted(produced)},
+        )
+        lost.repo = repo.name
+        lost.git_sha = repo.git_sha
+        lost.nonce = ctx.nonce
+        ctx.prior[cid] = lost
+        results.append(lost)
+    # Re-order to the phase's prescribed order, keeping anything the phase did
+    # not declare (there should be none) at the end rather than dropping it --
+    # dropping is the defect this whole change is about.
+    rank = {cid: i for i, cid in enumerate(declared)}
+    results.sort(key=lambda r: rank.get(r.check_id, len(rank)))
     return results
 
 
@@ -106,7 +147,11 @@ def cmd_check(args: argparse.Namespace) -> int:
     print(f"root={root}  network={'offline' if offline else 'online'}")
     print()
 
-    total = len(PHASE_ORDER[phase])
+    # The denominator is what the phase DECLARES, read live from PHASE_ORDER,
+    # not what the run produced. `11/11 PASS` for a twelve-check phase is the
+    # shape this whole change exists to stop printing.
+    declared_ids = phase_ids(phase)
+    total = len(declared_ids)
     agg: dict[str, int] = {}
     last_line = ""
 
@@ -123,7 +168,7 @@ def cmd_check(args: argparse.Namespace) -> int:
 
         print(f"--- resilient-{repo.name}  sha={repo.short_sha}  branch={repo.branch}"
               f"{'  DIRTY' if repo.is_dirty else ''}")
-        print(phase_table(results, PHASE_ORDER[phase]))
+        print(phase_table(results, declared_ids))
 
         counts: dict[str, int] = {}
         for r in results:
@@ -162,6 +207,23 @@ def cmd_check(args: argparse.Namespace) -> int:
         )
         print(f"run nonce: {run_nonce}")
         print(last_line)
+
+    # An incomplete run is not a green one, and this is checked BEFORE the
+    # status ladder because a run that lost a check has nothing trustworthy to
+    # say about the checks it kept. The denominator is PHASE_ORDER's; the
+    # numerator is what was actually aggregated. Before this, both came from
+    # the run, so they agreed by construction and the comparison was vacuous.
+    expected = total * len(repos)
+    observed = sum(agg.values())
+    if observed != expected:
+        print(
+            f"INCOMPLETE: {observed} result(s) for {expected} declared check(s) "
+            f"({total} in phase {phase!r} x {len(repos)} repo(s)). A phase that "
+            "cannot account for every check it declares has not measured the "
+            "phase, and this is a failure rather than a smaller pass.",
+            file=sys.stderr,
+        )
+        return 1
 
     # Exit codes exist so CI can gate on this. R9 is spec'd to fail the build,
     # so a FAIL must be non-zero; an incomplete run must not be green either.
