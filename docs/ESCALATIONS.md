@@ -206,3 +206,37 @@ defect: a gate that changes meaning without a diff. **Cannot be done from here**
 checking or changing eight other repos' workflows is eight writes into those
 repos. **Proposed**: each repo runs its own linter at its own pinned version and
 compares the finding count against what its CI comments claim.
+
+---
+
+## E-M08 — the v0.3.0 tag ships version strings that read 0.2.0
+
+**Measured by execution** on 2026-08-29 at mlkit `dfe2a10`:
+
+```
+git show v0.3.0:pyproject.toml | grep '^version'        -> version = "0.2.0"
+git show v0.3.0:src/resilient_mlkit/cli.py | grep __version__
+                                                        -> __version__ = "0.2.0"
+git rev-parse 'v0.3.0^{commit}'                         -> d08d85ed796c...
+```
+
+The tag `v0.3.0` was cut by the session lead at the PR #3 merge, but neither
+`pyproject.toml` nor `cli.__version__` was bumped on the branch it points at.
+Every artifact `mlkit portfolio` and `mlkit spine` generate from that tag — and
+from current `main` — stamps `"mlkit_version": "0.2.0"`, including the
+regenerated `portfolio/FLEET_VERDICTS.json` and `portfolio/SPINE_DRIFT.json`
+committed this round. The `mlkit_git_sha` field in the same artifacts is the
+reliable identity and is unaffected.
+
+**Cannot be done from here.** The tag is immutable and stays where it is.
+Bumping the strings on a working branch cannot make the tagged tree
+self-consistent, and choosing between the repairs — bump `main` to `0.3.0` and
+accept that the tag's own tree still says otherwise, or bump past it and cut a
+`v0.3.1` whose tree and tag agree — is a versioning decision for the release
+that the eight repos pin by, which is the session lead's to make (CLAUDE.md
+rule 12 reserves release decisions of record to the signatory's process).
+
+**Proposed**: bump `version` and `__version__` to `0.3.1` in one commit on
+`main` and cut `v0.3.1` from it, so the first tag whose tree and name agree is
+also the first one the repos re-pin to. Recorded in the CHANGELOG's `v0.3.0`
+entry so a reader of the tag finds the caveat next to the release notes.
