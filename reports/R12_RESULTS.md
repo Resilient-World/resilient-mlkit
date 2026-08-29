@@ -120,3 +120,70 @@ No adopter repo was edited. `resilient-triage` was read-only throughout —
 the phase runner writing finding lists into the repos it measures. No tag was
 cut. The adopters pin a tag after their own verifiers pass, and the session
 lead cuts it.
+
+## E-035-VERIFY — adversarial re-measurement of the E-035 repair
+
+Independent verification of the exemption repair on branch
+`fix/dead-controls-r12-and-unreachable-refusals`, run in a separate worktree
+with both scanners bound by `PYTHONPATH` and the binding printed before each
+run (the installed copy resolves to the main checkout, so the binding was
+proved rather than assumed).
+
+### What reproduced
+
+The deadness is real, and the repair's headline claim holds. Against the real
+`resilient-fray/src/registry/promotion_gate.py`:
+
+| scanner | bare file | `+ from resilient_mlkit.core.served import challenger_decision` |
+|---|---|---|
+| `origin/main` (3ee865a) | 4 findings | **0** |
+| the repair (f4831f8) | 4 findings | 4 |
+
+Fleet-wide the repair moves nothing: 3379 files across the 14 `resilient-*`
+checkouts, findings identical row-for-row (arabica 4, backend 6, blackout 2,
+choco 2, chokepoint 5, fray 4, frontend 0, mentra 0, mlkit 0, provenance 0,
+surge 0, torrent 0, transect 0, triage 2).
+
+### What did not — two surviving routes, both closed here
+
+E-035's own mutation still worked, on the same file, at check level.
+
+| construction (on `promotion_gate.py`) | f4831f8 | after this commit |
+|---|---|---|
+| baseline, no evasion | 4 findings / R12 FAIL | 4 findings / R12 FAIL |
+| `+1` line `import resilient_mlkit.core.served`, where the file already reads `resilient_mlkit` for an unrelated reason | **0 findings / R12 PASS** | 4 findings / R12 FAIL |
+| import the contract, rebind `challenger_decision` to a local gate, then call it | **0 findings / R12 PASS** | 5 findings / R12 FAIL |
+
+The dotted spelling binds the root package, and the exemption asked only
+whether the root was read; the shadow case produced a `Load` of the contract's
+name that resolved to the file's own gate. The branch's own rebind control did
+not see the second because it never called the rebinding.
+
+### Controls and mutation
+
+Three FIRES controls and three SILENT halves were added. Reverting `_uses` to
+the branch's first cut while keeping the tests: **3 failed, 41 passed** —
+exactly the FIRES halves. Restored: 44 passed.
+
+Adoption is not broken. Seven spellings of a real use stay silent, each
+measured on the same fray file: `from X import f; f(...)`;
+`from pkg.core import served; served.f(...)`; `import pkg.core.served` with the
+full chain; `import pkg.core.served as s; s.f(...)`; the contract type as a
+base class; as an annotation; in an `except` clause. The repo-local adapter
+route stays silent through the dotted spelling too.
+
+### Still open, and stated rather than closed
+
+A bare read (`challenger_decision` on a line of its own, or
+`_ = challenger_decision`) and a reference to a binding inside `if False:`
+remain silent. Both were measured, both are defects, and neither is separable
+from a real use by an AST walk that does not evaluate the module.
+
+### Not re-measured
+
+No model figure in any repo was re-run: this branch changes an `ast` walk and
+nothing that produces one, and the compute authorisation was repairs-only (no
+fits, no sweeps, no test-arm reads). Separately, the fleet figures recorded
+above at mlkit `14b2e6c` (fray 22, torrent 7, chokepoint 30, triage 14) do not
+reproduce against today's scanner (4, 0, 5, 2) — that divergence is present on
+`origin/main` and predates both this branch and this verification.

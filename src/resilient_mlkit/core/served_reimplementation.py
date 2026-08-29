@@ -76,6 +76,34 @@ so ``from adapter import challenger_decision`` genuinely resolves to the
 contract — but the file CARRYING a clause must still reference what it took
 from that adapter.
 
+WHAT "REFERENCES THAT NAME" HAD TO BE TIGHTENED TO (E-035-VERIFY)
+-----------------------------------------------------------------
+The first cut of the repair above closed E-035 for the ``from X import f``
+spelling only, and adversarial re-measurement against the SAME fray file found
+two ways through it. Both were forced end to end — ``scan_source``,
+``scan_repo`` and ``r12_served_contract`` — before this paragraph was written:
+
+* **The dotted spelling.** ``import resilient_mlkit.core.served`` binds the
+  ROOT name ``resilient_mlkit``, and the exemption asked only whether that root
+  was read. Fleet code reads it constantly for unrelated reasons — e.g.
+  ``resilient_mlkit.core.result.CheckResult`` — so the unrelated read paid for
+  the unused import and E-035's one-line mutation survived intact: fray's
+  ``promotion_gate.py`` again went 4 findings -> 0, R12 FAIL -> PASS. A dotted
+  import is now a PREFIX requirement: the referenced chain must reach the
+  contract itself, not merely its root package.
+* **Shadow-and-call.** Excluding ``Store`` nodes from the reference set was not
+  enough. A file that imports ``challenger_decision``, rebinds it to a local
+  gate, and then CALLS the rebinding still produces a ``Load`` of the name, so
+  it earned the exemption — a local implementation wearing the contract's name,
+  silent. A name that this file also binds itself no longer earns the
+  exemption; see :func:`_rebound_names`.
+
+Both are held as FIRES/SILENT pairs in
+``tests/test_served_reimplementation.py`` (``test_a_dotted_import_*``,
+``test_shadowing_*``). Reverting :func:`_uses` to the first cut fails exactly
+the FIRES halves. Neither closure moves a finding: both scanners walk all 14
+``resilient-*`` checkouts, 3379 files, and produce identical rows file-for-file.
+
 WHAT A GREEN R12 DOES NOT CLAIM
 -------------------------------
 That the repo's serving path is correct. R12 is an ``ast`` walk: it can see
@@ -87,6 +115,21 @@ referenced", which is strictly higher than "the contract is imported" and
 strictly lower than "the contract decides". That gap is stated rather than
 papered over; closing it needs the repo's own served-report reproduction, which
 is the adopter's verifier, not this check.
+
+Concretely, and measured rather than supposed: these three remain SILENT and
+are defects, on the real fray file —
+
+    from resilient_mlkit.core.served import challenger_decision
+    challenger_decision            # a bare read, or `_ = challenger_decision`
+
+    if False:
+        from resilient_mlkit.core.served import challenger_decision
+    challenger_decision(block)     # a reference to a binding never executed
+
+An ``ast`` walk cannot separate those from a real use without evaluating the
+module, and a rule that guessed would fire on adopters. The evasion cost is now
+a deliberate lie in the source rather than a tidy import line, which is the
+most this check can honestly buy.
 
 Nor does it claim to catch a re-implementation written in a language this does
 not parse, or one loaded at runtime from a string. Both are outside an AST.
@@ -366,33 +409,61 @@ def _is_contract_module(name: str) -> bool:
     return name == CONTRACT_MODULE or name.startswith(CONTRACT_MODULE + ".")
 
 
-def _bindings_from(tree: ast.AST, is_source: Callable[[str], bool]) -> set[str]:
-    """Local names this file binds from any module ``is_source`` accepts.
+def _bindings_from(
+    tree: ast.AST, is_source: Callable[[str], bool]
+) -> tuple[set[str], set[str]]:
+    """What a USE of this file's imports would have to look like.
 
-    The name that lands in the module namespace, not the dotted path it came
-    from, because that name is what a use would reference:
+    Returns ``(names, prefixes)``.
+
+    ``names`` are bindings that land in the module namespace as a bare name, so
+    a use is a ``Load`` of that name:
 
     * ``from X import f``            binds ``f``
     * ``from X import f as g``       binds ``g``
     * ``from pkg import X``          binds ``X``     (module-object import)
     * ``import X.Y.Z as c``          binds ``c``
-    * ``import X.Y.Z``               binds ``X`` — the only spelling whose use
-      is a dotted attribute chain, whose root Name is the first segment.
+
+    ``prefixes`` are the one spelling whose binding is NOT what a use
+    references. ``import X.Y.Z`` binds the root ``X``, but a use is the whole
+    dotted chain ``X.Y.Z...``. Treating the root as the requirement was the
+    E-035 hole this repair closed only halfway: it made ANY read of ``X`` --
+    ``resilient_mlkit.core.result.CheckResult``, say, which fleet code has for
+    reasons unrelated to serving -- pay for an unused
+    ``import resilient_mlkit.core.served``, so the one-line evasion survived
+    intact for that spelling. Verified by measurement on
+    resilient-fray's ``src/registry/promotion_gate.py``: 4 findings -> 0.
     """
     names: set[str] = set()
+    prefixes: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if not is_source(alias.name):
                     continue
-                names.add(alias.asname or alias.name.split(".")[0])
+                if alias.asname:
+                    names.add(alias.asname)
+                else:
+                    prefixes.add(alias.name)
         elif isinstance(node, ast.ImportFrom):
             base = node.module or ""
             for alias in node.names:
                 full = f"{base}.{alias.name}" if base else alias.name
                 if is_source(base) or is_source(full):
                     names.add(alias.asname or alias.name)
-    return names
+    return names, prefixes
+
+
+def _dotted(node: ast.AST) -> str | None:
+    """``a.b.c`` for an attribute chain rooted at a plain name; None otherwise."""
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if not isinstance(node, ast.Name):
+        return None
+    parts.append(node.id)
+    return ".".join(reversed(parts))
 
 
 def _referenced_names(tree: ast.AST) -> set[str]:
@@ -412,14 +483,74 @@ def _referenced_names(tree: ast.AST) -> set[str]:
     }
 
 
+def _referenced_chains(tree: ast.AST) -> set[str]:
+    """Every dotted chain this file READS, e.g. ``pkg.core.served.decide``."""
+    chains: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Load):
+            dotted = _dotted(node)
+            if dotted:
+                chains.add(dotted)
+    return chains
+
+
+def _rebound_names(tree: ast.AST) -> set[str]:
+    """Names this file BINDS to something of its own.
+
+    Excluding the import statements themselves, which are the binding under
+    test. A name that is imported from the contract and then assigned, defined,
+    or deleted is a local definition wearing the contract's name; references to
+    it after that point resolve to the local thing, so they are not evidence
+    the contract is load-bearing. ``_referenced_names`` skipping ``Store``
+    nodes was never enough on its own: the file that shadows AND THEN CALLS the
+    shadowed name still had a ``Load``, and so still earned the exemption.
+    """
+    rebound: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            rebound.add(node.id)
+            continue
+        # def / async def / class / `except E as name` all bind through `.name`.
+        name = getattr(node, "name", None)
+        if isinstance(
+            node,
+            (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.ExceptHandler),
+        ) and isinstance(name, str):
+            rebound.add(name)
+    return rebound
+
+
+def _uses(tree: ast.AST, is_source: Callable[[str], bool]) -> bool:
+    """True when this file binds a name from an accepted module AND uses it."""
+    names, prefixes = _bindings_from(tree, is_source)
+    if not names and not prefixes:
+        return False
+    rebound = _rebound_names(tree)
+    if (names - rebound) & _referenced_names(tree):
+        return True
+    if not prefixes:
+        return False
+    # The rebind rule above is deliberately NOT applied to a dotted prefix. Its
+    # root is a package name, and a module inside package ``serve`` defining
+    # ``def serve(...)`` is a name collision, not an evasion; meanwhile the
+    # requirement a prefix imposes is already the strong one — the whole chain
+    # down to the contract has to be read — so there is nothing for a shadow to
+    # buy. Excluding rebound roots here fired on the repo-local adapter route
+    # instead, which is the trade the module docstring forbids.
+    chains = _referenced_chains(tree)
+    return any(
+        any(chain == prefix or chain.startswith(prefix + ".") for chain in chains)
+        for prefix in prefixes
+    )
+
+
 def _uses_contract(tree: ast.AST) -> bool:
     """True when this file binds a contract name AND references it.
 
     The exemption predicate. See the module docstring's E-035 note for why this
     is not ``_imports_contract``.
     """
-    bound = _bindings_from(tree, _is_contract_module)
-    return bool(bound & _referenced_names(tree))
+    return _uses(tree, _is_contract_module)
 
 
 def _uses_route(tree: ast.AST, importers: set[str]) -> bool:
@@ -427,8 +558,7 @@ def _uses_route(tree: ast.AST, importers: set[str]) -> bool:
     AND references it. The one permitted level of indirection."""
     if not importers:
         return False
-    bound = _bindings_from(tree, lambda name: name in importers)
-    return bool(bound & _referenced_names(tree))
+    return _uses(tree, lambda name: name in importers)
 
 
 def _module_aliases(path: Path, root: Path) -> set[str]:
