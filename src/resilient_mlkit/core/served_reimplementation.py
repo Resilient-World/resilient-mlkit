@@ -44,22 +44,47 @@ a clause locally is a file that can disagree with the contract about it.
     legitimately want a thin typed wrapper — but only over the imported
     contract, which is exactly what the exemption below tests.
 
-THE EXEMPTION, AND WHY IT IS TWO LEVELS
----------------------------------------
-A file is silent if it imports ``resilient_mlkit.core.served``, **or** if it
-imports a module in the same repo that does. One level of indirection, matching
-the precedent R11 already set for taint propagation through module-local
-helpers: a repo that adopts the contract will put it behind one thin adapter,
-and a check that fired on the adapter's callers would make adoption impossible.
-Erring toward silence is the right error here — a check that fires on repos
-that have done the work gets disabled, and a disabled check measures nothing.
+THE EXEMPTION: A USE, NOT AN IMPORT
+------------------------------------
+A file is silent when it BINDS a name from ``resilient_mlkit.core.served`` —
+directly, or through one module in the same repo that does — **and then
+references that name somewhere other than the import line**. A call, an
+attribute access, a base class, a decorator, an annotation: anything that makes
+the contract load-bearing. An import nobody uses exempts nothing.
+
+That last sentence is the repair, and it is here because the check used to fail
+it. The exemption was ``_imports_contract`` alone, and resilient-fray PROVED by
+measurement what that bought: adding ONE line to
+``src/registry/promotion_gate.py`` —
+
+    from resilient_mlkit.core.served import challenger_decision  # noqa: F401
+
+— took the file's findings from 4 to 0 without changing a single decision it
+makes. fray refused to take R12 green that way and recorded it as ``E-035``.
+A check that a dead import can silence rewards the one thing it exists to
+forbid, so the exemption now asks the question it always meant to ask. The same
+mutation is reproduced as a control in ``tests/test_served_reimplementation.py``
+(``test_an_unused_import_does_not_exempt_*``); reverting this to the import test
+fails those and nothing else.
+
+One level of indirection is still honoured, matching the precedent R11 set for
+taint propagation through module-local helpers: a repo that adopts the contract
+will put it behind one thin adapter, and a check that fired on the adapter's
+callers would make adoption impossible. The route is still established by
+import — a module that imports the contract genuinely re-exports its symbols,
+so ``from adapter import challenger_decision`` genuinely resolves to the
+contract — but the file CARRYING a clause must still reference what it took
+from that adapter.
 
 WHAT A GREEN R12 DOES NOT CLAIM
 -------------------------------
 That the repo's serving path is correct. R12 is an ``ast`` walk: it can see
-that a file routes through the contract, never that it routes through it
-*correctly*. A file that imports ``core.served`` and then ignores the decision
-it returns is silent here and is a defect. That gap is stated rather than
+that a file references the contract, never that it routes through it
+*correctly*. A file that calls ``challenger_decision`` and then throws the
+verdict away is silent here and is a defect; so is one that references the name
+only to satisfy this check. The bar this check sets is "the contract is
+referenced", which is strictly higher than "the contract is imported" and
+strictly lower than "the contract decides". That gap is stated rather than
 papered over; closing it needs the repo's own served-report reproduction, which
 is the adopter's verifier, not this check.
 
@@ -71,7 +96,7 @@ from __future__ import annotations
 
 import ast
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -324,11 +349,86 @@ def _imports_contract(imported: set[str]) -> bool:
     ``import resilient_mlkit`` does NOT count: it reaches the package, not the
     contract, and counting it would let any repo silence this check with one
     unrelated import.
+
+    Importing is necessary for the exemption and NOT sufficient for it. This
+    predicate answers only "can this module see the contract", which is the
+    right question for :func:`contract_importers` — a module that imports a
+    symbol re-exports it, so it is a genuine route whether or not it uses it
+    itself. Whether a file is EXEMPT is :func:`_uses_contract`.
     """
     return any(
         name == CONTRACT_MODULE or name.startswith(CONTRACT_MODULE + ".")
         for name in imported
     )
+
+
+def _is_contract_module(name: str) -> bool:
+    return name == CONTRACT_MODULE or name.startswith(CONTRACT_MODULE + ".")
+
+
+def _bindings_from(tree: ast.AST, is_source: Callable[[str], bool]) -> set[str]:
+    """Local names this file binds from any module ``is_source`` accepts.
+
+    The name that lands in the module namespace, not the dotted path it came
+    from, because that name is what a use would reference:
+
+    * ``from X import f``            binds ``f``
+    * ``from X import f as g``       binds ``g``
+    * ``from pkg import X``          binds ``X``     (module-object import)
+    * ``import X.Y.Z as c``          binds ``c``
+    * ``import X.Y.Z``               binds ``X`` — the only spelling whose use
+      is a dotted attribute chain, whose root Name is the first segment.
+    """
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if not is_source(alias.name):
+                    continue
+                names.add(alias.asname or alias.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            for alias in node.names:
+                full = f"{base}.{alias.name}" if base else alias.name
+                if is_source(base) or is_source(full):
+                    names.add(alias.asname or alias.name)
+    return names
+
+
+def _referenced_names(tree: ast.AST) -> set[str]:
+    """Every name this file READS.
+
+    ``ast.Name`` in a ``Load`` context covers every shape that makes a binding
+    load-bearing, because Python spells all of them the same way at the root: a
+    call (``f(...)``), an attribute chain (``served.ServeArms`` — the chain's
+    root is a ``Name``), a base class, a decorator, a default, an annotation, a
+    re-assignment's right-hand side. A ``Store`` is excluded on purpose: a file
+    that rebinds the imported name is shadowing the contract, not using it.
+    """
+    return {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+    }
+
+
+def _uses_contract(tree: ast.AST) -> bool:
+    """True when this file binds a contract name AND references it.
+
+    The exemption predicate. See the module docstring's E-035 note for why this
+    is not ``_imports_contract``.
+    """
+    bound = _bindings_from(tree, _is_contract_module)
+    return bool(bound & _referenced_names(tree))
+
+
+def _uses_route(tree: ast.AST, importers: set[str]) -> bool:
+    """True when this file binds a name from a repo-local contract importer
+    AND references it. The one permitted level of indirection."""
+    if not importers:
+        return False
+    bound = _bindings_from(tree, lambda name: name in importers)
+    return bool(bound & _referenced_names(tree))
 
 
 def _module_aliases(path: Path, root: Path) -> set[str]:
@@ -744,7 +844,7 @@ def scan_source(source: str, display: str) -> list[Finding]:
         tree = ast.parse(source)
     except SyntaxError:
         return []
-    if _imports_contract(_imported_modules(tree)):
+    if _uses_contract(tree):
         return []
     return _ModuleScanner(display, tree).scan()
 
@@ -767,9 +867,12 @@ def scan_tree(
 ) -> tuple[list[Finding], int]:
     """Two-pass scan of a tree. Returns ``(findings, files_walked)``.
 
-    Pass one collects the modules that import the contract; pass two reports
-    every file that carries a clause and reaches the contract through neither
-    a direct import nor one of those modules.
+    Pass one collects the modules that import the contract — importing is what
+    makes a module a genuine re-export route, so that pass stays on
+    :func:`_imports_contract`. Pass two reports every file that carries a clause
+    and does not USE a name it took from the contract or from one of those
+    modules. The difference between the two passes is the E-035 repair: a route
+    is established by import, an exemption is earned by a reference.
     """
     root = Path(root)
     files = list(paths) if paths is not None else list(iter_repo_python_files(root))
@@ -781,11 +884,10 @@ def scan_tree(
         tree = _parse(path)
         if tree is None:
             continue
-        imported = _imported_modules(tree)
-        if _imports_contract(imported):
+        if _uses_contract(tree):
             continue
-        if importers & imported:
-            # Routes through a repo-local module that imports the contract.
+        if _uses_route(tree, importers):
+            # Uses a name taken from a repo-local module that imports the contract.
             continue
         display = str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
         findings.extend(_ModuleScanner(display, tree).scan())

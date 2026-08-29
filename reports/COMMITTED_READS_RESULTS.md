@@ -239,3 +239,73 @@ reader that refuses everything.
 — identical to the values recorded before the change. `git diff main..HEAD` over
 `portfolio/`, `src/resilient_mlkit/checks/`, `docs/allowlist.yaml` and
 `tests/test_version_declaration.py` is empty. No tag; `__version__` 0.5.0.
+
+## CR-7 — the two guards with no producer now have one
+
+A later pass was asked to decide, per refusal, between wiring a production path
+that can reach it and deleting it. Both were WIRED. Neither was deleted.
+
+### Reproducing the deadness first
+
+Measured on this branch before changing anything, with the scanner bound by
+`PYTHONPATH` and the binding printed. A stored results file is a real input to
+`mlkit check --portfolio`, so both guards were fed one carrying
+`evidence={"allow_dirty_read": true}`:
+
+| input | `CheckResult.__post_init__` | `portfolio.resolve()` |
+|---|---|---|
+| stored PASS + marker | **REFUSED** `UncommittedRead` | — |
+| stored FAIL + marker | passes (by design; only PASS is guarded) | **REFUSED** `UncommittedRead` |
+
+So neither guard was broken. Both fire the moment the state is presented. What
+did not exist was anything shipped that could present it: `checks/` imported no
+artifact reader, and `mlkit check` had no `--allow-dirty` flag to read one with.
+The guards were correct code behind an unreachable door.
+
+### What the missing producer turned out to be
+
+`checks/selection.py::_load` read `docs/selection.yaml` with
+`Path.read_text()`, and S1–S4 emitted PASS from the working tree. That is the
+E-M12 shape — a verdict quoting bytes in nobody's git history — sitting in the
+check pipeline of the tool written to refuse it, and it is why `core.artifact`
+had no caller there to mark anything. Deleting the guards would have deleted the
+only thing that would have caught it.
+
+Wired instead: `_load` reads through `core.artifact.load`, `RunContext` carries
+`allow_dirty` from a new `mlkit check --allow-dirty`, `core.artifact._parse`
+learned YAML, and every S1–S4 exit carries the marker into evidence through one
+`_evidence()` helper. Three arms, all three measured end to end through the real
+CLI on a repo whose committed register was edited in place:
+
+| register | flag | S1 | guard |
+|---|---|---|---|
+| committed, clean | — | PASS | silent |
+| committed, clean | `--allow-dirty` | PASS, unmarked | silent |
+| edited, uncommitted | — | NA naming the file | n/a — never read for a verdict |
+| edited, uncommitted | `--allow-dirty` | **FAIL** `REFUSED (--allow-dirty)` | `result.py`'s |
+| edited, uncommitted, failing | `--allow-dirty` | FAIL, marked → stored → `--portfolio` | **`resolve()`'s** |
+
+`_run_phase` now catches `UncommittedRead` explicitly. It was being buried by the
+generic handler as "check raised an unhandled exception" over four frames of
+traceback, which sends an operator looking for a bug in mlkit instead of
+committing their register. Still a FAIL; a refusal is not a pass.
+
+### Blast radius, measured rather than assumed
+
+`docs/selection.yaml` exists in exactly one of the fourteen `resilient-*`
+checkouts (blackout), where it is tracked and clean — so its S1–S4 behaviour is
+unchanged, and everywhere else `_load` already returned NA for an absent file.
+
+### Controls
+
+Five added (`CR7`), each mutation-proven. Disabling both refusals fails exactly
+four tests — the two CR-4 pairs that build evidence by hand and the two CR-7
+pairs that reach it through the shipped check — and nothing else. Separately,
+reverting `checks/selection.py` to its working-tree read fails four: the
+reachability control and the three that depend on a producer existing.
+
+The control that used to assert **no** `checks/` module imports `core.artifact`
+is gone. It asserted the deadness, and a control that asserts a guard is
+unreachable protects the unreachability. Its replacement,
+`test_CR7_the_two_check_pipeline_guards_have_a_producer`, asserts the inverse
+and names which guard goes dead if the producer is removed.

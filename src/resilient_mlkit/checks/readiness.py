@@ -776,10 +776,18 @@ def r12_served_contract(repo: Repo, ctx: RunContext) -> CheckResult:
     a check that trusts the declared-tree list cannot see a definition that
     lives outside it.
 
-    The exemption is an import, not a name. A file that imports the contract —
-    or imports a module in the same repo that does — is silent whatever shapes
-    it carries, so adopting the contract is what clears this check, and a repo
-    that wants a thin typed wrapper over ``ServedModel`` may keep one.
+    The exemption is a USE, not a name and not an import. A file that binds a
+    name from the contract — directly, or through one module in the same repo
+    that does — AND references that name is silent whatever shapes it carries,
+    so adopting the contract is what clears this check, and a repo that wants a
+    thin typed wrapper over ``ServedModel`` may keep one.
+
+    That it is a use rather than an import is the E-035 repair. The exemption
+    used to be the import statement alone, and resilient-fray measured what
+    that bought: one unused ``from resilient_mlkit.core.served import ...``
+    line took ``src/registry/promotion_gate.py`` from 4 findings to 0 without
+    changing a decision it makes. See
+    ``core/served_reimplementation.py``'s "THE EXEMPTION" section.
     """
     findings, files = served_reimplementation.scan_repo(repo.path)
 
@@ -825,7 +833,7 @@ def r12_served_contract(repo: Repo, ctx: RunContext) -> CheckResult:
             "R12", PHASE,
             f"{len(findings)} local implementation(s) of the served-model contract "
             f"across {len(touched)} file(s) ({len(reimplemented)} decide a contract "
-            f"clause rather than merely shaping one), none importing "
+            f"clause rather than merely shaping one), none using "
             f"{served_reimplementation.CONTRACT_MODULE}: {detail}"
             + (f"; +{more} more in {R12_REPORT_RELPATH}" if more > 0 else ""),
             evidence,
@@ -860,9 +868,11 @@ def _write_r12_report(
         "marks a serving type defined locally without the contract behind it — the",
         "shape of a second definition rather than a decision it makes.",
         "",
-        "A file that imports the contract, or imports a module in this repo that",
-        "does, produces no row here whatever shapes it carries. Adoption is what",
-        "clears this check; renaming is not.",
+        "A file that USES a name it took from the contract — directly, or through",
+        "one module in this repo that imports it — produces no row here whatever",
+        "shapes it carries. An import nobody references exempts nothing (E-035).",
+        "Adoption is what clears this check; renaming is not, and neither is a",
+        "dead import line.",
         "",
         "| severity | clause | file | symbol | why it matters |",
         "|---|---|---|---|---|",

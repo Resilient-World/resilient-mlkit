@@ -23,7 +23,13 @@ from .checks import PHASES, RunContext, for_phase, phase_ids
 from .core import nonce as nonce_mod
 from .core import policy, store
 from .core.repo import PORTFOLIO, Repo, discover, find_root
-from .core.result import CheckResult, CredentialRequired, Status
+from .core.result import (
+    ALLOW_DIRTY_KEY,
+    CheckResult,
+    CredentialRequired,
+    Status,
+    UncommittedRead,
+)
 from .core.table import phase_table
 from .portfolio import READY, render_portfolio, resolve
 from .portfolio import exit_code as portfolio_exit_code
@@ -88,6 +94,19 @@ def _run_phase(repo: Repo, phase: str, ctx: RunContext) -> list[CheckResult]:
             # letting the generic handler bury it as a crash.
             result = CheckResult.deferred(
                 spec.check_id, phase, exc.credential, exc.detail, exc.evidence
+            )
+        except UncommittedRead as exc:
+            # The check measured something and then REFUSED to call it a pass,
+            # because what it measured is not in git. That is the guard working,
+            # not the check breaking, and the generic handler below would print
+            # it as "check raised an unhandled exception" over four frames of
+            # traceback -- an operator reading that goes looking for a bug in
+            # mlkit instead of committing their register. Still a FAIL: a
+            # refusal is not a pass, and the run must stay red.
+            result = CheckResult.failed(
+                spec.check_id, phase,
+                f"REFUSED (--allow-dirty): {exc}",
+                {ALLOW_DIRTY_KEY: True},
             )
         except Exception:  # noqa: BLE001 - a crashing check is a failing check
             result = CheckResult.failed(
@@ -165,7 +184,13 @@ def cmd_check(args: argparse.Namespace) -> int:
     last_line = ""
 
     for repo in repos:
-        ctx = RunContext(nonce=run_nonce, root=root, offline=offline, timeout=args.timeout)
+        ctx = RunContext(
+            nonce=run_nonce,
+            root=root,
+            offline=offline,
+            timeout=args.timeout,
+            allow_dirty=bool(getattr(args, "allow_dirty", False)),
+        )
         try:
             results = _run_phase(repo, phase, ctx)
         finally:
@@ -883,6 +908,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_check.add_argument(
         "--offline", action="store_true", default=None,
         help="assert no network; skips reachability probing",
+    )
+    p_check.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help=(
+            "DIAGNOSIS ONLY: let a check read a repo artifact from the working "
+            "tree instead of from HEAD. Every result descending from such a read "
+            "is marked, a marked PASS is REFUSED where it is constructed, and a "
+            "marked result of any other status is REFUSED by --portfolio. The "
+            "flag buys a diagnosis and cannot buy a verdict"
+        ),
     )
     p_check.set_defaults(func=cmd_check)
 

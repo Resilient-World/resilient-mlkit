@@ -15,13 +15,11 @@ from __future__ import annotations
 
 import urllib.error
 import urllib.request
-from pathlib import Path
 from typing import Any
 
-import yaml
-
+from ..core import artifact
 from ..core.repo import Repo
-from ..core.result import CheckResult
+from ..core.result import ALLOW_DIRTY_KEY, CheckResult
 from . import RunContext, check
 
 PHASE = "selection"
@@ -55,49 +53,114 @@ REQUIRED_SOURCE_FIELDS = (
 )
 
 
-def _load(repo: Repo) -> tuple[dict[str, Any] | None, str]:
-    path: Path = repo.path / SELECTION_RELPATH
-    if not path.is_file():
-        return None, f"{SELECTION_RELPATH} does not exist"
-    try:
-        data = yaml.safe_load(path.read_text()) or {}
-    except yaml.YAMLError as exc:
-        return None, f"{SELECTION_RELPATH} is malformed YAML: {exc}"
+def _load(repo: Repo, ctx: RunContext) -> tuple[dict[str, Any] | None, str, bool]:
+    """The register, READ FROM COMMITTED STATE. Returns (data, error, marked).
+
+    This used to be ``(repo.path / SELECTION_RELPATH).read_text()``: S1-S4
+    parsed the working tree and emitted PASS from it, with no committed-read
+    discipline of any kind. That is precisely the shape ``docs/ESCALATIONS.md``
+    E-M12 records -- a verdict quoting bytes that are in nobody's git history,
+    so the reader it is quoted to cannot fetch what it passed on -- and
+    ``core.artifact`` exists to prevent it. The check pipeline simply never
+    used it: nothing under ``checks/`` imported the module, which is why
+    ``CheckResult.__post_init__``'s marked-PASS refusal and
+    ``portfolio.resolve()``'s had no producer and could not fire.
+
+    The third element is that producer. It is True when the register was read
+    through the ``--allow-dirty`` escape hatch, and every result built from it
+    must carry it into ``evidence`` under ``ALLOW_DIRTY_KEY`` -- see
+    :func:`_evidence`. Without the flag an uncommitted register is an NA naming
+    the file, which is the ``core.artifact`` contract and not a new judgement.
+    """
+    ref = artifact.load(repo, SELECTION_RELPATH, allow_dirty=ctx.allow_dirty)
+    marked = ref.allow_dirty_read
+    if ref.error:
+        # The reader's diagnosis is kept verbatim, and the two cases a reader of
+        # this phase acts on differently are named in this phase's own words in
+        # front of it. "Nobody has written a register" and "the register does
+        # not parse" send an operator to different places, and a reason that
+        # made them read alike would cost that.
+        if ref.path is None:
+            return None, f"{SELECTION_RELPATH} does not exist — {ref.error}", marked
+        if ref.document is None and _is_parse_failure(ref.error):
+            return (
+                None,
+                f"{SELECTION_RELPATH} is malformed YAML: {ref.error}",
+                marked,
+            )
+        return None, ref.error, marked
+    data = ref.document
+    if data is None:
+        data = {}
     if not isinstance(data, dict):
-        return None, f"{SELECTION_RELPATH} top level is not a mapping"
-    return data, ""
+        return None, f"{SELECTION_RELPATH} top level is not a mapping", marked
+    return data, "", marked
+
+
+#: ``core.artifact`` reports a parse failure as ``"<ExceptionType>: <message>"``
+#: and a committed-read refusal with its own NOT_COMMITTED prefix. Distinguishing
+#: them on the PyYAML exception names is narrower than matching on the absence of
+#: the prefix: a reason this phase relabels as "malformed YAML" must actually be
+#: a YAML parse failure, not the next error class the reader learns to report.
+_YAML_ERRORS = ("ParserError", "ScannerError", "ComposerError", "ConstructorError",
+                "ReaderError", "YAMLError", "UnicodeDecodeError")
+
+
+def _is_parse_failure(error: str) -> bool:
+    return error.split(":", 1)[0].strip() in _YAML_ERRORS
+
+
+def _evidence(evidence: dict[str, Any], marked: bool) -> dict[str, Any]:
+    """Carry the allow-dirty marker into a result's evidence.
+
+    One function rather than a line at each call site, because the marker's
+    whole value is that it cannot be dropped on one path out of four. A PASS
+    carrying it is refused by ``CheckResult.__post_init__``; a FAIL or NA
+    carrying it renders, is stored, and is refused by ``portfolio.resolve()``
+    when a terminal state is asked for. Neither refusal is reachable if this
+    function is not called.
+    """
+    if marked:
+        evidence = {**evidence, ALLOW_DIRTY_KEY: True}
+    return evidence
 
 
 @check("S1", PHASE, "TASK_SPEC — the task is pinned down before candidates are compared")
 def s1_task_spec(repo: Repo, ctx: RunContext) -> CheckResult:
-    data, err = _load(repo)
+    data, err, marked = _load(repo, ctx)
     if err:
-        return CheckResult.na("S1", PHASE, err)
+        return CheckResult.na("S1", PHASE, err, _evidence({}, marked))
     assert data is not None
 
     spec = data.get("task_spec") or {}
     if not isinstance(spec, dict) or not spec:
-        return CheckResult.failed("S1", PHASE, "task_spec is absent or empty")
+        return CheckResult.failed(
+            "S1", PHASE, "task_spec is absent or empty", _evidence({}, marked)
+        )
 
     missing = [f for f in REQUIRED_TASK_SPEC if not str(spec.get(f) or "").strip()]
     if missing:
         return CheckResult.failed(
             "S1", PHASE, "task_spec missing: " + ", ".join(missing),
-            {"present": sorted(k for k in spec if spec.get(k))},
+            _evidence({"present": sorted(k for k in spec if spec.get(k))}, marked),
         )
-    return CheckResult.passed("S1", PHASE, {"fields": len(REQUIRED_TASK_SPEC)})
+    return CheckResult.passed(
+        "S1", PHASE, _evidence({"fields": len(REQUIRED_TASK_SPEC)}, marked)
+    )
 
 
 @check("S2", PHASE, "CANDIDATE_REGISTER — three mandatory tiers, each licence-identified")
 def s2_candidate_register(repo: Repo, ctx: RunContext) -> CheckResult:
-    data, err = _load(repo)
+    data, err, marked = _load(repo, ctx)
     if err:
-        return CheckResult.na("S2", PHASE, err)
+        return CheckResult.na("S2", PHASE, err, _evidence({}, marked))
     assert data is not None
 
     candidates = data.get("candidates") or []
     if not candidates:
-        return CheckResult.failed("S2", PHASE, "candidate register is empty")
+        return CheckResult.failed(
+            "S2", PHASE, "candidate register is empty", _evidence({}, marked)
+        )
 
     tiers: dict[int, list[str]] = {}
     unlicensed: list[str] = []
@@ -113,12 +176,15 @@ def s2_candidate_register(repo: Repo, ctx: RunContext) -> CheckResult:
         if not str(cand.get("licence_url") or "").startswith(("http://", "https://")):
             unlicensed.append(cid)
 
-    evidence = {
-        "n_candidates": len(candidates),
-        "tier_0": len(tiers.get(0, [])),
-        "tier_1": len(tiers.get(1, [])),
-        "tier_2": len(tiers.get(2, [])),
-    }
+    evidence = _evidence(
+        {
+            "n_candidates": len(candidates),
+            "tier_0": len(tiers.get(0, [])),
+            "tier_1": len(tiers.get(1, [])),
+            "tier_2": len(tiers.get(2, [])),
+        },
+        marked,
+    )
 
     shortfalls = []
     if evidence["tier_0"] < 1:
@@ -144,13 +210,14 @@ def s2_candidate_register(repo: Repo, ctx: RunContext) -> CheckResult:
 
 @check("S3", PHASE, "EVIDENCE_RESOLVABLE — every cited URL actually resolves")
 def s3_evidence_resolvable(repo: Repo, ctx: RunContext) -> CheckResult:
-    data, err = _load(repo)
+    data, err, marked = _load(repo, ctx)
     if err:
-        return CheckResult.na("S3", PHASE, err)
+        return CheckResult.na("S3", PHASE, err, _evidence({}, marked))
     assert data is not None
     if ctx.offline:
         return CheckResult.na(
-            "S3", PHASE, "no network available; URL resolution cannot be measured"
+            "S3", PHASE, "no network available; URL resolution cannot be measured",
+            _evidence({}, marked),
         )
 
     urls: list[str] = []
@@ -167,7 +234,9 @@ def s3_evidence_resolvable(repo: Repo, ctx: RunContext) -> CheckResult:
 
     urls = sorted({u for u in urls if u.startswith(("http://", "https://"))})
     if not urls:
-        return CheckResult.na("S3", PHASE, "no citable URLs in the register")
+        return CheckResult.na(
+            "S3", PHASE, "no citable URLs in the register", _evidence({}, marked)
+        )
 
     unresolved: dict[str, str] = {}
     for url in urls:
@@ -175,7 +244,9 @@ def s3_evidence_resolvable(repo: Repo, ctx: RunContext) -> CheckResult:
         if code != 200:
             unresolved[url] = detail
 
-    evidence = {"total": len(urls), "resolved": len(urls) - len(unresolved)}
+    evidence = _evidence(
+        {"total": len(urls), "resolved": len(urls) - len(unresolved)}, marked
+    )
     if unresolved:
         return CheckResult.failed(
             "S3",
@@ -189,14 +260,16 @@ def s3_evidence_resolvable(repo: Repo, ctx: RunContext) -> CheckResult:
 
 @check("S4", PHASE, "DATA_AND_LICENCE — every source fully characterised and verdicted")
 def s4_data_and_licence(repo: Repo, ctx: RunContext) -> CheckResult:
-    data, err = _load(repo)
+    data, err, marked = _load(repo, ctx)
     if err:
-        return CheckResult.na("S4", PHASE, err)
+        return CheckResult.na("S4", PHASE, err, _evidence({}, marked))
     assert data is not None
 
     sources = data.get("sources") or []
     if not sources:
-        return CheckResult.failed("S4", PHASE, "no sources characterised")
+        return CheckResult.failed(
+            "S4", PHASE, "no sources characterised", _evidence({}, marked)
+        )
 
     incomplete: dict[str, list[str]] = {}
     verdicts: dict[str, int] = {}
@@ -213,7 +286,7 @@ def s4_data_and_licence(repo: Repo, ctx: RunContext) -> CheckResult:
         verdict = str(src.get("verdict") or "UNSET")
         verdicts[verdict] = verdicts.get(verdict, 0) + 1
 
-    evidence = {"n_sources": len(sources), "verdicts": verdicts}
+    evidence = _evidence({"n_sources": len(sources), "verdicts": verdicts}, marked)
     if incomplete:
         first = list(incomplete.items())[:3]
         return CheckResult.failed(

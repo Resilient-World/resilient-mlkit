@@ -683,3 +683,128 @@ def test_r12_did_not_disturb_the_existing_readiness_order():
     assert without == [
         "R9", "R10", "R11", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8",
     ]
+
+
+# ---------------------------------------------------------------------------
+# E-035: an import is not a use
+# ---------------------------------------------------------------------------
+# The exemption used to be satisfied by the import statement alone, and
+# resilient-fray proved by measurement what that bought: ONE unused line added
+# to src/registry/promotion_gate.py took its findings from 4 to 0. fray refused
+# to take R12 green that way and recorded it as E-035. These are that mutation,
+# reduced to the two module fixtures above so they run without fray present.
+#
+# Both halves are required. The FIRES half alone would pass a check that fired
+# on everything; the SILENT half alone would pass the check that shipped.
+
+EVASION = "from resilient_mlkit.core.served import challenger_decision  # noqa: F401\n"
+
+
+def test_an_unused_import_does_not_exempt_a_reimplementation():
+    """FIRES. The E-035 mutation, on both fixtures.
+
+    The assertion is equality with the un-evaded count, not merely "non-empty":
+    a repair that silenced SOME findings would still be a repair a dead import
+    can pay for, and this is the property that says it pays for nothing.
+    """
+    for name, source in (("SERVING", SERVING), ("TORRENT", TORRENT)):
+        bare = textwrap.dedent(source)
+        before = sr.scan_source(bare, "src/serve/thing.py")
+        after = sr.scan_source(EVASION + bare, "src/serve/thing.py")
+        assert before, f"{name} must carry a clause for this control to mean anything"
+        assert len(after) == len(before), (
+            f"{name}: one unused contract import took findings "
+            f"{len(before)} -> {len(after)}; an import is not a use (E-035)"
+        )
+
+
+def test_an_unused_import_does_not_exempt_at_repo_scope(tmp_path):
+    """FIRES, through scan_repo rather than scan_source.
+
+    scan_tree applies the exemption on its own path (the two-pass walk), so the
+    single-module entry point passing is not evidence that the repo scan does.
+    """
+    root = write_repo(
+        tmp_path,
+        {"src/serve/county_yield.py": EVASION + textwrap.dedent(SERVING)},
+    )
+    findings, walked = sr.scan_repo(root)
+    assert walked == 1
+    assert {f.path for f in findings} == {"src/serve/county_yield.py"}
+
+
+def test_an_unused_import_does_not_exempt_through_the_check(tmp_path):
+    """FIRES, at the check the portfolio actually runs."""
+    from resilient_mlkit.checks import RunContext
+    from resilient_mlkit.checks.readiness import r12_served_contract
+    from resilient_mlkit.core.repo import Repo
+    from resilient_mlkit.core.result import Status
+
+    write_repo(
+        tmp_path,
+        {"src/serve/county_yield.py": EVASION + textwrap.dedent(SERVING)},
+    )
+    result = r12_served_contract(
+        Repo(name="fixture", path=tmp_path),
+        RunContext(nonce="test-nonce", root=tmp_path),
+    )
+    assert result.status is Status.FAIL
+    assert result.evidence["contract_reimplemented"] > 0
+
+
+def test_a_used_import_still_exempts():
+    """SILENT. Add the SAME import to the SAME fixture and then CALL it.
+
+    The variable between this and the FIRES half is one call expression. If
+    this went red the repair would have bought its firing by breaking adoption,
+    which is the trade the module docstring says must not be made.
+    """
+    bare = textwrap.dedent(SERVING)
+    used = EVASION.replace("  # noqa: F401", "") + bare + (
+        "\n\ndef decide(comparisons):\n"
+        "    return challenger_decision(\n"
+        '        comparisons, recorded_bar=RECORDED_BAR, metrics=("mae",)\n'
+        "    )\n"
+    )
+    assert sr.scan_source(used, "src/serve/thing.py") == []
+
+
+def test_an_unused_repo_local_route_does_not_exempt_either(tmp_path):
+    """FIRES. The evasion one level of indirection out.
+
+    The adapter is real and the import of it is real; what is missing is any
+    reference to what was taken from it. Held separately from the direct case
+    because the two go through different predicates.
+    """
+    root = write_repo(
+        tmp_path,
+        {
+            "src/serve/contract.py": """
+                from resilient_mlkit.core.served import ServedModel, challenger_decision
+
+                __all__ = ["ServedModel", "challenger_decision"]
+            """,
+            "src/serve/county_yield.py": (
+                "from serve.contract import challenger_decision  # noqa: F401\n"
+                + textwrap.dedent(SERVING)
+            ),
+        },
+    )
+    findings, _ = sr.scan_repo(root)
+    assert {f.path for f in findings} == {"src/serve/county_yield.py"}
+
+
+def test_a_rebind_of_the_imported_name_is_not_a_use():
+    """FIRES. Shadowing the contract's name is the opposite of using it.
+
+    ``challenger_decision = _my_gate`` reads as a reference to a name-matching
+    scanner and is a local definition wearing the contract's name.
+    """
+    source = (
+        EVASION
+        + "\n\ndef _my_gate(block):\n"
+        '    return {"status": "PASS", "promotable": True, "reason": "local"}\n'
+        "\n\nchallenger_decision = _my_gate\n"
+    )
+    findings = sr.scan_source(source, "src/serve/thing.py")
+    assert "PROMOTION_VERDICT" in {f.clause for f in findings}
