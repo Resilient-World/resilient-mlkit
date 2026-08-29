@@ -51,9 +51,14 @@ mlkit spine     --out portfolio/SPINE_DRIFT.md
 ```
 
 Both write a `.json` twin beside the `.md`. Every figure in the verdict table
-carries the artifact it came from, that artifact's sha256, and whether git has
-those bytes at HEAD; a column a repo's artifacts do not carry reports `NA` with
-the reason rather than being omitted.
+carries the artifact it came from and that artifact's sha256, and every figure
+is read from the repo's **committed** state — `git cat-file blob HEAD:<path>`,
+not the working tree. An artifact that is on disk and on no ref reports
+`NA (not committed at HEAD: <path>)` in every column that resolves through it,
+as does one whose working tree has diverged from its commit; a column a repo's
+artifacts do not carry reports `NA` with the reason rather than being omitted.
+`mlkit portfolio --allow-dirty` reads the working tree for local diagnosis,
+writes nothing, and exits 2 — nothing read that way can reach a verdict row.
 
 ## Statuses
 
