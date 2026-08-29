@@ -552,3 +552,81 @@ the artifact", not "the tool broke".
 file that repo owns. The remedy is that repo's — commit it, DVC-track it, or
 withdraw the row — and `mlkit portfolio --allow-dirty` will show what the
 pointers resolve to in the meantime, while writing nothing and exiting non-zero.
+
+---
+
+## E-M14 — three champion-record shapes across eight repos; the fleet should converge on one
+
+**Raised by** `SV-4-PARITY-DISCOVERY` on `feat/loop-mlkit-5`, which found that
+`scripts/verify_served_hash_parity.py` could see only one of them and was
+reporting the other two as "this repo serves nothing hash-pinned yet" — a claim
+about three repos that the scanner had never measured and that was false for all
+three.
+
+**Measured** locally, A-1, nothing fitted, nothing written into any model repo:
+`.venv/bin/python scripts/verify_served_hash_parity.py` at mlkit `f48334f`,
+python 3.14.6, artifact `reports/served_hash_parity.json`
+sha256 `5859c659babbb381dfb225c2b3ab154f13c531a2e3624c9497d90e4c1d5913cc`,
+generated 2026-08-29T15:44:08Z. Eight artifacts compared, eight matched, none
+differed, none unresolvable. The shapes, as measured:
+
+| Shape | Repos | Where | What the digest covers |
+|---|---|---|---|
+| `canonical_self_hash` — top-level `artifact_sha256` | fray (×2), chokepoint (×2), triage | `models/<name>/champion*.json` | the record's own canonical JSON, every field |
+| `sidecar_coefficient_digest` — top-level `artifact.{path,sha256}` | arabica, torrent, surge | `models/<name>/model.json`, and for surge `data/model_registry/<name>/model.json` | only the separate coefficient file's bytes |
+| neither | choco, blackout | — | nothing pinned; NA is correct for these two |
+
+**Why this is a decision and not a commit.** The two shapes are not two
+spellings of one property. A `canonical_self_hash` covers the whole record: its
+metrics, its split counts, its provenance prose and its licence quotations all
+move the digest, so none of them can be edited after promotion without the
+serve path refusing to construct. A `sidecar_coefficient_digest` covers the
+coefficients and nothing else. Arabica's `model.json` carries `val_scoring`,
+`split` row counts and a `training_provenance` block; torrent's carries a
+`committed_val_row` with a median NSE and an `escalation` id; surge's carries
+`metric_warnings` recording that the model loses to a baseline on val. **None
+of that is under any digest today.** Those fields can be edited, and every
+digest in the fleet still verifies.
+
+Three further asymmetries the parity run surfaced, each of which a converged
+shape would settle:
+
+1. **Root.** Surge's registry is at `data/model_registry/`, everyone else's at
+   `models/`. Any fleet tool that hardcodes one root silently omits the other,
+   which is precisely the defect being reported here.
+2. **Tree.** Triage's champion is committed on `.worktrees/e029` and is absent
+   from its checked-out `main`. The row exists only because discovery now falls
+   back to linked worktrees, and it is flagged `scope_note: evidence about that
+   worktree`. A row that is true of one branch and not of the repo is not a
+   fleet fact.
+3. **Movement.** fray's two recorded digests are not the ones
+   `reports/served_hash_parity.json` carried before this run —
+   `b6a9b933…`/`cba79308…` at fray `3b1941f`, now `b862f7f5…`/`da2d0773…` at
+   fray `aef69ed`. fray's own commit `5abe3aa` ("R10-REPIN: both champions
+   re-serialized from a clean tree, and nothing measured moved") explains it and
+   both still self-verify. This is recorded because a digest moving between two
+   runs of a parity tool is exactly the event the tool exists to make visible,
+   and it should be visible even when it is benign.
+
+**Proposed**, for the signatory, and deliberately **not done here**:
+
+1. Adopt `canonical_self_hash` as the fleet's one champion-record shape, with
+   the coefficient pin kept *inside* the sealed record rather than instead of
+   it — `core.served.seal()` over a payload that itself contains
+   `artifact.{path,sha256}`. That is strictly additive for arabica, torrent and
+   surge: no existing digest changes meaning, and the record's own fields come
+   under a digest for the first time.
+2. Settle one root and one filename. `models/<registered_name>/champion.json`
+   is the majority shape; surge's registry is the outlier and the move is a
+   path change in that repo, not a re-measurement.
+3. Decide whether a champion committed only on a linked worktree counts as
+   served. Triage is the live case. Either it lands on the branch the repo
+   serves from, or the fleet reports it as out-of-scope — the current answer,
+   a flagged row, is a disclosure and this repo has already learned once
+   (E-M12) that disclosure beside a figure is not a control.
+
+This is a fleet-wide records change touching eight repos, three of which have
+open colleague PRs (choco #160, blackout #129, triage #94). Under CLAUDE.md
+rule 12 the convergence decision is the signatory's. Nothing in this branch
+changes any model repo: the scanner reads files and runs read-only `git`
+commands, and no champion record anywhere was rewritten.
