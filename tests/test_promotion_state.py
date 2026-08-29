@@ -25,6 +25,7 @@ backwards:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -274,3 +275,128 @@ def test_positive_control_a_halt_outranks_a_FAIL_and_names_the_hard_stop(repo: R
     state = resolve(repo, results)
     assert state.state == BLOCKED
     assert "hard stop" in state.reason
+
+
+# -- no remembered count of the gating set (E-M09 round; checks/__init__.py's rule)
+#
+# `checks/__init__.py` records the discipline in its own docstring: its count is
+# obtained by COUNTING the registry, "not by remembering, which is the only way
+# a number in a docstring is ever worth anything". `portfolio.py` was the place
+# that still remembered. Its module docstring read "S1-S5, R1-R11, D1-D5,
+# E1-E5: twenty-six checks" after R12 joined `PHASE_ORDER`, so the module that
+# DEFINES the gating set described a set one check smaller than the one it
+# returns, and nothing in the suite could see it.
+#
+# The rule here is deliberately not "portfolio.py must contain no numbers". It
+# is: any count of checks stated in that file must equal the registry's. A file
+# that states none passes trivially, which is the shape the repair takes.
+
+_UNITS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+    "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
+    "seventeen": 17, "eighteen": 18, "nineteen": 19,
+}
+_TENS = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50}
+
+#: A count immediately qualifying the word "checks": `26 checks`,
+#: `twenty-six checks`, `27 gating checks`. The f-string
+#: `f"all {len(all_ids)} gating checks pass"` is not matched, and must not be:
+#: it is the derived count and is the correct way to state one.
+_COUNT_OF_CHECKS = re.compile(
+    r"\b([A-Za-z]+(?:-[A-Za-z]+)?|\d+)\s+(?:gating\s+)?checks\b", re.IGNORECASE
+)
+
+
+def _as_int(token: str) -> int | None:
+    """The integer a token names, or None when it names no number at all."""
+    if token.isdigit():
+        return int(token)
+    word = token.lower()
+    if word in _UNITS:
+        return _UNITS[word]
+    if word in _TENS:
+        return _TENS[word]
+    if "-" in word:
+        tens, _, unit = word.partition("-")
+        if tens in _TENS and unit in _UNITS and _UNITS[unit] < 10:
+            return _TENS[tens] + _UNITS[unit]
+    return None
+
+
+def stated_check_counts(source: str) -> list[tuple[str, int]]:
+    """Every literal count of checks written into ``source``.
+
+    Returns `(token, value)` pairs so a failure names the words to fix rather
+    than only the number they came to.
+    """
+    out: list[tuple[str, int]] = []
+    for token in _COUNT_OF_CHECKS.findall(source):
+        value = _as_int(token)
+        if value is not None:
+            out.append((token, value))
+    return out
+
+
+def _portfolio_source() -> str:
+    import resilient_mlkit.portfolio as mod
+
+    return Path(mod.__file__).read_text(encoding="utf-8")
+
+
+def test_portfolio_states_no_gating_count_the_registry_contradicts() -> None:
+    """FIRES on `main` at 21f7e6f: the docstring says twenty-six, the registry 27."""
+    expected = len(gating_ids())
+    wrong = [
+        (token, value)
+        for token, value in stated_check_counts(_portfolio_source())
+        if value != expected
+    ]
+    assert wrong == [], (
+        f"portfolio.py states a count of checks the registry contradicts "
+        f"(checks.PHASE_ORDER gates {expected}): {wrong}. Defer to the registry "
+        "rather than restating it — a remembered count rots in place, which is "
+        "what checks/__init__.py's own docstring says and why it counts instead"
+    )
+
+
+# -- controls for the above ------------------------------------------------
+
+
+def test_positive_control_a_stale_count_reinserted_is_caught() -> None:
+    """FIRES: the exact sentence that was in portfolio.py, on a copy in memory."""
+    stale = (
+        '"""Terminal-state resolution.\n\n'
+        "The gating set is S1-S5, R1-R11, D1-D5, E1-E5: twenty-six checks.\n"
+        '"""\n'
+    )
+    found = stated_check_counts(stale)
+    assert found == [("twenty-six", 26)]
+    assert found[0][1] != len(gating_ids()), (
+        "this control assumes the registry does not gate 26 checks; if it ever "
+        "does, the fixture below must move, not the assertion"
+    )
+
+
+def test_negative_control_the_right_count_written_out_is_silent() -> None:
+    """SILENT: a literal count is only a defect while it disagrees.
+
+    Without this pair the check above is indistinguishable from a rule banning
+    digits, which would be a different (and worse) rule.
+    """
+    right = f"The gating set is {len(gating_ids())} checks.\n"
+    found = stated_check_counts(right)
+    assert [value for _, value in found] == [len(gating_ids())]
+
+
+def test_negative_control_a_derived_count_is_not_a_literal() -> None:
+    """SILENT: `f"all {len(all_ids)} gating checks pass"` is the correct shape."""
+    derived = 'return RepoState(repo, results, READY, f"all {len(all_ids)} gating checks pass")\n'
+    assert stated_check_counts(derived) == []
+
+
+def test_the_parser_can_see_a_count_at_all() -> None:
+    """A finder that finds nothing would make every assertion above vacuous."""
+    assert stated_check_counts("twenty-seven gating checks") == [("twenty-seven", 27)]
+    assert stated_check_counts("26 checks") == [("26", 26)]
+    assert stated_check_counts("triage checks") == []

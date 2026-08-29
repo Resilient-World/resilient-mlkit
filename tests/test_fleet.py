@@ -15,6 +15,7 @@ row's value.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -638,3 +639,138 @@ def test_the_reader_follows_the_artifact_when_the_recorded_figure_changes(
     )
     assert after.score.value == 74.16097783177521
     assert after.score.present
+
+
+# ---------------------------------- evidence that lives only on a side branch
+#
+# `portfolio/FLEET_VERDICTS.md` records, per repo, the branch the table was read
+# from. Every one of the eight was read off a non-`main` branch, so "branch is
+# not main" does not discriminate; what discriminates is whether the artifact
+# the adapter names exists on that repo's `main` at all. Measured read-only on
+# 2026-08-29 in each repo's own clone -- no checkout, no fetch, nothing written:
+#
+#   git -C resilient-blackout cat-file -e e021-decision:reports/train/weather_failure_test_read.json   -> present
+#   git -C resilient-blackout cat-file -e main:reports/train/weather_failure_test_read.json            -> absent
+#   git -C resilient-blackout cat-file -e {e021-decision,main}:reports/train/weather_failure_all_in_scope_gate.json
+#                                                                                                     -> present / absent
+#   git -C resilient-triage   cat-file -e {e028-decision,main}:models/weekly_mortality/champion.json   -> present / absent
+#
+# and the same probe against the other six repos' declared artifacts found all
+# of them present on their own `main` (arabica, choco, fray, torrent,
+# chokepoint, surge). So the branch dependence is blackout's and triage's, and
+# it is a fact about the EVIDENCE, not about which branch someone happened to
+# have checked out.
+#
+# surge already carries a note of this shape for the adjacent case -- its
+# artifacts were read from a linked worktree rather than from the branch the
+# repo root had checked out -- and that note is the pattern copied here. The
+# provenance table records all of this; the point of putting it in
+# `fleet_adapters.py` is that a reader of the adapter alone must not assume the
+# evidence is on `main`.
+
+#: repo -> the branch its declared artifacts are committed on, for the repos
+#: whose artifacts are NOT on that repo's `main`. Corroborated below against
+#: the branch `portfolio/FLEET_VERDICTS.md` records reading each repo from.
+BRANCH_ONLY_EVIDENCE = {
+    "blackout": "e021-decision",
+    "triage": "e028-decision",
+}
+
+FLEET_VERDICTS_MD = Path(__file__).resolve().parent.parent / "portfolio" / "FLEET_VERDICTS.md"
+
+#: A row of the "Repos as they were read" table: `| triage | `e028-decision` | ...`
+_READ_AS = re.compile(r"^\|\s*([a-z]+)\s*\|\s*`([^`]+)`\s*\|", re.MULTILINE)
+
+
+def provenance_branches(markdown: str) -> dict[str, str]:
+    """repo -> branch, from the committed provenance table."""
+    return dict(_READ_AS.findall(markdown))
+
+
+def entries_missing_branch_note(adapters, required: dict[str, str]) -> list[str]:
+    """Adapter keys that depend on a side branch without saying so.
+
+    The marker is deliberately concrete: the note must name the branch AND the
+    word `main`, because "reads from e021-decision" alone still leaves a reader
+    to infer what that means for `main`.
+    """
+    return [
+        a.key
+        for a in adapters
+        if a.repo in required
+        and not (required[a.repo] in (a.note or "") and "main" in (a.note or ""))
+    ]
+
+
+def test_every_branch_only_adapter_says_its_evidence_is_not_on_main() -> None:
+    """FIRES on `main` at 21f7e6f, where only surge's entry carried such a note."""
+    from resilient_mlkit.fleet_adapters import ADAPTERS
+
+    covered = {a.repo for a in ADAPTERS}
+    assert set(BRANCH_ONLY_EVIDENCE) <= covered, "declared repos have no adapter"
+    missing = entries_missing_branch_note(ADAPTERS, BRANCH_ONLY_EVIDENCE)
+    assert missing == [], (
+        "these adapters name artifacts that are committed only on a side branch "
+        f"of the repo they read, and do not say so: {missing}. "
+        "portfolio/FLEET_VERDICTS.md's provenance table records it; a reader of "
+        "fleet_adapters.py alone would assume main-committed evidence"
+    )
+
+
+def test_the_declared_branches_match_the_committed_provenance_table() -> None:
+    """The note may not name a branch the generated table contradicts."""
+    assert FLEET_VERDICTS_MD.is_file(), f"{FLEET_VERDICTS_MD} does not exist"
+    recorded = provenance_branches(FLEET_VERDICTS_MD.read_text(encoding="utf-8"))
+    assert recorded, "no provenance rows parsed; this control would pass over an absence"
+    for repo, branch in BRANCH_ONLY_EVIDENCE.items():
+        assert recorded.get(repo) == branch, (
+            f"{repo}: the adapter note is written for `{branch}` but the committed "
+            f"provenance table read it from {recorded.get(repo)!r}"
+        )
+
+
+# -- controls for the two above --------------------------------------------
+
+
+def test_positive_control_a_deleted_branch_note_is_caught() -> None:
+    """FIRES: the blackout/triage entries exactly as `main` carried them."""
+    from resilient_mlkit.fleet_adapters import ADAPTERS
+
+    import dataclasses
+
+    stripped = tuple(
+        dataclasses.replace(a, note="") if a.repo in BRANCH_ONLY_EVIDENCE else a
+        for a in ADAPTERS
+    )
+    missing = entries_missing_branch_note(stripped, BRANCH_ONLY_EVIDENCE)
+    assert sorted(missing) == sorted(
+        a.key for a in ADAPTERS if a.repo in BRANCH_ONLY_EVIDENCE
+    )
+
+
+def test_positive_control_a_note_naming_the_wrong_branch_is_caught() -> None:
+    """FIRES: a marker is only a marker while it names the right branch."""
+    from resilient_mlkit.fleet_adapters import ADAPTERS
+
+    import dataclasses
+
+    wrong = tuple(
+        dataclasses.replace(a, note="committed on some-other-branch, not on main")
+        if a.repo == "triage"
+        else a
+        for a in ADAPTERS
+    )
+    assert entries_missing_branch_note(wrong, BRANCH_ONLY_EVIDENCE) == ["triage"]
+
+
+def test_negative_control_a_repo_whose_evidence_is_on_main_needs_no_note() -> None:
+    """SILENT: arabica's artifact IS on arabica's main (measured above).
+
+    Without this pair the rule above is indistinguishable from "every adapter
+    must carry a note", which would make the note meaningless.
+    """
+    from resilient_mlkit.fleet_adapters import ADAPTERS
+
+    on_main = [a for a in ADAPTERS if a.repo not in BRANCH_ONLY_EVIDENCE]
+    assert on_main, "no adapters left to control against"
+    assert entries_missing_branch_note(on_main, BRANCH_ONLY_EVIDENCE) == []

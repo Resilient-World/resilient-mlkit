@@ -209,3 +209,136 @@ def test_negative_control_an_indented_assignment_is_not_a_declaration() -> None:
     """SILENT: a local named `__version__` inside a function is not the package's."""
     local = "def probe():\n    __version__ = '0.0.1'\n    return __version__\n"
     assert second_version_literals({"probe.py": local}) == []
+
+
+# -- the newest entry must describe the release that actually landed (E-M09/E-M10)
+#
+# The heading/version agreement above catches a NUMBER that disagrees with the
+# code. It cannot catch a body that disagrees with the tree, and on `main` at
+# `21f7e6f` that is exactly what shipped: the v0.5.0 entry was written on
+# `feat/r10-served-contract` (PR #6), where the release really was a new check
+# and nothing else, and it says so — "no existing check changes verdict on
+# unchanged code". PR #7 then merged into the same `main` the non-finite
+# repairs that `docs/ESCALATIONS.md` E-M09 and E-M10 record as changing the
+# verdict of D2, E1, T2, R2, D3, E3 and R4 on unchanged repo code. By the scale
+# at the top of `CHANGELOG.md` that is the MAJOR event of this release, and the
+# only release note a consumer reads denied it.
+#
+# So this pins two things about the newest entry's BODY, and the pair matters:
+# it must not restate the withdrawn claim, and it must name at least one of the
+# checks whose verdict moved. Either half alone is satisfiable by deletion.
+
+#: The checks E-M09 (D2, E1) and E-M10 (T2, R2, D3, E3, R4) record as changing
+#: verdict on unchanged repo code in this release.
+VERDICT_CHANGING_CHECKS = ("D2", "E1", "T2", "R2", "D3", "E3", "R4")
+
+#: The sentence as committed on `main` at `21f7e6f`, whitespace-tolerant
+#: because the CHANGELOG hard-wraps and the claim spans a line break.
+_WITHDRAWN_CLAIM = re.compile(r"no\s+existing\s+check\s+changes\s+verdict", re.IGNORECASE)
+
+#: A top-level heading only. `### One definition of "served"` is a section of an
+#: entry, not the start of the next one.
+_TOP_HEADING = re.compile(r"^##\s+.+$", re.MULTILINE)
+
+
+def newest_entry_body(changelog_text: str) -> str:
+    """Everything under the topmost `##` heading, up to the next one.
+
+    Empty string when there is no heading at all, which the callers assert on
+    rather than silently treating as "nothing to object to".
+    """
+    first = _TOP_HEADING.search(changelog_text)
+    if first is None:
+        return ""
+    rest = changelog_text[first.end() :]
+    following = _TOP_HEADING.search(rest)
+    return rest[: following.start()] if following else rest
+
+
+def verdict_changing_checks_named(body: str) -> list[str]:
+    """Which of the E-M09/E-M10 check ids the entry names, in declared order."""
+    return [c for c in VERDICT_CHANGING_CHECKS if re.search(rf"\b{c}\b", body)]
+
+
+def restates_the_withdrawn_claim(body: str) -> bool:
+    """True when the entry still asserts no existing check changed verdict."""
+    return _WITHDRAWN_CLAIM.search(body) is not None
+
+
+def test_the_newest_entry_does_not_deny_the_verdict_changes_it_shipped(
+    changelog_text: str,
+) -> None:
+    """FIRES on `main` at 21f7e6f, where the entry carries the withdrawn claim."""
+    body = newest_entry_body(changelog_text)
+    assert body.strip(), "the newest CHANGELOG entry has no body to read"
+    assert not restates_the_withdrawn_claim(body), (
+        "the newest CHANGELOG entry claims no existing check changes verdict on "
+        "unchanged code, while the tree it describes contains the non-finite "
+        "repairs docs/ESCALATIONS.md E-M09 and E-M10 record as moving D2, E1, "
+        "T2, R2, D3, E3 and R4 from PASS to FAIL. By this file's own scale that "
+        "is a major event, and the release note denies it"
+    )
+
+
+def test_the_newest_entry_names_the_checks_whose_verdict_moved(
+    changelog_text: str,
+) -> None:
+    """FIRES on an entry that is merely silent about them rather than wrong."""
+    body = newest_entry_body(changelog_text)
+    named = verdict_changing_checks_named(body)
+    assert named, (
+        "the newest CHANGELOG entry names none of "
+        f"{VERDICT_CHANGING_CHECKS}; a consumer upgrading to this version reads "
+        "this entry and nothing else, and every one of those checks can now fail "
+        "on repo code that did not change (E-M09, E-M10)"
+    )
+
+
+# -- controls for the two above --------------------------------------------
+
+
+def test_positive_control_the_shipped_v0_5_0_body_is_caught() -> None:
+    """FIRES: the sentence as it stood, wrapped exactly as the file wraps it."""
+    shipped = (
+        "# Changelog\n\n## v0.5.0 — 2026-08-29\n\n"
+        "**Why `0.5.0` and not `0.4.1`.** The scale at the top of this file makes a\n"
+        "**minor** release one where \"a new check exists\". R12 is new; no existing check\n"
+        "changes verdict on unchanged code, and a test asserts that the readiness order\n"
+        "with R12 removed is byte-identical to the order before this branch.\n"
+    )
+    body = newest_entry_body(shipped)
+    assert restates_the_withdrawn_claim(body)
+    assert verdict_changing_checks_named(body) == []
+
+
+def test_negative_control_a_corrected_body_is_accepted() -> None:
+    """SILENT: names the verdict changes and makes no denial."""
+    corrected = (
+        "# Changelog\n\n## v0.5.0 — 2026-08-29\n\n"
+        "The principal event is that D2, E1, T2, R2, D3, E3 and R4 change verdict\n"
+        "on unchanged repo code (E-M09, E-M10). R12 is new and is the minor half.\n"
+        "\n### A section\n\nmore prose\n\n## v0.4.0 — 2026-08-28\n\nolder\n"
+    )
+    body = newest_entry_body(corrected)
+    assert not restates_the_withdrawn_claim(body)
+    assert verdict_changing_checks_named(body) == [
+        "D2", "E1", "T2", "R2", "D3", "E3", "R4",
+    ]
+    assert "older" not in body, "the body must stop at the next release heading"
+
+
+def test_negative_control_a_prior_entry_making_the_claim_is_out_of_scope() -> None:
+    """SILENT: only the NEWEST entry describes the release being cut.
+
+    An older entry that truthfully said no verdict moved must stay exactly as
+    written; rewriting history to satisfy a control is the failure this whole
+    file exists to prevent.
+    """
+    text = (
+        "# Changelog\n\n## v0.9.0 — 2026-08-29\n\nD2 and E1 moved.\n\n"
+        "## v0.3.0 — 2026-08-28\n\nNeither changes any check's verdict, so no "
+        "existing check changes verdict on unchanged code.\n"
+    )
+    body = newest_entry_body(text)
+    assert not restates_the_withdrawn_claim(body)
+    assert verdict_changing_checks_named(body) == ["D2", "E1"]
