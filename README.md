@@ -63,16 +63,25 @@ the reason rather than being omitted.
 | `STALE` | Measured at a different git SHA than the one checked out. |
 | `ESCALATED` | Reserved to the human signatory. |
 
-Two of the readiness checks import nothing and walk source with `ast`, which
+Three of the readiness checks import nothing and walk source with `ast`, which
 is what lets them see code no binding exposes: **R10** `FABRICATED_DEFAULTS`
 (a measured quantity given a plausible default that then satisfies the gate
-consuming it) and **R11** `FABRICATED_TARGETS` (a value drawn from an RNG,
+consuming it), **R11** `FABRICATED_TARGETS` (a value drawn from an RNG,
 flowed into a data record, and stamped with a provenance field claiming it was
-observed). R11 walks every Python file in the repo rather than the trees a
-repo declares, because the declared-tree list is exactly the surface an author
+observed), and **R12** `SERVED_CONTRACT` (a repo answering, in its own code,
+the questions `core.served` exists to answer once — is this the artifact that
+was measured, may this challenger be promoted, which arm may be served). R11
+and R12 walk every Python file in the repo rather than the trees a repo
+declares, because the declared-tree list is exactly the surface an author
 controls.
 
-`READY-TO-TRAIN` requires all 26 gating checks to pass. Six of them (S5, D1, D4, D5,
+R12 is rule 7 applied to serving. The fleet converged on one definition of
+"ready" — these checks — and grew three of "served", including two files with
+the same name and different SHAs whose gates return opposite verdicts on a
+zero baseline. R12's exemption is an **import**, so adopting `core.served` is
+what clears it; renaming is not.
+
+`READY-TO-TRAIN` requires all 27 gating checks to pass. Six of them (S5, D1, D4, D5,
 E4, E5) are human-only and always report `ESCALATED`, so **an agent cannot
 drive a repo to READY-TO-TRAIN**. That is deliberate: those six are legal and
 billing exposures, not code changes.
@@ -150,5 +159,5 @@ A missing module that resolves inside the repo is the repo's own defect and
 still fails. The guard protects measurements from bad interpreters; it does
 not protect repos from themselves.
 
-R10 and R11 are never guarded — they parse source and import nothing, so they
-measure correctly from any interpreter.
+R10, R11 and R12 are never guarded — they parse source and import nothing, so
+they measure correctly from any interpreter.

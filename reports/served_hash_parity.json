@@ -1,0 +1,85 @@
+{
+  "report_type": "served_hash_parity",
+  "question": "does resilient_mlkit.core.served.canonical_payload_sha256 reproduce the artifact_sha256 each repo's own local function already committed?",
+  "generated_at": "2026-08-29T07:44:11.730151+00:00",
+  "mlkit_version": "0.5.0",
+  "mlkit_git_sha": "14b2e6c96ff03fd2a91b1e5a477f16dedb1e281a",
+  "python": "3.14.6",
+  "portfolio_root": "/Users/david/Downloads/Claude Code",
+  "artifacts_compared": 5,
+  "matched": 5,
+  "differed": 0,
+  "rows": [
+    {
+      "repo": "choco",
+      "git_sha": "d0a0357b400cc6ea13a9fa5172a50e48463f2c0e",
+      "status": "NA",
+      "reason": "no committed artifact under models/ carries an artifact_sha256; this repo serves nothing hash-pinned yet"
+    },
+    {
+      "repo": "arabica",
+      "git_sha": "bb69ee283a3d9f336c4e72d9dc08bdc00f42a6bd",
+      "status": "NA",
+      "reason": "no committed artifact under models/ carries an artifact_sha256; this repo serves nothing hash-pinned yet"
+    },
+    {
+      "repo": "fray",
+      "git_sha": "3b1941f9c92facc5df5f4b5ac9565d4076ced116",
+      "artifact": "models/county_yield/champion_forecast_available.json",
+      "recorded_sha256": "b6a9b9331232e3a941a4d4b59cc25ec56bccf677c0f558f8b551cf95f766cd12",
+      "recomputed_sha256": "b6a9b9331232e3a941a4d4b59cc25ec56bccf677c0f558f8b551cf95f766cd12",
+      "status": "MATCH"
+    },
+    {
+      "repo": "fray",
+      "git_sha": "3b1941f9c92facc5df5f4b5ac9565d4076ced116",
+      "artifact": "models/county_yield/champion_spatial_infill.json",
+      "recorded_sha256": "cba79308d6d545720ddc685a6bc48a82e7cb56e699b99b308744b429588a845c",
+      "recomputed_sha256": "cba79308d6d545720ddc685a6bc48a82e7cb56e699b99b308744b429588a845c",
+      "status": "MATCH"
+    },
+    {
+      "repo": "torrent",
+      "git_sha": "c16c2101d8e2eb0e71a5c2bb10ec2859c17b9a1c",
+      "status": "NA",
+      "reason": "no committed artifact under models/ carries an artifact_sha256; this repo serves nothing hash-pinned yet"
+    },
+    {
+      "repo": "chokepoint",
+      "git_sha": "57695ab780dc3e0fcf5a85d79acbc6d8f64879a7",
+      "artifact": "models/daily_flow/champion.json",
+      "recorded_sha256": "408cb02daf86c27d5cc94e0bca77b697b5f8dc7ada0f4171950eab175e63c224",
+      "recomputed_sha256": "408cb02daf86c27d5cc94e0bca77b697b5f8dc7ada0f4171950eab175e63c224",
+      "status": "MATCH"
+    },
+    {
+      "repo": "chokepoint",
+      "git_sha": "57695ab780dc3e0fcf5a85d79acbc6d8f64879a7",
+      "artifact": "models/episode_response/champion.json",
+      "recorded_sha256": "3efca9a6ee9bad96b7b31ea6ea6b96f0ddcd0ad19eaeccc43f085d3297954391",
+      "recomputed_sha256": "3efca9a6ee9bad96b7b31ea6ea6b96f0ddcd0ad19eaeccc43f085d3297954391",
+      "status": "MATCH"
+    },
+    {
+      "repo": "surge",
+      "git_sha": "9eab2fe801776d3fbad064900c204dac5d1e0f48",
+      "status": "NA",
+      "reason": "no committed artifact under models/ carries an artifact_sha256; this repo serves nothing hash-pinned yet"
+    },
+    {
+      "repo": "triage",
+      "git_sha": "f44430853eac04ade440f586a08a106cb2a870bf",
+      "artifact": "models/weekly_mortality/champion.json",
+      "recorded_sha256": "ec8bd643dc433bd5798bc531f8d4cd19b8abe48aa51fa6b94bc0a201e1e2ad56",
+      "recomputed_sha256": "ec8bd643dc433bd5798bc531f8d4cd19b8abe48aa51fa6b94bc0a201e1e2ad56",
+      "status": "MATCH"
+    },
+    {
+      "repo": "blackout",
+      "git_sha": "ed80086937e1a4c02bb2ac1ce79a754ae8fecdcf",
+      "status": "NA",
+      "reason": "no committed artifact under models/ carries an artifact_sha256; this repo serves nothing hash-pinned yet"
+    }
+  ],
+  "note": "Duplicates inside .worktrees are excluded: a worktree carries a byte-identical copy of the same artifact and would inflate the count without adding evidence."
+}

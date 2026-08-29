@@ -35,7 +35,14 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from ..core import environment, fabricated_targets, fabrication, policy, report
+from ..core import (
+    environment,
+    fabricated_targets,
+    fabrication,
+    policy,
+    report,
+    served_reimplementation,
+)
 from ..core.repo import BindingError, Repo
 from ..core.result import CheckResult, CredentialRequired
 from . import RunContext, check
@@ -722,6 +729,137 @@ def _write_r11_report(
         )
     if not findings:
         lines.append("| — | — | — | — | — | — | — | (none) |")
+    lines.append("")
+    # Unguarded: static analysis, no repo imports. See core/report.py.
+    report.guarded_write(
+        path, "\n".join(lines), probe=None, depends_on_bindings=False,
+        nonce=ctx.nonce, git_sha=repo.git_sha,
+    )
+
+
+#: Where R12 writes the full finding list, relative to the repo root.
+R12_REPORT_RELPATH = "reports/served_contract.md"
+
+#: Most findings printed into a FAIL reason; the rest live in the report.
+R12_REASON_FINDINGS = 3
+
+
+@check("R12", PHASE, "SERVED_CONTRACT — no local re-implementation of the served model")
+def r12_served_contract(repo: Repo, ctx: RunContext) -> CheckResult:
+    """Walk every Python file for a served-model contract implemented locally.
+
+    R11's question one layer up. Rule 7 says eight local copies of a gate is
+    eight different definitions of "ready", which is the same as none; measured
+    2026-08-29 the fleet had one definition of "ready" and THREE of "served",
+    including two files with the same name and different SHAs. R12 asks whether
+    a file decides what is served — is this the artifact that was measured, may
+    this challenger be promoted, which arm may be scored — without routing
+    through ``core.served``.
+
+    Scoped like R11 rather than like R10: every Python file in the repo, not
+    the trees ``[source] trees`` declares. Serving code lives under
+    ``scripts/`` and ``benchmarks/`` in three of the repos it is aimed at, and
+    a check that trusts the declared-tree list cannot see a definition that
+    lives outside it.
+
+    The exemption is an import, not a name. A file that imports the contract —
+    or imports a module in the same repo that does — is silent whatever shapes
+    it carries, so adopting the contract is what clears this check, and a repo
+    that wants a thin typed wrapper over ``ServedModel`` may keep one.
+    """
+    findings, files = served_reimplementation.scan_repo(repo.path)
+
+    reimplemented = [
+        f for f in findings
+        if f.severity == served_reimplementation.REIMPLEMENTED
+    ]
+    adjacent = [f for f in findings if f not in reimplemented]
+    touched: list[str] = []
+    for f in findings:
+        if f.path not in touched:
+            touched.append(f.path)
+
+    report_path = repo.path / R12_REPORT_RELPATH
+    _write_r12_report(report_path, repo, ctx, findings, files)
+
+    evidence = {
+        "files_walked": files,
+        "findings": len(findings),
+        "contract_reimplemented": len(reimplemented),
+        "serving_adjacent": len(adjacent),
+        "files_named": touched,
+        "contract_module": served_reimplementation.CONTRACT_MODULE,
+        "report": str(report_path.relative_to(repo.path)),
+        "top": [f.to_dict() for f in (reimplemented or adjacent)[:R12_REASON_FINDINGS]],
+    }
+
+    if not files:
+        # Same reasoning as R11: a walk over nothing that reports green is the
+        # defect this instrument exists to catch, applied to the instrument.
+        return CheckResult.na(
+            "R12", PHASE,
+            f"no Python files found under {repo.path}; the absence of a locally "
+            "re-implemented served contract is unmeasured, not established",
+            evidence,
+        )
+
+    if findings:
+        head = (reimplemented or adjacent)[:R12_REASON_FINDINGS]
+        detail = "; ".join(f"{f.path}:{f.line} {f.clause} {f.symbol}" for f in head)
+        more = len(findings) - len(head)
+        return CheckResult.failed(
+            "R12", PHASE,
+            f"{len(findings)} local implementation(s) of the served-model contract "
+            f"across {len(touched)} file(s) ({len(reimplemented)} decide a contract "
+            f"clause rather than merely shaping one), none importing "
+            f"{served_reimplementation.CONTRACT_MODULE}: {detail}"
+            + (f"; +{more} more in {R12_REPORT_RELPATH}" if more > 0 else ""),
+            evidence,
+        )
+    return CheckResult.passed("R12", PHASE, evidence)
+
+
+def _write_r12_report(
+    path: Path,
+    repo: Repo,
+    ctx: RunContext,
+    findings: list[served_reimplementation.Finding],
+    files: int,
+) -> None:
+    """Write every finding out, because a truncated reason is not evidence."""
+    lines = [
+        f"# Served-model contract (R12) — resilient-{repo.name}",
+        "",
+        f"- run nonce: `{ctx.nonce}`",
+        f"- git SHA: `{repo.git_sha}`",
+        (f"- files walked: {files} (every `.py` in the repo, excluding vendored "
+         "directories and `tests/`)"),
+        f"- contract: `{served_reimplementation.CONTRACT_MODULE}`",
+        f"- findings: {len(findings)}",
+        "",
+        "Each row is a place where this repo answers, in its own code, a question",
+        "the served-model contract exists to answer once: is this the artifact that",
+        "was measured, is this the data it was measured on, may this challenger be",
+        "promoted, and which arm may be served.",
+        "",
+        "`CONTRACT_REIMPLEMENTED` marks a clause the file DECIDES. `SERVING_ADJACENT`",
+        "marks a serving type defined locally without the contract behind it — the",
+        "shape of a second definition rather than a decision it makes.",
+        "",
+        "A file that imports the contract, or imports a module in this repo that",
+        "does, produces no row here whatever shapes it carries. Adoption is what",
+        "clears this check; renaming is not.",
+        "",
+        "| severity | clause | file | symbol | why it matters |",
+        "|---|---|---|---|---|",
+    ]
+    for f in findings:
+        detail = f.detail.replace("|", "\\|")
+        lines.append(
+            f"| {f.severity} | {f.clause} | `{f.path}:{f.line}` | `{f.symbol}` | {detail} |"
+        )
+    if not findings:
+        lines.append("| — | — | — | — | (none) |")
     lines.append("")
     # Unguarded: static analysis, no repo imports. See core/report.py.
     report.guarded_write(

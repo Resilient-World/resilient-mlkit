@@ -1,0 +1,999 @@
+{
+  "report_type": "served_contract_fleet_scan",
+  "question": "which repos decide a served-model contract clause locally instead of routing through resilient_mlkit.core.served?",
+  "generated_at": "2026-08-29T07:44:38.071760+00:00",
+  "mlkit_version": "0.5.0",
+  "mlkit_git_sha": "14b2e6c96ff03fd2a91b1e5a477f16dedb1e281a",
+  "python": "3.14.6",
+  "portfolio_root": "/Users/david/Downloads/Claude Code",
+  "contract_module": "resilient_mlkit.core.served",
+  "note": "READ-ONLY across the fleet: this script parses Python and writes one file, inside mlkit. No repo other than mlkit is modified. A PASS here today would be evidence the scanner is blind rather than evidence a repo is clean -- nothing has adopted the contract yet.",
+  "repos": [
+    {
+      "repo": "choco",
+      "git_sha": "d0a0357b400cc6ea13a9fa5172a50e48463f2c0e",
+      "files_walked": 398,
+      "verdict": "FAIL",
+      "reason": "",
+      "findings": 2,
+      "contract_reimplemented": 2,
+      "files_named": [
+        "src/registry/promotion_gate.py"
+      ],
+      "clauses": [
+        "PROMOTION_VERDICT"
+      ],
+      "detail": [
+        {
+          "path": "src/registry/promotion_gate.py",
+          "line": 417,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "_record",
+          "detail": "decides PASS/FAIL on a promotion locally; core.served.challenger_decision is the one gate, and it is the clause where the fleet's implementations actually disagree",
+          "corroborating": []
+        },
+        {
+          "path": "src/registry/promotion_gate.py",
+          "line": 456,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "run_promotion_gate",
+          "detail": "decides a promotion locally; core.served.challenger_decision is the one gate, and it is the clause the fleet actually disagrees on",
+          "corroborating": []
+        }
+      ]
+    },
+    {
+      "repo": "arabica",
+      "git_sha": "bb69ee283a3d9f336c4e72d9dc08bdc00f42a6bd",
+      "files_walked": 375,
+      "verdict": "FAIL",
+      "reason": "",
+      "findings": 4,
+      "contract_reimplemented": 4,
+      "files_named": [
+        "src/registry/promotion_gate.py"
+      ],
+      "clauses": [
+        "PROMOTION_VERDICT"
+      ],
+      "detail": [
+        {
+          "path": "src/registry/promotion_gate.py",
+          "line": 94,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "_record",
+          "detail": "decides PASS/FAIL on a promotion locally; core.served.challenger_decision is the one gate, and it is the clause where the fleet's implementations actually disagree",
+          "corroborating": []
+        },
+        {
+          "path": "src/registry/promotion_gate.py",
+          "line": 359,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "evaluate_all_gates",
+          "detail": "decides PASS/FAIL on a promotion locally; core.served.challenger_decision is the one gate, and it is the clause where the fleet's implementations actually disagree",
+          "corroborating": []
+        },
+        {
+          "path": "src/registry/promotion_gate.py",
+          "line": 397,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "_status",
+          "detail": "decides PASS/FAIL on a promotion locally; core.served.challenger_decision is the one gate, and it is the clause where the fleet's implementations actually disagree",
+          "corroborating": []
+        },
+        {
+          "path": "src/registry/promotion_gate.py",
+          "line": 718,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "main",
+          "detail": "decides PASS/FAIL on a promotion locally; core.served.challenger_decision is the one gate, and it is the clause where the fleet's implementations actually disagree",
+          "corroborating": []
+        }
+      ]
+    },
+    {
+      "repo": "fray",
+      "git_sha": "3b1941f9c92facc5df5f4b5ac9565d4076ced116",
+      "files_walked": 217,
+      "verdict": "FAIL",
+      "reason": "",
+      "findings": 22,
+      "contract_reimplemented": 21,
+      "files_named": [
+        "scripts/serve_county_yield.py",
+        "src/registry/models_of_record.py",
+        "src/registry/promotion_gate.py",
+        "src/serve/county_yield.py"
+      ],
+      "clauses": [
+        "CHAMPION_RECORD",
+        "PROMOTION_VERDICT",
+        "PROVENANCE",
+        "SELF_HASH",
+        "SERVE_ARM"
+      ],
+      "detail": [
+        {
+          "path": "scripts/serve_county_yield.py",
+          "line": 105,
+          "clause": "SERVE_ARM",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "SERVEABLE_ARMS",
+          "detail": "declares a serve-arm policy locally; core.served.ServeArms makes the policy data and the refusal mechanical, which is what lets two repos disagree about which arm is closed without disagreeing about the guard",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "scripts/serve_county_yield.py",
+          "line": 268,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "scripts/serve_county_yield.py",
+          "line": 342,
+          "clause": "SERVE_ARM",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "if <arm> ... raise",
+          "detail": "refuses an arm inline; core.served.ServeArms.require is the contract's guard and refuses an UNDECLARED arm too, which an inline test against one name does not",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "scripts/serve_county_yield.py",
+          "line": 454,
+          "clause": "SERVE_ARM",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "if <arm> ... raise",
+          "detail": "refuses an arm inline; core.served.ServeArms.require is the contract's guard and refuses an UNDECLARED arm too, which an inline test against one name does not",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/registry/models_of_record.py",
+          "line": 102,
+          "clause": "PROVENANCE",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "verify_recorded_checkpoint",
+          "detail": "verifies bytes against a record locally; core.served.verify_at_load and DataSource.verify are the contract's refusals",
+          "corroborating": []
+        },
+        {
+          "path": "src/registry/models_of_record.py",
+          "line": 136,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "challenger_clears_record",
+          "detail": "decides a promotion locally; core.served.challenger_decision is the one gate, and it is the clause the fleet actually disagrees on",
+          "corroborating": []
+        },
+        {
+          "path": "src/registry/promotion_gate.py",
+          "line": 226,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "PromotionResult",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/registry/promotion_gate.py",
+          "line": 251,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "_record",
+          "detail": "decides PASS/FAIL on a promotion locally; core.served.challenger_decision is the one gate, and it is the clause where the fleet's implementations actually disagree",
+          "corroborating": []
+        },
+        {
+          "path": "src/registry/promotion_gate.py",
+          "line": 290,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "evaluate_promotion",
+          "detail": "decides a promotion locally; core.served.challenger_decision is the one gate, and it is the clause the fleet actually disagrees on",
+          "corroborating": []
+        },
+        {
+          "path": "src/registry/promotion_gate.py",
+          "line": 502,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "run_promotion_gate",
+          "detail": "decides a promotion locally; core.served.challenger_decision is the one gate, and it is the clause the fleet actually disagrees on",
+          "corroborating": []
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 157,
+          "clause": "SELF_HASH",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "sha256 over canonical JSON with the hash field excluded",
+          "detail": "recomputes an artifact self-hash locally; core.served.canonical_payload_sha256 is the one definition of that digest, and it reproduces every committed artifact hash in the fleet byte for byte",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 280,
+          "clause": "PROVENANCE",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "verify_checkpoint",
+          "detail": "verifies bytes against a record locally; core.served.verify_at_load and DataSource.verify are the contract's refusals",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 406,
+          "clause": "PROVENANCE",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "_verify_source_files",
+          "detail": "verifies bytes against a record locally; core.served.verify_at_load and DataSource.verify are the contract's refusals",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 448,
+          "clause": "PROVENANCE",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "verify_panel_provenance",
+          "detail": "verifies bytes against a record locally; core.served.verify_at_load and DataSource.verify are the contract's refusals",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 463,
+          "clause": "PROVENANCE",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "verify_covariate_provenance",
+          "detail": "verifies bytes against a record locally; core.served.verify_at_load and DataSource.verify are the contract's refusals",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 638,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "challenger_gate",
+          "detail": "decides a promotion locally; core.served.challenger_decision is the one gate, and it is the clause the fleet actually disagrees on",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 671,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 684,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 695,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 727,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 740,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/serve/county_yield.py",
+          "line": 170,
+          "clause": "CHAMPION_RECORD",
+          "severity": "SERVING_ADJACENT",
+          "symbol": "CountyYieldChampion",
+          "detail": "a local served-model record (methods ['from_payload', 'load', 'load_track', 'predict', 'verify_checkpoint']); core.served.ServedModel is the portfolio's record type",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "torrent",
+      "git_sha": "c16c2101d8e2eb0e71a5c2bb10ec2859c17b9a1c",
+      "files_walked": 533,
+      "verdict": "FAIL",
+      "reason": "",
+      "findings": 7,
+      "contract_reimplemented": 6,
+      "files_named": [
+        "src/torrent/api/routers/mlops.py",
+        "src/torrent/mlops/champion_challenger.py"
+      ],
+      "clauses": [
+        "PROMOTION_VERDICT",
+        "SHADOW_ROUTER"
+      ],
+      "detail": [
+        {
+          "path": "src/torrent/api/routers/mlops.py",
+          "line": 47,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "ChampionChallengerRequest",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/torrent/api/routers/mlops.py",
+          "line": 57,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "ChampionChallengerResponse",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/torrent/api/routers/mlops.py",
+          "line": 60,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "ChampionChallengerResponse.promote",
+          "detail": "a promotion verdict held as a record field; unless it is derived from a three-valued status, an unmeasured comparison and a measured loss are the same value",
+          "corroborating": []
+        },
+        {
+          "path": "src/torrent/mlops/champion_challenger.py",
+          "line": 31,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "ChallengerResult",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/torrent/mlops/champion_challenger.py",
+          "line": 40,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "ChallengerResult.promote",
+          "detail": "a promotion verdict held as a record field; unless it is derived from a three-valued status, an unmeasured comparison and a measured loss are the same value",
+          "corroborating": []
+        },
+        {
+          "path": "src/torrent/mlops/champion_challenger.py",
+          "line": 98,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "ChampionChallenger",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/torrent/mlops/champion_challenger.py",
+          "line": 43,
+          "clause": "SHADOW_ROUTER",
+          "severity": "SERVING_ADJACENT",
+          "symbol": "ShadowRouter",
+          "detail": "a local traffic router; ShadowRouter is defined twice in the fleet with OPPOSITE production semantics (one returns the champion's result, one returns the challenger's)",
+          "corroborating": []
+        }
+      ]
+    },
+    {
+      "repo": "chokepoint",
+      "git_sha": "57695ab780dc3e0fcf5a85d79acbc6d8f64879a7",
+      "files_walked": 272,
+      "verdict": "FAIL",
+      "reason": "",
+      "findings": 30,
+      "contract_reimplemented": 27,
+      "files_named": [
+        "scripts/promote_daily_flow_champion.py",
+        "scripts/run_zeroshot_foundation_eval.py",
+        "src/resilient_chokepoint/mlops/champion_challenger.py",
+        "src/resilient_chokepoint/mlops/promotion_gate.py",
+        "src/resilient_chokepoint/registry/promotion_gate.py",
+        "src/resilient_chokepoint/serve/corridor_scale_only.py",
+        "src/resilient_chokepoint/serve/daily_flow_forecaster.py"
+      ],
+      "clauses": [
+        "CHAMPION_RECORD",
+        "PROMOTION_VERDICT",
+        "PROVENANCE",
+        "SELF_HASH",
+        "SERVE_ARM",
+        "SHADOW_ROUTER"
+      ],
+      "detail": [
+        {
+          "path": "scripts/promote_daily_flow_champion.py",
+          "line": 421,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "_controls",
+          "detail": "decides PASS/FAIL on a promotion locally; core.served.challenger_decision is the one gate, and it is the clause where the fleet's implementations actually disagree",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "scripts/run_zeroshot_foundation_eval.py",
+          "line": 234,
+          "clause": "PROVENANCE",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "verify_checkpoint",
+          "detail": "verifies bytes against a record locally; core.served.verify_at_load and DataSource.verify are the contract's refusals",
+          "corroborating": []
+        },
+        {
+          "path": "src/resilient_chokepoint/mlops/champion_challenger.py",
+          "line": 44,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "ChallengerResult",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/resilient_chokepoint/mlops/champion_challenger.py",
+          "line": 64,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "__post_init__",
+          "detail": "decides PASS/FAIL on a promotion locally; core.served.challenger_decision is the one gate, and it is the clause where the fleet's implementations actually disagree",
+          "corroborating": []
+        },
+        {
+          "path": "src/resilient_chokepoint/mlops/promotion_gate.py",
+          "line": 34,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "PromotionGate",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/resilient_chokepoint/registry/promotion_gate.py",
+          "line": 18,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "PromotionResult",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/resilient_chokepoint/registry/promotion_gate.py",
+          "line": 25,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "PromotionGate",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/resilient_chokepoint/registry/promotion_gate.py",
+          "line": 94,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "evaluate",
+          "detail": "decides PASS/FAIL on a promotion locally; core.served.challenger_decision is the one gate, and it is the clause where the fleet's implementations actually disagree",
+          "corroborating": []
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/corridor_scale_only.py",
+          "line": 153,
+          "clause": "SELF_HASH",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "sha256 over canonical JSON with the hash field excluded",
+          "detail": "recomputes an artifact self-hash locally; core.served.canonical_payload_sha256 is the one definition of that digest, and it reproduces every committed artifact hash in the fleet byte for byte",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/corridor_scale_only.py",
+          "line": 375,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "challenger_gate",
+          "detail": "decides a promotion locally; core.served.challenger_decision is the one gate, and it is the clause the fleet actually disagrees on",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/corridor_scale_only.py",
+          "line": 391,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/corridor_scale_only.py",
+          "line": 405,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/corridor_scale_only.py",
+          "line": 419,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/corridor_scale_only.py",
+          "line": 456,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/corridor_scale_only.py",
+          "line": 465,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/corridor_scale_only.py",
+          "line": 478,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/corridor_scale_only.py",
+          "line": 487,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 100,
+          "clause": "SERVE_ARM",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "DECIDING_SPLIT",
+          "detail": "declares a serve-arm policy locally; core.served.ServeArms makes the policy data and the refusal mechanical, which is what lets two repos disagree about which arm is closed without disagreeing about the guard",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 145,
+          "clause": "SELF_HASH",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "sha256 over canonical JSON with the hash field excluded",
+          "detail": "recomputes an artifact self-hash locally; core.served.canonical_payload_sha256 is the one definition of that digest, and it reproduces every committed artifact hash in the fleet byte for byte",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 497,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "challenger_gate",
+          "detail": "decides a promotion locally; core.served.challenger_decision is the one gate, and it is the clause the fleet actually disagrees on",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 526,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 553,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 573,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 593,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 602,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 615,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 624,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/mlops/champion_challenger.py",
+          "line": 124,
+          "clause": "SHADOW_ROUTER",
+          "severity": "SERVING_ADJACENT",
+          "symbol": "ShadowRouter",
+          "detail": "a local traffic router; ShadowRouter is defined twice in the fleet with OPPOSITE production semantics (one returns the champion's result, one returns the challenger's)",
+          "corroborating": []
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/corridor_scale_only.py",
+          "line": 157,
+          "clause": "CHAMPION_RECORD",
+          "severity": "SERVING_ADJACENT",
+          "symbol": "EpisodeResponseChampion",
+          "detail": "a local served-model record (methods ['from_payload', 'load']); core.served.ServedModel is the portfolio's record type",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_chokepoint/serve/daily_flow_forecaster.py",
+          "line": 160,
+          "clause": "CHAMPION_RECORD",
+          "severity": "SERVING_ADJACENT",
+          "symbol": "DailyFlowChampion",
+          "detail": "a local served-model record (methods ['from_payload', 'load']); core.served.ServedModel is the portfolio's record type",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "surge",
+      "git_sha": "9eab2fe801776d3fbad064900c204dac5d1e0f48",
+      "files_walked": 328,
+      "verdict": "PASS",
+      "reason": "",
+      "findings": 0,
+      "contract_reimplemented": 0,
+      "files_named": [],
+      "clauses": [],
+      "detail": []
+    },
+    {
+      "repo": "triage",
+      "git_sha": "f44430853eac04ade440f586a08a106cb2a870bf",
+      "files_walked": 416,
+      "verdict": "FAIL",
+      "reason": "",
+      "findings": 14,
+      "contract_reimplemented": 13,
+      "files_named": [
+        "benchmarks/converge_dlnm_champion.py",
+        "scripts/score_weekly_mortality_positive_metrics.py",
+        "scripts/serialize_weekly_mortality_champion.py",
+        "scripts/serve_weekly_mortality.py",
+        "src/resilient_triage/mlops/registry.py",
+        "src/resilient_triage/registry/promotion_gate.py",
+        "src/resilient_triage/serve/weekly_mortality.py"
+      ],
+      "clauses": [
+        "CHAMPION_RECORD",
+        "PROMOTION_VERDICT",
+        "SELF_HASH",
+        "SERVE_ARM"
+      ],
+      "detail": [
+        {
+          "path": "benchmarks/converge_dlnm_champion.py",
+          "line": 286,
+          "clause": "SERVE_ARM",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "if <arm> ... raise",
+          "detail": "refuses an arm inline; core.served.ServeArms.require is the contract's guard and refuses an UNDECLARED arm too, which an inline test against one name does not",
+          "corroborating": []
+        },
+        {
+          "path": "scripts/score_weekly_mortality_positive_metrics.py",
+          "line": 54,
+          "clause": "SERVE_ARM",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "ARM",
+          "detail": "declares a serve-arm policy locally; core.served.ServeArms makes the policy data and the refusal mechanical, which is what lets two repos disagree about which arm is closed without disagreeing about the guard",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "scripts/score_weekly_mortality_positive_metrics.py",
+          "line": 132,
+          "clause": "SERVE_ARM",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "if <arm> ... raise",
+          "detail": "refuses an arm inline; core.served.ServeArms.require is the contract's guard and refuses an UNDECLARED arm too, which an inline test against one name does not",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "scripts/serialize_weekly_mortality_champion.py",
+          "line": 127,
+          "clause": "SERVE_ARM",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "if <arm> ... raise",
+          "detail": "refuses an arm inline; core.served.ServeArms.require is the contract's guard and refuses an UNDECLARED arm too, which an inline test against one name does not",
+          "corroborating": []
+        },
+        {
+          "path": "scripts/serve_weekly_mortality.py",
+          "line": 55,
+          "clause": "SERVE_ARM",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "SERVEABLE_ARMS",
+          "detail": "declares a serve-arm policy locally; core.served.ServeArms makes the policy data and the refusal mechanical, which is what lets two repos disagree about which arm is closed without disagreeing about the guard",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "scripts/serve_weekly_mortality.py",
+          "line": 66,
+          "clause": "SERVE_ARM",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "if <arm> ... raise",
+          "detail": "refuses an arm inline; core.served.ServeArms.require is the contract's guard and refuses an UNDECLARED arm too, which an inline test against one name does not",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_triage/mlops/registry.py",
+          "line": 687,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "PromotionGate",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/resilient_triage/registry/promotion_gate.py",
+          "line": 13,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "PromotionResult",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "src/resilient_triage/serve/weekly_mortality.py",
+          "line": 117,
+          "clause": "SELF_HASH",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "sha256 over canonical JSON with the hash field excluded",
+          "detail": "recomputes an artifact self-hash locally; core.served.canonical_payload_sha256 is the one definition of that digest, and it reproduces every committed artifact hash in the fleet byte for byte",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_triage/serve/weekly_mortality.py",
+          "line": 444,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "challenger_gate",
+          "detail": "decides a promotion locally; core.served.challenger_decision is the one gate, and it is the clause the fleet actually disagrees on",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_triage/serve/weekly_mortality.py",
+          "line": 466,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_triage/serve/weekly_mortality.py",
+          "line": 480,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_triage/serve/weekly_mortality.py",
+          "line": 494,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "{promotable, ...}",
+          "detail": "a promotion verdict assembled as a bare dict; core.served.ChallengerDecision enforces that PASS carries measured skill and that NA carries none",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        },
+        {
+          "path": "src/resilient_triage/serve/weekly_mortality.py",
+          "line": 121,
+          "clause": "CHAMPION_RECORD",
+          "severity": "SERVING_ADJACENT",
+          "symbol": "WeeklyMortalityChampion",
+          "detail": "a local served-model record (methods ['from_payload', 'load']); core.served.ServedModel is the portfolio's record type",
+          "corroborating": [
+            "string \"artifact_sha256\""
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "blackout",
+      "git_sha": "ed80086937e1a4c02bb2ac1ce79a754ae8fecdcf",
+      "files_walked": 241,
+      "verdict": "FAIL",
+      "reason": "",
+      "findings": 2,
+      "contract_reimplemented": 2,
+      "files_named": [
+        "resilient_blackout/mlops/promotion_gate.py",
+        "resilient_blackout/mlops/registry.py"
+      ],
+      "clauses": [
+        "PROMOTION_VERDICT"
+      ],
+      "detail": [
+        {
+          "path": "resilient_blackout/mlops/promotion_gate.py",
+          "line": 34,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "PromotionGate",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        },
+        {
+          "path": "resilient_blackout/mlops/registry.py",
+          "line": 686,
+          "clause": "PROMOTION_VERDICT",
+          "severity": "CONTRACT_REIMPLEMENTED",
+          "symbol": "PromotionGate",
+          "detail": "a local promotion-verdict type; core.served.ChallengerDecision keeps NA structurally distinct from FAIL, which a bool cannot",
+          "corroborating": []
+        }
+      ]
+    }
+  ]
+}
