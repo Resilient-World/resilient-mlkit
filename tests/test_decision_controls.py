@@ -33,7 +33,12 @@ from __future__ import annotations
 import textwrap
 
 from resilient_mlkit.checks import RunContext
-from resilient_mlkit.checks.decision import d2_placebo_test
+from resilient_mlkit.checks.decision import (
+    MAX_COVERAGE_TOL,
+    MIN_COVERAGE_N,
+    d2_placebo_test,
+    d3_uncertainty_coverage,
+)
 from resilient_mlkit.core.repo import Repo
 from resilient_mlkit.core.result import Status
 from resilient_mlkit.portfolio import BLOCKED, resolve
@@ -402,3 +407,115 @@ def test_negative_control_an_ordinary_finite_placebo_is_untouched_by_the_guard(t
     )
     assert result.status is Status.PASS
     assert result.evidence["estimate"] == 0.004
+
+
+# -- D3: the coverage tolerance is mlkit's, not the binding's -------------
+#
+# D3's pairs are the same shape as R4's and for the same reason: a binding may
+# ask for something stricter than mlkit and never for something looser, because
+# a subject that sets its own pass mark sets no pass mark. The other pair here
+# is the underpowered one — below MIN_COVERAGE_N the binomial standard error
+# alone exceeds the tolerance, so the measurement cannot support a verdict in
+# either direction and the honest answer is NA.
+
+
+def _coverage_repo(tmp_path, body: str, *, declare: bool = True) -> Repo:
+    module = f"d3_bindings_{next(_SERIAL)}"
+    (tmp_path / f"{module}.py").write_text(textwrap.dedent(body))
+    (tmp_path / ".mlkit").mkdir(parents=True, exist_ok=True)
+    toml = '[repo]\nname = "fixturerepo"\n'
+    if declare:
+        toml += f'\n[bindings]\ncoverage = "{module}:coverage"\n'
+    (tmp_path / ".mlkit" / "repo.toml").write_text(toml)
+    return Repo(name="fixturerepo", path=tmp_path)
+
+
+def _run_d3(tmp_path, body: str, *, declare: bool = True):
+    repo = _coverage_repo(tmp_path, body, declare=declare)
+    try:
+        return d3_uncertainty_coverage(repo, _ctx(tmp_path))
+    finally:
+        repo.release()
+
+
+def _coverage(fields: str) -> str:
+    return f"""
+        def coverage():
+            return {{{fields}}}
+    """
+
+
+def test_negative_control_coverage_matching_nominal_is_silent(tmp_path):
+    """SILENT: empirical within tolerance of nominal, on enough points."""
+    result = _run_d3(tmp_path, _coverage('"nominal": 0.90, "empirical": 0.89, "n": 5000'))
+    assert result.status is Status.PASS
+    assert result.evidence["tol"] == MAX_COVERAGE_TOL
+
+
+def test_positive_control_intervals_that_do_not_cover_are_refused(tmp_path):
+    """FIRES: 68% empirical against a 90% nominal means the prediction intervals
+    do not mean what they say, and everything quoted from them is narrower than
+    the truth."""
+    result = _run_d3(tmp_path, _coverage('"nominal": 0.90, "empirical": 0.68, "n": 5000'))
+    assert result.status is Status.FAIL
+    assert "do not mean what they say" in result.reason
+
+
+def test_positive_control_a_binding_cannot_widen_its_own_coverage_tolerance(tmp_path):
+    """FIRES: the branch that makes D3 a gate.
+
+    The binding asks for `tol: 0.50`, under which a 22-point coverage miss would
+    pass. `min(declared, MAX_COVERAGE_TOL)` clamps it to 0.05 and the check
+    fires anyway, printing mlkit's tolerance rather than the one it was handed.
+    """
+    result = _run_d3(
+        tmp_path, _coverage('"nominal": 0.90, "empirical": 0.68, "n": 5000, "tol": 0.50')
+    )
+    assert result.status is Status.FAIL
+    assert result.evidence["tol"] == MAX_COVERAGE_TOL
+
+
+def test_positive_control_a_stricter_declared_tolerance_is_honoured(tmp_path):
+    """FIRES on the other side of the clamp: a binding may be stricter than
+    mlkit, so `tol: 0.005` fires on a 1-point miss that mlkit alone allows.
+    Without this half, the clamp is indistinguishable from a fixed threshold."""
+    result = _run_d3(
+        tmp_path, _coverage('"nominal": 0.90, "empirical": 0.89, "n": 5000, "tol": 0.005')
+    )
+    assert result.status is Status.FAIL
+    assert result.evidence["tol"] == 0.005
+
+
+def test_a_holdout_too_small_to_measure_coverage_is_NA_not_a_pass(tmp_path):
+    """FIRES as NA: below MIN_COVERAGE_N the binomial standard error alone
+    exceeds the tolerance, so the measurement cannot support a verdict either
+    way. Calling that PASS would be a coverage claim resting on noise."""
+    result = _run_d3(tmp_path, _coverage('"nominal": 0.90, "empirical": 0.90, "n": 40'))
+    assert result.status is Status.NA
+    assert "too small to measure coverage" in result.reason
+    assert result.evidence["n"] == 40
+
+
+def test_negative_control_exactly_the_minimum_n_is_measurable(tmp_path):
+    """SILENT at the boundary: the test is `n < MIN_COVERAGE_N`, so the floor
+    itself measures — the NA above is of the shortfall, not of small holdouts."""
+    result = _run_d3(
+        tmp_path, _coverage(f'"nominal": 0.90, "empirical": 0.90, "n": {MIN_COVERAGE_N}')
+    )
+    assert result.status is Status.PASS
+
+
+def test_a_missing_coverage_field_is_refused_by_name(tmp_path):
+    """FIRES: coverage with no n is a proportion with no denominator."""
+    result = _run_d3(tmp_path, _coverage('"nominal": 0.90, "empirical": 0.90'))
+    assert result.status is Status.FAIL
+    assert "did not report n" in result.reason
+
+
+def test_an_undeclared_coverage_binding_is_NA(tmp_path):
+    """FIRES as NA: unmeasured coverage is not calibrated coverage."""
+    result = _run_d3(
+        tmp_path, _coverage('"nominal": 0.90, "empirical": 0.90, "n": 5000'), declare=False
+    )
+    assert result.status is Status.NA
+    assert "no 'coverage' binding declared" in result.reason
