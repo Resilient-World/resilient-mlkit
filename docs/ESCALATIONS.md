@@ -447,3 +447,58 @@ Three things remain a release decision of record and are **not** an agent's:
 is the first artifact that makes the answer permanent. If the answer is `1.0.0`,
 it is one edit to `__version__` and one heading, and the control added here
 keeps the two from drifting apart while it is made.
+
+## E-M12 — the choco fleet row was read from a file committed on no branch at all
+
+**Raised by** the adversarial verification of `feat/loop-mlkit-4`, while
+re-measuring that branch's own claim that "the other six repos' declared
+artifacts are all present on their own `main`".
+
+**Measured** read-only on 2026-08-29 in each repo's own clone -- `git cat-file
+-e <ref>:<path>`, `git log --all -- <path>`, `git check-ignore -v`; no
+checkout, no fetch, nothing written. Over the 17 distinct `(repo, path)` pairs
+`src/resilient_mlkit/fleet_adapters.py` declares, 16 resolve on the ref the
+adapter implies. The seventeenth does not:
+
+    resilient-choco  models/observed_production_head.meta.json
+      main                       -> ABSENT
+      any ref (`log --all`)      -> no commit touches this path
+      check-ignore               -> .gitignore:82:/models/*
+      working tree               -> present, 39172 bytes
+
+That path is the `main:` artifact of the `choco` adapter, and every choco cell
+in `portfolio/FLEET_VERDICTS.md` that resolves through it -- candidate, score,
+split, baseline score, test-arm-spent -- was therefore read from an untracked,
+gitignored working-tree file. The adjacent `served:`
+artifact (`models/observed_production_persistence.meta.json`) IS committed on
+choco's `main`, which is why the row looks half-provenanced rather than
+obviously unbacked.
+
+**Why this is not the same defect as the branch dependence** already recorded
+in `fleet_adapters.py`. blackout's and triage's evidence is committed, on a
+named branch, with a sha256 in the provenance table; a reader can resolve it.
+choco's cannot be resolved from any ref, so there is no branch to name and
+`BRANCH_ONLY_EVIDENCE` is the wrong place for it. The verifier's new control
+`test_negative_control_a_repo_whose_evidence_is_on_main_needs_no_note` is
+silent on choco for exactly that reason, and correctly so -- it measures notes,
+not provenance.
+
+**Not done here, and why.**
+
+1. No note was invented for the choco adapter. The honest note would assert
+   where the evidence lives, and it lives nowhere resolvable; writing one would
+   be the fabrication this repo's rules exist to stop.
+2. `resilient-choco` has an open colleague PR (#160). Nothing in that repo was
+   read except through `git cat-file`/`log`/`check-ignore`, and nothing was
+   written. Whether the file should be committed, DVC-tracked, or the row
+   withdrawn is that repo's decision, not this one's.
+3. No control was added that shells out to sibling clones. `fleet_adapters.py`
+   declares paths, not clones; a test that requires seven checkouts to be
+   present would fail in CI for a reason that has nothing to do with the
+   defect.
+
+**Proposed**, for the signatory: fold the choco row into E-M10's authorised
+fleet re-measurement rather than patching it separately, and treat the choco
+verdict as unprovenanced until its `main:` artifact resolves from a ref. A
+committed figure whose artifact exists on no branch is not distinguishable from
+one nobody can check.

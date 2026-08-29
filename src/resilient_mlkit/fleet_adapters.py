@@ -24,11 +24,24 @@ the branch that repo has checked out, and blackout's two entries and triage's
 read artifacts committed only on ``e021-decision`` and ``e028-decision``.
 Measured read-only on 2026-08-29 with ``git cat-file -e <ref>:<path>`` in each
 repo's own clone -- no checkout, no fetch, nothing written: present on those
-branches, absent on each repo's ``main``, while the other six repos' declared
-artifacts are all present on their own ``main``. ``portfolio/FLEET_VERDICTS.md``
+branches, absent on each repo's ``main``. ``portfolio/FLEET_VERDICTS.md``
 records the same fact in its provenance table;
 ``tests/test_fleet.py::test_every_branch_only_adapter_says_its_evidence_is_not_on_main``
 holds the two in agreement.
+
+One correction to an earlier reading of that probe, which claimed the other six
+repos' artifacts were "all present on their own ``main``". Re-measured the same
+way on 2026-08-29 over the distinct ``(repo, path)`` pairs these adapters
+declare -- 16 of 17 resolve on the ref their note implies -- but the
+seventeenth, ``choco``'s ``main`` artifact
+``models/observed_production_head.meta.json`` is committed on NO ref in that
+clone -- ``git -C resilient-choco log --all -- <path>`` is empty and
+``git check-ignore -v`` reports ``.gitignore:82:/models/*``. It exists only in
+choco's working tree, so the choco row of the fleet table was read from an
+untracked file. That is a different defect from branch dependence (there is no
+branch to name), it is not what ``BRANCH_ONLY_EVIDENCE`` encodes, and choco has
+an open colleague PR, so it is recorded here and escalated rather than
+"fixed" by inventing a note for it.
 """
 
 from __future__ import annotations

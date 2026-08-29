@@ -764,13 +764,37 @@ def test_positive_control_a_note_naming_the_wrong_branch_is_caught() -> None:
 
 
 def test_negative_control_a_repo_whose_evidence_is_on_main_needs_no_note() -> None:
-    """SILENT: arabica's artifact IS on arabica's main (measured above).
+    """SILENT: an adapter outside ``BRANCH_ONLY_EVIDENCE`` is never flagged.
 
     Without this pair the rule above is indistinguishable from "every adapter
     must carry a note", which would make the note meaningless.
+
+    Strengthened during adversarial verification. The earlier shape passed a
+    pre-filtered slice (the non-required adapters, notes as committed) and
+    asserted the result was empty. That did catch the break its docstring
+    names -- dropping ``entries_missing_branch_note``'s ``a.repo in required``
+    guard makes it fail -- but its silence and the rule's firing were measured
+    on DIFFERENT inputs, so "silent" could still have meant "given nothing to
+    object to": blanking the notes of those same adapters does not change its
+    result either way.
+
+    This shape fixes that by using one input for both halves. Every note on the
+    WHOLE adapter tuple is blanked; the rule must fire (the three
+    branch-dependent entries are flagged) and, on that same input, must stay
+    silent for every adapter whose evidence is on its own ``main``.
     """
+    import dataclasses
+
     from resilient_mlkit.fleet_adapters import ADAPTERS
 
-    on_main = [a for a in ADAPTERS if a.repo not in BRANCH_ONLY_EVIDENCE]
+    on_main = [a.key for a in ADAPTERS if a.repo not in BRANCH_ONLY_EVIDENCE]
     assert on_main, "no adapters left to control against"
-    assert entries_missing_branch_note(on_main, BRANCH_ONLY_EVIDENCE) == []
+
+    blanked = tuple(dataclasses.replace(a, note="") for a in ADAPTERS)
+    flagged = entries_missing_branch_note(blanked, BRANCH_ONLY_EVIDENCE)
+
+    assert flagged, "same-input positive: a blanked note must fire for the required repos"
+    assert not (set(flagged) & set(on_main)), (
+        "an adapter whose evidence is on its repo's own main was flagged for "
+        f"missing a branch note: {sorted(set(flagged) & set(on_main))}"
+    )
