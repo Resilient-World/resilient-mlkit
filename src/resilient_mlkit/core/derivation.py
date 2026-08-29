@@ -135,7 +135,8 @@ can promote to ``real``.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 #: Out-of-sample residual-ratio threshold at or below which a row is a
 #: derivation candidate. Unchanged from the original surge probe.

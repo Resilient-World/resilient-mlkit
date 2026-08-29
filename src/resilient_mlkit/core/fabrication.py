@@ -45,10 +45,20 @@ code. They remain a matter for review.
 from __future__ import annotations
 
 import ast
+import itertools
+import math
 import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+
+#: The two AST nodes that carry a signature. Several scanners need
+#: ``.args``/``.body``/a docstring, which ``ast.AST`` does not promise, and
+#: annotating them as bare AST hid that from the type checker.
+_FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
+#: Statements ``_scan_guarded_statement`` is dispatched for, from ``scan()``.
+_StatementNode = ast.Assign | ast.AnnAssign | ast.Return
+
 
 # ---------------------------------------------------------------------------
 # Vocabulary
@@ -297,7 +307,16 @@ def tokenise(name: str) -> list[str]:
     # quantity both ways: ``pretrend_pvalue`` is one token but ``p_value`` is
     # two, and ``std_err``, ``ci_low``, ``effect_size`` and ``r_squared`` all
     # only become recognisable once rejoined.
-    parts.extend(a + b for a, b in zip(parts, parts[1:]))
+    #
+    # The snapshot is load-bearing, not decoration. `parts` is being extended by
+    # the very call that consumes it, so pairing must run over the list AS IT
+    # WAS. The previous spelling, `zip(parts, parts[1:])`, got that right only
+    # by accident of `parts[1:]` being a copy that bounded the zip; pairing the
+    # live list instead feeds each appended item straight back in and does not
+    # terminate. Written explicitly here so the bound is a stated fact -- the
+    # depluralise step below already spells the same snapshot out.
+    snapshot = list(parts)
+    parts.extend(a + b for a, b in itertools.pairwise(snapshot))
     # Depluralise, so that ``scores``, ``probs`` and ``rrs`` reach the same
     # vocabulary entry as their singulars.
     parts.extend(p[:-1] for p in list(parts) if len(p) > 2 and p.endswith("s"))
@@ -397,7 +416,11 @@ def _numeric_literal(node: ast.AST | None) -> str | None:
             return "True" if node.value else None
         if isinstance(node.value, (int, float)):
             value = float(node.value)
-            if value != value or value in (float("inf"), float("-inf")):
+            # NaN and the infinities are not plausible figures, so they are not
+            # fabrications. Spelled with `math` rather than the `value != value`
+            # self-comparison this used to carry: same truth value on a float,
+            # but it reads as a typo and a linter is right to say so.
+            if math.isnan(value) or math.isinf(value):
                 return None
             if value != 0.0 and abs(value) < 1e-4:
                 # 1e-6, 1e-9 and friends are divide-by-zero guards, not
@@ -981,7 +1004,7 @@ class _ModuleScanner:
             config_context=_reads_config(producer) or self.at_module_level(node),
         ))
 
-    def _scan_param_defaults(self, fn: ast.AST) -> None:
+    def _scan_param_defaults(self, fn: _FunctionNode) -> None:
         """``def gate(champion_mape=0.20, challenger_mape=0.15)``.
 
         A caller omitting the argument gets a figure nobody measured, and the
@@ -1000,9 +1023,11 @@ class _ModuleScanner:
         if args.defaults:
             for arg, default in zip(positional[len(positional) - len(args.defaults):], args.defaults):
                 pairs.append((arg, default))
-        for arg, default in zip(args.kwonlyargs, args.kw_defaults):
-            if default is not None:
-                pairs.append((arg, default))
+        for arg, kw_default in zip(args.kwonlyargs, args.kw_defaults):
+            # kw_defaults holds None for keyword-only args with no default --
+            # a hole in the list, not a `None` literal default.
+            if kw_default is not None:
+                pairs.append((arg, kw_default))
         if not pairs or not fn.body:
             return
         sinks = self._build_sinks(fn)
@@ -1017,8 +1042,8 @@ class _ModuleScanner:
             if not satisfies_a_gate(arg.arg, literal):
                 continue
             sink = sinks.get(arg.arg)
-            if sink is None or not (
-                sink.startswith("compared against") or sink.startswith("decides the verdict")
+            if sink is None or not sink.startswith(
+                ("compared against", "decides the verdict")
             ):
                 continue
             line = getattr(default, "lineno", getattr(fn, "lineno", 0))
@@ -1031,7 +1056,7 @@ class _ModuleScanner:
                 literal=literal, sink=sink, snippet=self.snippet(arg),
             ))
 
-    def _scan_metric_literal_return(self, fn: ast.AST) -> None:
+    def _scan_metric_literal_return(self, fn: _FunctionNode) -> None:
         """``def compute_csi(...): ... return 1.0``.
 
         Four independent CSI implementations in this portfolio returned a
@@ -1076,7 +1101,7 @@ class _ModuleScanner:
             ))
 
     @staticmethod
-    def _docstring_names_a_metric(fn: ast.AST) -> bool:
+    def _docstring_names_a_metric(fn: _FunctionNode) -> bool:
         """``def _critical_success_index(...): '''... (CSI) = TP/(TP+FN+FP)'''``.
 
         Some metric implementations spell the quantity out in the name and
@@ -1089,9 +1114,10 @@ class _ModuleScanner:
         if not first:
             return False
         for word in re.findall(r"\b[A-Z][A-Za-z0-9]{1,6}\b", first):
-            if word.isupper() or re.fullmatch(r"[A-Z][a-z]?[A-Z][A-Za-z0-9]*", word):
-                if word.lower() in MEASURED_TOKENS:
-                    return True
+            if (
+                word.isupper() or re.fullmatch(r"[A-Z][a-z]?[A-Z][A-Za-z0-9]*", word)
+            ) and word.lower() in MEASURED_TOKENS:
+                return True
         return False
 
     def _scan_gate_pass_literal(self, node: ast.Return) -> None:
@@ -1192,7 +1218,7 @@ class _ModuleScanner:
             return [target.slice.value]
         return []
 
-    def _scan_guarded_statement(self, node: ast.AST) -> None:
+    def _scan_guarded_statement(self, node: _StatementNode) -> None:
         """Literals assigned or returned where no measurement happened.
 
         Fires only inside an ``except`` handler or a branch guarded by an
@@ -1204,8 +1230,10 @@ class _ModuleScanner:
             return
         shape = f"{guard}-branch literal"
 
+        value: ast.expr | None
+        targets: list[ast.expr]
         if isinstance(node, ast.Assign):
-            value, targets = node.value, node.targets
+            value, targets = node.value, list(node.targets)
         elif isinstance(node, ast.AnnAssign):
             value, targets = node.value, [node.target]
         else:
@@ -1291,10 +1319,15 @@ class _ModuleScanner:
             if isinstance(parent, ast.If):
                 if current in parent.body and _is_absence_test(parent.test):
                     return "absence"
-                if current in parent.orelse and not _is_absence_test(parent.test):
-                    # `if smds: ... else: 0.0` -- the else arm IS the empty case.
-                    if isinstance(parent.test, (ast.Name, ast.Attribute, ast.Call, ast.Compare)):
-                        return "absence"
+                # `if smds: ... else: 0.0` -- the else arm IS the empty case.
+                if (
+                    current in parent.orelse
+                    and not _is_absence_test(parent.test)
+                    and isinstance(
+                        parent.test, (ast.Name, ast.Attribute, ast.Call, ast.Compare)
+                    )
+                ):
+                    return "absence"
             if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Module)):
                 return None
             current = parent

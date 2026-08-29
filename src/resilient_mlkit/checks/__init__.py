@@ -7,9 +7,9 @@ it runs in, because for readiness that order is not numerical.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
 from ..core.repo import Repo
 from ..core.result import CheckResult

@@ -1,0 +1,135 @@
+# CI for resilient-mlkit.
+#
+# UNVERIFIED AS COMMITTED. GitHub Actions is failing account-wide on billing at
+# the time of writing (2026-08-28), so this workflow has never executed and no
+# run of it is being claimed. It is committed now so that it starts working the
+# moment billing is restored, rather than being written after the next
+# regression it would have caught.
+#
+# What HAS been run, locally, on the commit that added this file:
+#
+#   ruff 0.16.5  check src tests scripts          -> all checks passed
+#   mypy 2.3.1   src/resilient_mlkit              -> no issues, 25 source files
+#   pytest 9.1.1 (focused, per file)              -> see the PR body; the full
+#                                                    suite has NOT been run here
+#
+# Those local runs are what the jobs below reproduce. They are not evidence
+# that the workflow file itself is correct -- only a run is.
+#
+# WHY THE TOOL VERSIONS ARE PINNED EXACTLY
+# ----------------------------------------
+# This file previously installed `ruff>=0.4` and ran it at its DEFAULTS, with a
+# comment arguing that adding a config would widen what passes. The intent was
+# right and the mechanism was not: ruff's default rule set is a property of the
+# ruff RELEASE, so an unpinned floor means the check's definition changes
+# without anyone editing this file -- and it already had. Measured 2026-08-29 on
+# 8647be9, `ruff check src tests scripts` reported **36 errors** at ruff 0.16.5
+# against the "all checks passed" this comment used to claim, including three
+# `# noqa: E402` and one `# noqa: PLC0415` flagged RUF100 UNUSED because those
+# rules are not in the current defaults. The declaration had gone stale in place
+# and nothing could see it, which is this package's own defect class pointed at
+# itself.
+#
+# So the floor becomes an exact pin. Defaults are kept -- no `[tool.ruff]`
+# select was added, nothing was widened, and all 36 findings were fixed in
+# `src/` rather than suppressed. Pinning does not weaken the gate; it gives the
+# gate a definition that is committed instead of inferred from whatever the
+# runner downloaded that morning. Upgrading is then a visible diff with a
+# visible findings delta, which is the point.
+#
+# tests/test_ci_workflow.py enforces the pins, so this reasoning cannot rot back
+# into a floor.
+#
+# Scope note: `mlkit portfolio` and `mlkit spine` deliberately have NO job here.
+# Both read the eight model repos as sibling checkouts, which do not exist on a
+# runner. A job that ran them would find no repos and exit clean, which is a
+# green tick for having measured nothing -- the exact defect this package was
+# written to detect.
+
+name: CI
+
+on:
+  push:
+    branches: [main, feat/**]
+  pull_request:
+
+# A second push should cancel the first run rather than queue behind it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install ruff
+        # Pinned exactly, not floored. See the header: ruff's default rule set
+        # ships with the release, so `>=` makes this job's meaning depend on the
+        # release date rather than on this file.
+        run: python -m pip install --upgrade pip "ruff==0.16.5"
+      # No config file: mlkit runs ruff at its defaults, so what CI checks is
+      # exactly what a contributor gets from a bare `ruff check` at the pinned
+      # version. Adding a config to widen what passes would make this job agree
+      # with nothing.
+      - run: ruff check src tests scripts
+
+  typecheck:
+    name: mypy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package and type checker
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "."
+          pip install "mypy==2.3.1" "types-PyYAML>=6.0"
+      # Deliberately NOT --ignore-missing-imports. mlkit has exactly one
+      # optional third-party import (numpy, inside a probe that reports NA when
+      # it fails) and that one is declared in pyproject.toml. A blanket ignore
+      # would also silence a genuinely missing first-party module.
+      - run: python -m mypy src/resilient_mlkit
+
+  tests:
+    name: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the floor declared in pyproject; 3.12 is what the model repos
+        # run. Both, because a package installed into eight environments must
+        # not depend on the interpreter that happened to be handy.
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install package and test extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+      - name: pytest-timeout must be ACTIVE, not merely declared
+        # `timeout` is an ini key pytest does not know: without the plugin
+        # registered, pytest ignores it silently and pyproject.toml reads as
+        # though a limit is in force. Fail the job here, before the suite runs,
+        # rather than discovering it from a job that hung for six hours.
+        run: python -c "import pytest_timeout; print(pytest_timeout.__file__)"
+      - name: Unit tests
+        run: python -m pytest tests -q

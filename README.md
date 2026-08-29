@@ -11,10 +11,47 @@ that did not come out of a run of this CLI does not exist.
 
 - `src/resilient_mlkit/` — the package. 26 gating checks across 5 phases,
   plus 5 diagnostic triage checks.
+- `src/resilient_mlkit/fleet_adapters.py` — one declared adapter per model of
+  record, saying which committed artifact and which pointer carries each column
+  of the fleet verdict table.
 - `spine/` — the canonical docs and scaffolding synced into every model repo.
 - `scripts/sync_spine.py` — propagates `spine/`. Canonical files are
   overwritten; seed files (escalations, blockers, allowlist, repo.toml) are
-  written once and then owned by the repo.
+  written once and then owned by the repo. It imports the declaration of what
+  "canonical" means from `core.spine`, so the syncer and the drift check cannot
+  disagree about it.
+- `portfolio/` — the fleet adjudications. `MODEL_QUALITY.md` is hand-written
+  judgement; `FLEET_VERDICTS.md` and `SPINE_DRIFT.md` are generated and must not
+  be hand-edited.
+- `docs/ESCALATIONS.md` — findings the instrument measured in the model repos
+  that cannot be fixed from here.
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `mlkit check --phase PHASE` | run one phase against every repo found |
+| `mlkit check --portfolio` | each repo's terminal readiness state |
+| `mlkit portfolio` | regenerate the **measured** columns of the fleet verdict table by reading each repo's committed artifacts |
+| `mlkit spine` | report canonical-spine drift per repo. **Report-only — never writes into a model repo** |
+| `mlkit env` | can this interpreter measure each repo at all |
+| `mlkit keys` | credentials the portfolio is waiting on |
+| `mlkit notice` | regenerate `NOTICE.md` from the allowlist |
+| `mlkit allowlist verify` | allowlist structure and signature |
+
+`mlkit portfolio` and `mlkit check --portfolio` are different questions.
+The first is model quality — does this thing beat its baseline. The second is
+readiness — can this repo start a run. Neither answers the other.
+
+```
+mlkit portfolio --out portfolio/FLEET_VERDICTS.md
+mlkit spine     --out portfolio/SPINE_DRIFT.md
+```
+
+Both write a `.json` twin beside the `.md`. Every figure in the verdict table
+carries the artifact it came from, that artifact's sha256, and whether git has
+those bytes at HEAD; a column a repo's artifacts do not carry reports `NA` with
+the reason rather than being omitted.
 
 ## Statuses
 

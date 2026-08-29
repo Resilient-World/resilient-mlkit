@@ -27,3 +27,42 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 resilient_mlkit = ["py.typed"]
+
+# Test-time dependencies. Declared here so the environment is reproducible from
+# the manifest rather than from whoever last ran pip by hand.
+#
+# pytest-timeout is not optional comfort. `timeout` below is an ini key pytest
+# does not know: without the plugin registered, pytest silently ignores it and
+# the declaration bounds nothing while reading as though it does. That is the
+# same defect class as a config key no stage consumes, and it is only
+# detectable by execution -- see tests/test_pytest_timeout_active.py.
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-timeout>=2.3",
+    # A TEST dependency, not a runtime one. `core.derivation` imports numpy
+    # inside a probe that reports NA when the import fails -- that is correct
+    # behaviour and stays correct in the eight repos, whose own environments
+    # supply numpy. But tests/test_derivation.py builds real arrays to exercise
+    # the probe, so the suite cannot run without it. Declared here so `pip
+    # install -e ".[test]"` gives a working suite; the eight repos install
+    # mlkit without this extra and are unaffected.
+    "numpy>=1.24",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers"]
+#: Seconds. No check in this package is a long-running job; anything that sits
+#: here for three minutes is wedged, not working.
+timeout = 180
+timeout_method = "thread"
+
+# mlkit deliberately has no numpy dependency: it is installed into eight repos
+# and every dependency added here is forced on all of them. `core.derivation`
+# imports numpy inside a probe that reports NA when the import fails, which is
+# the correct behaviour and not a missing stub. Declaring that here is a
+# statement of fact about the dependency set, not a silenced type error.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+ignore_missing_imports = true

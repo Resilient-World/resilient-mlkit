@@ -21,43 +21,20 @@ import argparse
 import sys
 from pathlib import Path
 
-MARKER = "CANONICAL"
+# The declaration of what "canonical" means lives in the package, so that this
+# script and `mlkit spine` cannot disagree about it. Two definitions of
+# canonical is the same as none.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-REPOS = (
-    "choco", "arabica", "fray", "torrent",
-    "chokepoint", "surge", "triage", "blackout",
-)
-
-#: Canonical files. Authored in the spine, overwritten on every sync. Editing
-#: the copy in a model repo is pointless -- the next sync reverts it.
-CANONICAL_FILES = (
-    ("CLAUDE.md", "CLAUDE.md"),
-    ("docs/DATA_POLICY.md", "docs/DATA_POLICY.md"),
-    ("docs/SELECTION.md", "docs/SELECTION.md"),
-    ("docs/READINESS.md", "docs/READINESS.md"),
-    ("docs/DECISION_VALIDITY.md", "docs/DECISION_VALIDITY.md"),
-    ("docs/RUN_ECONOMICS.md", "docs/RUN_ECONOMICS.md"),
-)
-
-#: Seed files. Written once if absent, then owned by the repo and NEVER
-#: overwritten. Each becomes repo-specific the moment it carries real content:
-#: escalations and blockers accumulate per repo, repo.toml gains that repo's
-#: bindings, and the allowlist gains determinations a human signed. Treating
-#: any of these as canonical would silently revert exactly the work that
-#: matters most -- including a signed allowlist, which is the one file in the
-#: portfolio an automated process must never touch.
-SEED_FILES = (
-    ("docs/ESCALATIONS.md", "docs/ESCALATIONS.md"),
-    ("docs/BLOCKERS.md", "docs/BLOCKERS.md"),
-    ("docs/allowlist.yaml", "docs/allowlist.yaml"),
-    ("mlkit/repo.toml", ".mlkit/repo.toml"),
-)
+from resilient_mlkit.core.repo import PORTFOLIO as REPOS
+from resilient_mlkit.core.spine import CANONICAL_FILES, SEED_FILES
+from resilient_mlkit.core.spine import has_banner as _has_banner
 
 
 def is_ours(path: Path) -> bool:
     """True when we may overwrite an existing canonical file at ``path``."""
     try:
-        return MARKER in path.read_text(errors="ignore")[:4000]
+        return _has_banner(path.read_text(errors="ignore"))
     except OSError:
         return False
 

@@ -47,7 +47,6 @@ from resilient_mlkit.core.derivation import (
     formula_derivation_probe,
 )
 
-
 # ---------------------------------------------------------------------------
 # (a) the surge synthetic fixture construction
 # ---------------------------------------------------------------------------
