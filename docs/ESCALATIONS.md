@@ -502,3 +502,53 @@ fleet re-measurement rather than patching it separately, and treat the choco
 verdict as unprovenanced until its `main:` artifact resolves from a ref. A
 committed figure whose artifact exists on no branch is not distinguishable from
 one nobody can check.
+
+---
+
+## E-M13 — the instrument's read semantics changed; the eight repos pin it by branch
+
+**Raised by** `COMMITTED-READS` on `feat/loop-mlkit-1`, which closed the
+mechanism behind E-M12: `core.artifact.load()` now reads
+`git cat-file blob HEAD:<relpath>` and refuses to serve a figure git does not
+have, rather than serving it with a provenance flag attached.
+
+**Measured** locally, A-1, no cloud and nothing fitted:
+`.venv/bin/python -m pytest tests/test_committed_reads.py tests/test_fleet.py
+tests/test_promotion_state.py tests/test_fabricated_defaults.py -q
+--timeout=180` → **152 passed** (python 3.14.6, pytest 9.1.1). The twenty new
+controls are proven by mutation rather than by inspection: reverting `load()` to
+working-tree reads fails 7 of them, disabling `refuse_uncommitted` fails 3,
+dropping the new PASS invariant fails 1, and laundering the marker through
+`_compare` fails 1.
+
+**Why this needs a decision rather than a commit.** `CHANGELOG.md`'s opening
+paragraph states the exposure plainly: all eight model repos pin mlkit with
+`branch = "main"`, so every commit here reaches every repo the next time anyone
+runs `uv lock` — an instrument change arriving as ambient drift. This change is
+exactly the kind that must not arrive that way. A repo that upgrades without
+noticing will see fleet cells that were numbers become
+`NA (not committed at HEAD: …)`, and the correct reading of that NA is "commit
+the artifact", not "the tool broke".
+
+**Proposed**, and deliberately **not done here**:
+
+1. Settle the open question E-M08, E-M09 and E-M11 all record — whether this
+   line's major is `0.5.0` or `1.0.0` — and then cut the tag. Tag-cutting is a
+   release decision of record and is the session lead's per E-M11; no branch in
+   this round cuts one and `__version__` is untouched at `0.5.0`.
+2. Move the eight adopters off `branch = "main"` and onto that tag, so that the
+   next instrument change is a reviewable upgrade. This is eight repos'
+   manifests, three of which have open colleague PRs (choco #160, blackout #129,
+   triage #94), so it is a fleet-wide records change and not an agent's.
+3. Fold the choco row into E-M10's authorised fleet re-measurement, as E-M12
+   already proposed. Nothing about that changed here except that the row will
+   now come back as an NA naming the file rather than as a figure nobody can
+   fetch. `portfolio/FLEET_VERDICTS.md` and its `.json` twin were NOT
+   regenerated on this branch and are byte-identical to `main`; the table stands
+   as measured until that authorised run.
+
+**What an adopter should do on upgrade**, once the tag exists: run
+`mlkit portfolio` and read the NA reasons. Every `not committed at HEAD` names a
+file that repo owns. The remedy is that repo's — commit it, DVC-track it, or
+withdraw the row — and `mlkit portfolio --allow-dirty` will show what the
+pointers resolve to in the meantime, while writing nothing and exiting non-zero.
