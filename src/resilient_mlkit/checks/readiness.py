@@ -636,10 +636,19 @@ def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
 
     The defect: a value is drawn from a random number generator, flows into
     the numbers written onto a data record, and that record is stamped with a
-    provenance field claiming the numbers were observed. The stamp is the
+    provenance field its own construction contradicts. The stamp is the
     defect -- the same code stamped ``synthetic`` is a fixture -- and it
     compounds, because R5 counts rows BY that field and will count these as
     real.
+
+    Three ways a stamp can be false, and the check must answer all three or it
+    is defeated by naming. A value that CLAIMS observation. A value, or a
+    record, that claims observation and declares simulation at once -- which
+    used to be an exemption and was therefore the cheapest evasion available.
+    And a source label naming an external dataset on a record whose every
+    value was manufactured in this process, which is the shape that let a
+    loader drawing all eight of its fields from ``self.rng`` sit behind
+    ``source="era5_land"`` and report zero findings.
 
     Deliberately NOT scoped to ``[source] trees``. R10 is, and that is right
     for R10; here the declared-tree list is precisely the surface an author
@@ -651,6 +660,9 @@ def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
     findings = fabricated_targets.scan_repo(repo.path)
     files = fabricated_targets.count_python_files([repo.path])
 
+    by_rule: dict[str, int] = {}
+    for f in findings:
+        by_rule[f.rule] = by_rule.get(f.rule, 0) + 1
     targets = [f for f in findings if f.severity == fabricated_targets.TARGET_FABRICATED]
     inputs = [f for f in findings if f.severity != fabricated_targets.TARGET_FABRICATED]
     in_holdout = [f for f in findings if f.split.lower() in {"val", "test", "valid", "validation"}]
@@ -664,6 +676,7 @@ def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
         "target_fabricated": len(targets),
         "input_fabricated": len(inputs),
         "stamped_into_holdout": len(in_holdout),
+        "by_rule": by_rule,
         "report": str(report_path.relative_to(repo.path)),
         "top": [f.to_dict() for f in (targets or inputs)[:R11_REASON_FINDINGS]],
     }
@@ -683,7 +696,7 @@ def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
         head = (targets or inputs)[:R11_REASON_FINDINGS]
         detail = "; ".join(
             f'{f.path}:{f.line} {f.field} <- {f.origin_call} stamped '
-            f'{f.claim_field}="{f.claim_value}"'
+            f'{f.claim_field}="{f.claim_value}" [{f.rule}]'
             for f in head
         )
         more = len(findings) - len(head)
@@ -695,8 +708,8 @@ def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
         return CheckResult.failed(
             "R11", PHASE,
             f"{len(findings)} record(s) built from an RNG draw carry a provenance "
-            f"field claiming observed origin ({len(targets)} of them fabricate the "
-            f"target itself): {detail}{holdout}"
+            f"stamp their own construction contradicts ({len(targets)} of them "
+            f"fabricate the target itself): {detail}{holdout}"
             + (f"; +{more} more in {R11_REPORT_RELPATH}" if more > 0 else ""),
             evidence,
         )
@@ -721,28 +734,39 @@ def _write_r11_report(
         f"- findings: {len(findings)}",
         "",
         "Each row is a record whose numbers can be traced back to a random draw and",
-        "whose provenance stamp says they were observed. The `claim` column is the",
-        "specific field that makes it a fabrication rather than an honestly-labelled",
-        "simulation: change that value to `synthetic` and the record becomes a",
-        "fixture, which this check does not report.",
+        "whose provenance stamp does not say so. The `claim` column is the specific",
+        "field that makes it a fabrication rather than an honestly-labelled",
+        "simulation.",
+        "",
+        "The `rule` column says WHY the stamp is false, and the three answers are",
+        "not interchangeable:",
+        "",
+        "- `OBSERVED_STAMP` — the value claims observation outright (`\"observed_ccc\"`).",
+        "- `CONTRADICTED_STAMP` — the same value, or the same record, both claims",
+        "  observation and declares simulation. R5 counts by ONE field, so a second",
+        "  field saying `synthetic` does not make the first one true.",
+        "- `CONTRADICTED_SOURCE` — the stamp names an external dataset, and every",
+        "  value on the record was manufactured inside this process: RNG draws,",
+        "  literals, and arithmetic over a loop index. Nothing on the record came",
+        "  from the named source because nothing on it came from anywhere.",
         "",
         "`TARGET_FABRICATED` marks a draw reaching the field a model is trained to",
         "predict. `INPUT_FABRICATED` marks one reaching another data field of the",
         "same stamped record.",
         "",
-        "| severity | record | field | drawn at | claim | split | drawn fields | corroborating |",
-        "|---|---|---|---|---|---|---|---|",
+        "| rule | severity | record | field | drawn at | claim | split | drawn fields | corroborating |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for f in findings:
         corroborating = ", ".join(f"`{c}`" for c in f.corroborating) or "—"
         lines.append(
-            f"| {f.severity} | `{f.path}:{f.line}` | `{f.field}` | "
+            f"| {f.rule} | {f.severity} | `{f.path}:{f.line}` | `{f.field}` | "
             f"`{f.origin_symbol}` = `{f.origin_call}` (line {f.origin_line}) | "
             f'`{f.claim_field}="{f.claim_value}"` | {f.split or "—"} | '
             f"{f.tainted_fields}/{f.data_fields} | {corroborating} |"
         )
     if not findings:
-        lines.append("| — | — | — | — | — | — | — | (none) |")
+        lines.append("| — | — | — | — | — | — | — | — | (none) |")
     lines.append("")
     # Unguarded: static analysis, no repo imports. See core/report.py.
     report.guarded_write(

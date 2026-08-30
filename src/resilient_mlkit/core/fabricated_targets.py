@@ -54,29 +54,73 @@ than a widened R10:
 
 WHAT SEPARATES A FABRICATION FROM AN HONEST SIMULATION
 ------------------------------------------------------
-One thing, and it is checkable: the *value* of the provenance field.
+Not the *sound* of the provenance string. That was the first answer this module
+gave, and naming defeated it twice.
 
-* ``label_origin="observed_ccc"``  -> the record claims observation. FINDING.
-* ``label_origin="synthetic"``     -> the record declares itself. SILENT.
-* ``source_id="civ_ccc_regional"`` -> names something, claims nothing this
-  module can adjudicate. OPAQUE: reported as corroboration, never as the
-  trigger.
+**The first defeat: an opaque product name.** ``ERA5LandBaselineLoader.iter_grid``
+in resilient-arabica draws every one of ``t2m, tmax, tmin, precip, rh, vpd,
+srad, wind`` from ``self.rng`` and stamps the record ``source="era5_land"``.
+``era5_land`` tokenises to ``{era5, land, era5land}``, which met neither claim
+vocabulary, so the value classified OPAQUE and OPAQUE never triggered. A fully
+synthetic loader therefore read as real and R11 returned zero findings on it --
+recorded as an honest negative in that repo's E-051 and left standing, because
+the check as written had nothing to say. The same escape was open to any
+synthetic loader willing to name itself after a real product, and three of them
+were sitting in resilient-surge (``source="ntslf"``, ``"bom"``, ``"jcomm"``,
+each a real tide-gauge network, each returning ``np.random.normal(...)``).
 
-A record carrying a simulation declaration in ANY of its provenance fields is
-never reported, even when another field claims observation. That asymmetry is
-deliberate. A record that says "synthetic" somewhere is not passing itself off,
-and flagging it would put this check in the business of adjudicating internally
-inconsistent metadata -- a job for review, not for a gate. The cost is a narrow
-evasion (stamp both) and it is stated here rather than hidden; the benefit is
-that the check never fires on an honest fixture, and a check that fires on
-honest work gets disabled.
+**The second defeat: stamp both.** A record carrying a simulation declaration
+in ANY provenance field used to be exempt, even when another field claimed
+observation, and this module said so in its own docstring: "the cost is a
+narrow evasion (stamp both) and it is stated here rather than hidden". Stating
+an evasion does not close it. arabica pre-registered
+``synthetic_weather_real_isd_fallback`` as a repair label and its own control
+rejected it: the string satisfies R11 while still asserting observation to
+every human who reads it, and R5 counts by ONE field, so a second field saying
+``synthetic`` does not make the first one true.
+
+Both defeats share a shape with R12's (satisfied by an import instead of a
+call): the check read a LABEL instead of the thing the label describes, so the
+cheapest evasion was to name the fake after something real. The repair is not
+another token in a list -- the next loader will be called something else -- but
+a second question the AST can already answer.
+
+THE QUESTION THAT REPLACED IT
+-----------------------------
+Did the VALUES come from an RNG, and is the label beside them contradicted by
+the construction that produced them?
+
+A stamp is false in one of three ways, and all three are findings:
+
+* ``OBSERVED_STAMP`` -- the value claims observation outright
+  (``label_origin="observed_ccc"``, ``kind="real"``).
+* ``CONTRADICTED_STAMP`` -- one value, or one record, both claims observation
+  and declares simulation. No longer an exemption.
+* ``CONTRADICTED_SOURCE`` -- the stamp NAMES an external source
+  (``source="era5_land"``) and every value on the record was manufactured
+  inside this process: RNG draws, literals, literal-defaulted knobs, and
+  arithmetic or pure numeric calls over those. Nothing on that record came
+  from the named source, because nothing on it came from anywhere.
+
+``CONTRADICTED_SOURCE`` still does not adjudicate the string. It never decides
+whether ``era5_land`` names a real registry -- that is a judgement about the
+world and a gate must not make it. It reads the code instead. The moment ONE
+value on the record could have come from outside -- a file read, a request, a
+dataframe passed in, a parameter with no default, a call this module does not
+recognise -- the rule goes silent, because then the label may well describe
+where that value came from. Unrecognised is always the quiet direction: an
+unknown call can never be the thing that creates a finding.
+
+A record's identifiers are exempt from that test and its measurements are not.
+``fetch_ntslf(station_id)`` passes the caller's station id straight through and
+manufactures the water levels; the stamp is a claim about the water levels.
 
 The simulation vocabulary is read from PROVENANCE FIELDS ONLY. A comment, a
 docstring or an unrelated ``"note": "synthetic demo"`` does not excuse a
 record, because none of those travel into a manifest.
 
-THE THREE PARTS, ALL REQUIRED
------------------------------
+THE PARTS, ALL REQUIRED
+-----------------------
 1. **An RNG draw.** Detected with ``fabrication._is_random_draw``, the same
    vocabulary R10 uses -- one definition of "this number came from noise".
 2. **Flow from that draw into a written field.** A flow-insensitive taint
@@ -85,12 +129,28 @@ THE THREE PARTS, ALL REQUIRED
    Flow-INsensitive on purpose: an AST rule that depended on statement order
    would be defeated by moving a line, and the brief for this check is that it
    survive reformatting.
-3. **A provenance field on the same record claiming observed origin.**
+3. **A provenance stamp the record's own construction contradicts**, in one of
+   the three ways above.
 
 Miss any one and the module is silent. An RNG draw with no stamp is a fixture.
 A stamp with no draw is a data record. A stamp on a record whose only tainted
 field is a config knob (``seed``, ``batch_size``) is a run note; the
-configuration vocabulary R10 already maintains vetoes those.
+configuration vocabulary R10 already maintains vetoes those. And a record that
+declares itself ``synthetic`` and claims nothing is a fixture, which is the
+one thing this check must never report.
+
+THE TWO PASSES, AND WHY THEY LEAN OPPOSITE WAYS
+-----------------------------------------------
+``taint_of`` over-approximates: a name reassigned from a clean source after
+being tainted stays tainted. That is safe because taint alone never produces a
+finding -- a stamp is always also required.
+
+``manufactured_of`` under-approximates: anything it cannot PROVE was built
+inside the process is left out. That is necessary because it is the conjunct
+that turns an opaque source label into a finding, and an over-approximation
+there would fire on real loaders. The two passes must lean opposite ways, and
+a change that makes ``manufactured_of`` more generous is a change that can
+invent findings.
 
 WHAT THIS MODULE DOES NOT CLAIM TO CATCH, so that a green R11 is not read as
 more than it is: a target read from a file that was itself generated in an
@@ -100,6 +160,15 @@ formula-derivation probe, which measures the data rather than the code); and
 taint carried through a class attribute or a global mutated across functions.
 The first two are covered elsewhere in the instrument. The third is a gap,
 stated rather than papered over.
+
+``CONTRADICTED_SOURCE`` adds one more, and it is the price of leaning
+conservative: a record that mixes ONE externally-sourced value in among
+manufactured ones is not adjudicated, even when the external value is a
+formality. ``iter_daily`` in the same arabica module reads its farms off
+``self._synthetic_farms``, so the class-attribute gap above swallows it too.
+Both are under-reports, and an under-report from this rule is a record a
+reader still has to open. What it must never do is fire on a loader that reads
+real data, and every conjunct above is chosen to keep it off that.
 """
 
 from __future__ import annotations
@@ -137,6 +206,29 @@ ORIGIN_FIELDS: frozenset[str] = frozenset(
         "kind", "label_kind", "row_kind", "data_kind", "target_kind",
         "label_type", "row_type", "data_type", "record_type",
         "acquisition", "acquisition_mode", "method", "measurement_method",
+    }
+)
+
+#: The subset of :data:`ORIGIN_FIELDS` whose NAME asserts where the values
+#: came from, as opposed to what shape or procedure produced them. Only these
+#: can carry a source label that the construction beneath them contradicts.
+#:
+#: ``kind``, ``*_type``, ``*_kind``, ``method`` and ``measurement_method`` are
+#: deliberately NOT here. They are kept in ``ORIGIN_FIELDS`` because a VALUE
+#: under them can still claim observation (``"kind": "real"`` is the pinned
+#: positive control), but ``"kind": "polygon"`` names a shape rather than a
+#: registry, and a rule that read every opaque ``kind`` as a source claim
+#: would fire on geometry code.
+SOURCE_NAMING_FIELDS: frozenset[str] = frozenset(
+    {
+        "source_id", "source", "sources", "source_name", "origin", "origins",
+        "label_origin", "target_origin", "feature_origin", "data_origin",
+        "row_origin", "record_origin", "value_origin", "y_origin",
+        "provenance", "lineage", "evidence_mode", "evidence",
+        "label_source", "target_source", "data_source", "feature_source",
+        "observation_source", "measurement_source",
+        "dataset", "dataset_id", "collection", "catalogue", "catalog",
+        "acquisition", "acquisition_mode",
     }
 )
 
@@ -203,10 +295,99 @@ TARGET_TOKENS: frozenset[str] = frozenset(
     }
 )
 
+#: Tokens naming a field that KEYS or LOCATES a record rather than measuring
+#: anything: a station id, a filename, a URL. A source stamp is a claim about
+#: where the MEASUREMENTS came from, so an identifier arriving from outside
+#: does not make the measurements observed.
+#:
+#: This exists because ``fetch_ntslf(station_id)`` in resilient-surge returns
+#: ``water_level_m=np.random.normal(3.0, 0.3, 24)`` stamped ``source="ntslf"``
+#: and passes the caller's ``station_id`` straight through. Requiring EVERY
+#: field to be manufactured let the identifier alone excuse the record, which
+#: is the naming defeat one level down.
+#:
+#: Kept deliberately narrow. ``year``, ``lat`` and ``lon`` are NOT here: they
+#: can be the axis a real measurement was taken along, and a record built from
+#: a caller's years is not one this rule adjudicates.
+IDENTIFIER_TOKENS: frozenset[str] = frozenset(
+    {
+        "id", "ids", "identifier", "identifiers", "uid", "uuid", "guid",
+        "key", "keys", "slug", "code", "codes", "name", "names", "title",
+        "path", "paths", "file", "filename", "filepath", "url", "uri",
+        "href", "index", "idx", "pk",
+    }
+)
+
+
+
 #: Severity of a finding, ranked. Both are defects; only the first puts noise
 #: where a model's target is supposed to be.
 TARGET_FABRICATED = "TARGET_FABRICATED"
 INPUT_FABRICATED = "INPUT_FABRICATED"
+
+#: WHICH of the three rules produced a finding. Severity says where the noise
+#: landed (target or input); the rule says what made it a fabrication. They are
+#: independent and a reader needs both.
+#:
+#: ``OBSERVED_STAMP``      a provenance value claims observation.
+#: ``CONTRADICTED_STAMP``  one value, or one record, both claims observation
+#:                         and declares simulation.
+#: ``CONTRADICTED_SOURCE`` a source label naming an external dataset sits on a
+#:                         record whose every value was manufactured in this
+#:                         process.
+OBSERVED_STAMP = "OBSERVED_STAMP"
+CONTRADICTED_STAMP = "CONTRADICTED_STAMP"
+CONTRADICTED_SOURCE = "CONTRADICTED_SOURCE"
+
+#: Callables that carry no information from outside this process: they compute
+#: over what they are given. Used by :meth:`_ModuleScanner.manufactured_of` to
+#: decide whether a record's values could have come from anywhere but the
+#: program itself. Anything NOT in this set -- ``read_csv``, ``open``,
+#: ``open_dataset``, ``get``, ``execute``, an unknown helper -- makes a value
+#: potentially external, which is the safe direction: it makes the check
+#: SILENT.
+PURE_CALLS: frozenset[str] = frozenset(
+    {
+        "float", "int", "str", "bool", "round", "abs", "min", "max", "sum",
+        "len", "range", "enumerate", "zip", "list", "tuple", "set", "sorted",
+        "reversed", "format", "divmod", "pow", "complex",
+        "sin", "cos", "tan", "arcsin", "arccos", "arctan", "arctan2",
+        "exp", "expm1", "log", "log1p", "log10", "log2", "sqrt", "cbrt",
+        "clip", "arange", "linspace", "logspace", "geomspace",
+        "zeros", "ones", "full", "empty", "eye", "identity",
+        "array", "asarray", "asfarray", "astype", "reshape", "ravel",
+        "flatten", "squeeze", "expand_dims", "transpose",
+        "maximum", "minimum", "fmax", "fmin", "where", "sign", "power",
+        "mod", "remainder", "floor", "ceil", "trunc", "rint",
+        "tanh", "sinh", "cosh", "sigmoid", "softmax",
+        "cumsum", "cumprod", "prod", "repeat", "tile", "concatenate",
+        "stack", "hstack", "vstack", "column_stack", "append",
+        "mean", "median", "std", "var", "percentile", "quantile",
+        "item", "tolist", "copy", "deepcopy", "join", "strip", "lower",
+        "upper", "replace", "zfill", "isoformat",
+        # Time AXES built from literals. ``pd.date_range("2024-01-01",
+        # periods=24, freq="h")`` manufactures its values the same way
+        # ``np.arange`` does; without it the timestamp column of every
+        # synthetic gauge frame reads as "might have come from outside" and
+        # the three fabricated tide-gauge loaders in resilient-surge stayed
+        # unreported. The recursion still requires the ARGUMENTS to be
+        # manufactured, so ``pd.to_datetime(df["t"])`` is not.
+        "date_range", "period_range", "timedelta_range",
+        "to_datetime", "to_timedelta", "Timestamp", "Timedelta",
+        "datetime", "timedelta", "date",
+    }
+)
+
+#: Module aliases whose ATTRIBUTES are numeric constants rather than data
+#: handles -- ``np.pi``, ``math.e``. Needed because a seasonal term written
+#: ``2.5 * np.sin(2.0 * np.pi * doy / 365.0)`` is manufactured arithmetic and a
+#: rule that could not see ``np.pi`` would call it external.
+PURE_MODULES: frozenset[str] = frozenset(
+    {
+        "np", "numpy", "math", "cmath", "statistics", "scipy", "sp", "torch",
+        "npr", "pd", "pandas", "dt",
+    }
+)
 
 #: Directories never walked. R10's set plus the agent scratch directories,
 #: which are not source and whose contents are nobody's deliverable. R10's own
@@ -225,27 +406,43 @@ REPO_SKIP_DIRS: frozenset[str] = fabrication.SKIP_DIRS | frozenset(
 OBSERVED = "OBSERVED"
 SIMULATED = "SIMULATED"
 OPAQUE = "OPAQUE"
+CONTRADICTED = "CONTRADICTED"
 
 
 def classify_claim(value: str) -> str:
     """Read a provenance value as a claim about origin.
 
     Returns ``OBSERVED`` when the value asserts the row came from the world,
-    ``SIMULATED`` when it declares the row was made up, and ``OPAQUE`` when it
-    names something this module cannot adjudicate -- a source id, a dataset
-    code, a product name. OPAQUE is reported as corroboration and never as a
-    trigger, because guessing whether ``civ_ccc_regional`` is a real registry
-    is exactly the kind of judgement a gate must not make.
+    ``SIMULATED`` when it declares the row was made up, ``CONTRADICTED`` when
+    it does BOTH in the same string, and ``OPAQUE`` when it names something
+    this module cannot adjudicate from the string alone -- a source id, a
+    dataset code, a product name.
 
-    A value declaring simulation wins over one claiming observation, so that
-    ``"synthetic observed-style panel"`` is silent rather than flagged.
+    ``CONTRADICTED`` replaces the precedence rule this function used to apply.
+    A simulation token used to beat an observation token in the same value, so
+    ``synthetic_weather_real_isd_fallback`` classified as ``SIMULATED`` and
+    went unreported while still asserting observation to every human who read
+    it. That was the module's own stated cost ("the narrow evasion (stamp
+    both)"), and arabica's E-051 found it in a pre-registered label before it
+    was shipped. A string that both claims and declares is not an honest
+    hedge; it is a label that reads one way to the gate and the other way to a
+    reader, which is precisely the defect this module exists to catch. It is
+    now a finding of its own.
+
+    ``OPAQUE`` is still never a trigger ON ITS OWN. What decides an opaque
+    source label is the construction underneath it, not the string -- see
+    :meth:`_ModuleScanner.manufactured_of`.
     """
     tokens = set(tokenise(value))
     if not tokens:
         return OPAQUE
-    if tokens & SIMULATED_CLAIM_TOKENS:
+    simulated = bool(tokens & SIMULATED_CLAIM_TOKENS)
+    observed = bool(tokens & OBSERVED_CLAIM_TOKENS)
+    if simulated and observed:
+        return CONTRADICTED
+    if simulated:
         return SIMULATED
-    if tokens & OBSERVED_CLAIM_TOKENS:
+    if observed:
         return OBSERVED
     return OPAQUE
 
@@ -259,6 +456,16 @@ def is_config_field(name: str) -> bool:
     definitions of "this is configuration" is the same as none.
     """
     return bool(HARD_CONFIG_TOKENS & set(tokenise(name)))
+
+
+def is_identifier_field(name: str) -> bool:
+    """True when a field keys or locates the record instead of measuring it.
+
+    Consulted only by :meth:`_ModuleScanner._wholly_manufactured`. It never
+    vetoes a field out of the taint hits, so an RNG-drawn identifier is still
+    reportable when a stamp claims observation.
+    """
+    return bool(IDENTIFIER_TOKENS & set(tokenise(name)))
 
 
 def is_target_field(name: str) -> bool:
@@ -312,6 +519,9 @@ class Finding:
     split: str = ""
     snippet: str = ""
     severity: str = TARGET_FABRICATED
+    #: Which of the three rules fired. Independent of severity: severity says
+    #: where the noise landed, this says what made the label false.
+    rule: str = OBSERVED_STAMP
     #: How many of the record's data fields carry a draw, and how many it has.
     #: One finding is emitted per record rather than one per field -- eight
     #: findings for one row would bury seven other rows -- so this pair is
@@ -326,7 +536,7 @@ class Finding:
         return (
             f"{self.path}:{self.line}  {self.field} <- {self.origin_symbol} "
             f"({self.origin_call} at line {self.origin_line}) stamped "
-            f'{self.claim_field}="{self.claim_value}" [{self.severity}{split}; '
+            f'{self.claim_field}="{self.claim_value}" [{self.rule}/{self.severity}{split}; '
             f"{self.tainted_fields}/{self.data_fields} data fields drawn{extra}]"
             f"\n      {self.snippet}"
         )
@@ -345,6 +555,7 @@ class Finding:
             "split": self.split,
             "snippet": self.snippet,
             "severity": self.severity,
+            "rule": self.rule,
             "tainted_fields": self.tainted_fields,
             "data_fields": self.data_fields,
         }
@@ -387,6 +598,7 @@ class _ModuleScanner:
             for child in ast.iter_child_nodes(parent):
                 self.parents[id(child)] = parent
         self._taint_cache: dict[int, dict[str, Origin]] = {}
+        self._manufactured_cache: dict[int, set[str]] = {}
         self._findings: list[Finding] = []
         self._seen: set[tuple[int, str, str]] = set()
         self._module_dicts = self._collect_module_dicts()
@@ -532,6 +744,187 @@ class _ModuleScanner:
         self._taint_cache[key] = taint
         return taint
 
+    # -- manufactured values -----------------------------------------------
+    #
+    # The question this answers is the one a source label makes a claim about:
+    # could ANY value on this record have come from outside the running
+    # process? Not "does the string sound observed" -- that is the question
+    # that was defeated by naming a fully synthetic loader ``era5_land``.
+    #
+    # A value is MANUFACTURED when it is built only from literals, RNG draws,
+    # loop indices over manufactured ranges, scalar parameters with literal
+    # defaults, and arithmetic or pure numeric calls over those. Anything else
+    # -- a file handle, a request, a dataframe passed in, a parameter with no
+    # default, an attribute of an object this scope did not build, a call to
+    # an unrecognised helper -- is NOT manufactured, and the check goes silent.
+    # The unknown direction is deliberately the quiet one: an unrecognised
+    # call must never be the thing that CREATES a finding.
+
+    @staticmethod
+    def _is_literal_default(node: ast.AST | None) -> bool:
+        """True when a parameter default is a literal.
+
+        ``lat_min=-20.0`` does NOT parse to ``ast.Constant``; it parses to
+        ``UnaryOp(USub, Constant(20.0))``. Reading only ``ast.Constant`` here
+        silently dropped every negative bound in the ERA5 grid loader -- the
+        exact shape this rule exists for -- and the check stayed green for a
+        reason that had nothing to do with the data. Literal containers are
+        included for the same reason: ``bands=("t2m", "tp")`` is a knob.
+        """
+        if node is None:
+            return False
+        if isinstance(node, ast.Constant):
+            return True
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+            return _ModuleScanner._is_literal_default(node.operand)
+        if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            return all(_ModuleScanner._is_literal_default(e) for e in node.elts)
+        if isinstance(node, ast.Dict):
+            return all(
+                (k is None or _ModuleScanner._is_literal_default(k))
+                and _ModuleScanner._is_literal_default(v)
+                for k, v in zip(node.keys, node.values)
+            )
+        return False
+
+    def _scope_parameters(self, scope: ast.AST) -> set[str]:
+        """Parameters that are knobs rather than inbound data.
+
+        A parameter with a LITERAL default is a dial the caller may turn --
+        ``days=365``, ``resolution=0.5``, ``lat_min=-20.0``. A parameter with
+        no default is how data arrives, and a record built from one is not
+        wholly manufactured however the rest of it was made. That distinction
+        is what keeps this rule off ``def build(years)`` and ``def
+        jitter(rows)``.
+        """
+        if not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return set()
+        args = scope.args
+        positional = list(args.posonlyargs) + list(args.args)
+        out: set[str] = set()
+        # Defaults right-align onto the positional parameters.
+        for arg, default in zip(positional[len(positional) - len(args.defaults):],
+                                args.defaults):
+            if self._is_literal_default(default):
+                out.add(arg.arg)
+        for arg, default in zip(args.kwonlyargs, args.kw_defaults):
+            if self._is_literal_default(default):
+                out.add(arg.arg)
+        return out
+
+    @staticmethod
+    def _is_draw_call(node: ast.AST) -> bool:
+        """True when ``node`` IS an RNG draw, not merely one containing a draw.
+
+        ``fabrication._is_random_draw`` answers "is there a draw anywhere under
+        here", which is the right question for taint and the wrong one here.
+        ``float(row.t2m) + rng.normal(0, 0.01)`` contains a draw and is NOT
+        manufactured -- half of it was read off a dataset -- and treating it as
+        manufactured made the rule fire on a real loader that jitters real
+        data. The callee is re-asked on its own, with the arguments removed, so
+        the draw vocabulary still has exactly one definition.
+        """
+        if not isinstance(node, ast.Call):
+            return False
+        bare = ast.copy_location(ast.Call(func=node.func, args=[], keywords=[]), node)
+        return fabrication._is_random_draw(bare) is not None
+
+    def _manufactured_expr(self, node: ast.AST | None, names: set[str]) -> bool:
+        """True when nothing in ``node`` can carry a value from outside."""
+        if node is None:
+            return False
+        if self._is_draw_call(node):
+            # A draw manufactures its output -- provided its own parameters
+            # were manufactured too. ``rng.normal(loc=df.mean(), scale=0.1)``
+            # is noise centred on real data and is not adjudicated here.
+            return (
+                all(self._manufactured_expr(a, names) for a in node.args)
+                and all(self._manufactured_expr(k.value, names) for k in node.keywords)
+            )
+        if isinstance(node, ast.Constant):
+            return True
+        if isinstance(node, ast.Name):
+            return node.id in names
+        if isinstance(node, ast.Attribute):
+            base = node.value
+            if isinstance(base, ast.Name) and base.id in PURE_MODULES:
+                return True  # np.pi, math.e -- a constant, not a handle.
+            return node.attr in names
+        if isinstance(node, ast.Call):
+            func = node.func
+            fname = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+            if fname not in PURE_CALLS:
+                return False
+            if isinstance(func, ast.Attribute):
+                base = func.value
+                pure_module = isinstance(base, ast.Name) and base.id in PURE_MODULES
+                if not pure_module and not self._manufactured_expr(base, names):
+                    return False
+            return (
+                all(self._manufactured_expr(a, names) for a in node.args)
+                and all(self._manufactured_expr(k.value, names) for k in node.keywords)
+            )
+        if isinstance(node, ast.Slice):
+            return all(
+                part is None or self._manufactured_expr(part, names)
+                for part in (node.lower, node.upper, node.step)
+            )
+        if isinstance(node, (ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare,
+                             ast.IfExp, ast.JoinedStr, ast.FormattedValue,
+                             ast.Tuple, ast.List, ast.Set, ast.Dict,
+                             ast.Subscript, ast.Starred, ast.Index)):
+            children = list(ast.iter_child_nodes(node))
+            values = [c for c in children if isinstance(c, ast.expr)]
+            if not values:
+                return True
+            return all(self._manufactured_expr(c, names) for c in values)
+        return False
+
+    def manufactured_of(self, scope: ast.AST) -> set[str]:
+        """Names in ``scope`` that provably came from inside this process.
+
+        Seeded with the scope's literal-defaulted parameters, then run to a
+        fixpoint over the same assignment forms the taint pass reads.
+        Flow-insensitive for the same reason: statement order is not evidence.
+
+        Over-approximating here would be UNSAFE -- it is the conjunct that
+        makes an opaque source label a finding -- so unlike ``taint_of`` this
+        pass is deliberately conservative. Anything it cannot prove
+        manufactured stays out, and the check stays quiet.
+        """
+        key = id(scope)
+        cached = self._manufactured_cache.get(key)
+        if cached is not None:
+            return cached
+        # NOT seeded from ``taint_of``. Taint is a "contains a draw anywhere"
+        # relation, so a name assigned ``float(row.t2m) + rng.normal(0, 0.01)``
+        # is tainted while being half real data; seeding from it would carry
+        # that same false positive one hop further and out of sight of the
+        # expression rule below.
+        names: set[str] = self._scope_parameters(scope)
+        changed = True
+        while changed:
+            changed = False
+            for sub in self._statements(scope):
+                pairs: list[tuple[list[str], ast.AST | None]] = []
+                if isinstance(sub, ast.Assign):
+                    pairs = [(self._target_names(t), sub.value) for t in sub.targets]
+                elif isinstance(sub, (ast.AnnAssign, ast.AugAssign, ast.NamedExpr)):
+                    pairs = [(self._target_names(sub.target), sub.value)]
+                elif isinstance(sub, (ast.For, ast.AsyncFor, ast.comprehension)):
+                    pairs = [(self._target_names(sub.target), sub.iter)]
+                else:
+                    continue
+                for targets, value in pairs:
+                    if not self._manufactured_expr(value, names):
+                        continue
+                    for name in targets:
+                        if name not in names:
+                            names.add(name)
+                            changed = True
+        self._manufactured_cache[key] = names
+        return names
+
     def _resolve_tainted_functions(self) -> None:
         """Module-local helpers whose return value carries a draw.
 
@@ -562,6 +955,7 @@ class _ModuleScanner:
                         break
         # Taint computed before the helper set was known is stale; recompute.
         self._taint_cache.clear()
+        self._manufactured_cache.clear()
 
     # -- records -----------------------------------------------------------
 
@@ -661,19 +1055,83 @@ class _ModuleScanner:
 
     # -- adjudication ------------------------------------------------------
 
-    def _adjudicate(self, record: _Record, taint: dict[str, Origin]) -> None:
-        claims = [s for s in record.stamps if s.claim is OBSERVED]
-        if not claims:
+    def _decide(self, record: _Record) -> tuple[str, Stamp] | None:
+        """Which rule this record's STAMPS trip, and the stamp that trips it.
+
+        Three rules, in the order a reader should hear them. The record's
+        construction is not consulted here -- that is the caller's job, and it
+        is what settles the third.
+        """
+        observed = [s for s in record.stamps if s.claim is OBSERVED]
+        declared = [s for s in record.stamps if s.claim is SIMULATED]
+        both_in_one = [s for s in record.stamps if s.claim is CONTRADICTED]
+
+        if both_in_one:
+            # One string that claims and declares at once:
+            # ``synthetic_weather_real_isd_fallback``.
+            return CONTRADICTED_STAMP, both_in_one[0]
+        if observed and declared:
+            # Two stamps on one record saying opposite things. This used to be
+            # an exemption -- "a record that says synthetic somewhere is not
+            # passing itself off" -- and it was the cheapest way past this
+            # check: keep the observed claim that R5 counts by, add a second
+            # field nothing counts by. Report the OBSERVED stamp, because that
+            # is the one that travels into a manifest, and carry the
+            # declaration in the corroboration so a reader sees the conflict.
+            return CONTRADICTED_STAMP, observed[0]
+        if observed:
+            return OBSERVED_STAMP, observed[0]
+        if declared:
+            # Declares itself and claims nothing. A fixture. Silent.
+            return None
+
+        named = [
+            s for s in record.stamps
+            if s.field in SOURCE_NAMING_FIELDS and s.claim is OPAQUE and tokenise(s.value)
+        ]
+        if named:
+            return CONTRADICTED_SOURCE, named[0]
+        return None
+
+    def _wholly_manufactured(self, record: _Record, scope: ast.AST) -> bool:
+        """True when no value on this record could have come from outside.
+
+        The substance behind an opaque source label. ``source="era5_land"`` on
+        a record whose every field is an RNG draw, a literal, or arithmetic
+        over a loop index is a label contradicted by the construction it
+        labels: there is no ERA5 anywhere in it. The same label on a record
+        that also carries a value read from a file, passed in as an argument,
+        or pulled off an object this scope did not build is NOT adjudicated,
+        because then the label may well describe where that value came from.
+
+        Note what this does NOT do: it does not decide whether ``era5_land``
+        names a real registry. That judgement stays out of the gate. It reads
+        the code instead, which is checkable.
+        """
+        names = self.manufactured_of(scope)
+        values = [
+            v for name, v in record.data
+            if not is_config_field(name) and not is_identifier_field(name)
+        ]
+        if not values and not record.carried:
+            return False
+        if not all(self._manufactured_expr(v, names) for v in values):
+            return False
+        return all(name in names for name in record.carried)
+
+    def _adjudicate(self, record: _Record, taint: dict[str, Origin],
+                    scope: ast.AST) -> None:
+        decision = self._decide(record)
+        if decision is None:
             return
-        if any(s.claim is SIMULATED for s in record.stamps):
-            # The record declares itself somewhere. Honest, however
-            # inconsistently labelled. See the module docstring.
+        rule, claim = decision
+        if rule is CONTRADICTED_SOURCE and not self._wholly_manufactured(record, scope):
             return
 
         split = next((s.value for s in record.stamps if s.field in SPLIT_FIELDS), "")
         corroborating = tuple(
             s.render() for s in record.stamps
-            if s.claim is not OBSERVED and s.field not in SPLIT_FIELDS
+            if s is not claim and s.field not in SPLIT_FIELDS
         )
 
         hits: list[tuple[str, Origin]] = []
@@ -703,7 +1161,6 @@ class _ModuleScanner:
         hits.sort(key=lambda h: (not is_target_field(h[0]), h[0]))
         data_fields = sum(1 for name, _ in record.data if not is_config_field(name)) \
             + len(record.carried)
-        claim = claims[0]
         for name, origin in hits[:1]:
             key = (record.line, name, claim.field)
             if key in self._seen:
@@ -723,6 +1180,7 @@ class _ModuleScanner:
                     split=split,
                     snippet=self.snippet(record.node),
                     severity=TARGET_FABRICATED if is_target_field(name) else INPUT_FABRICATED,
+                    rule=rule,
                     tainted_fields=len(hits),
                     data_fields=max(data_fields, len(hits)),
                 )
@@ -747,13 +1205,13 @@ class _ModuleScanner:
             taint = self.taint_of(scope)
             for sub in self._statements(scope):
                 if isinstance(sub, ast.Dict):
-                    self._adjudicate(self._record_from_dict(sub), taint)
+                    self._adjudicate(self._record_from_dict(sub), taint, scope)
                 elif isinstance(sub, ast.Call):
                     record = self._record_from_call(sub)
                     if record is not None:
-                        self._adjudicate(record, taint)
+                        self._adjudicate(record, taint, scope)
             for record in self._frame_records(scope):
-                self._adjudicate(record, taint)
+                self._adjudicate(record, taint, scope)
         self._findings.sort(key=lambda f: (f.path, f.line, f.field))
         return self._findings
 

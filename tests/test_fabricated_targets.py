@@ -378,16 +378,26 @@ def test_negative_a_draw_in_another_function_does_not_taint_this_record():
     ) == []
 
 
-def test_negative_a_record_declaring_itself_anywhere_is_not_adjudicated():
-    """NEGATIVE, with its cost stated.
+def test_positive_stamp_both_is_a_finding_not_an_exemption():
+    """POSITIVE. This test used to assert the opposite, and that was the defect.
 
-    A record carrying a simulation declaration in any provenance field is
-    never reported, even when another field claims observation. The narrow
-    evasion (stamp both) is accepted deliberately: adjudicating internally
-    inconsistent metadata is review work, and the alternative is a check that
-    fires on honest fixtures.
+    A record carrying a simulation declaration in ANY provenance field was
+    exempt, even when another field claimed observation. The module documented
+    the hole itself -- "the cost is a narrow evasion (stamp both) and it is
+    stated here rather than hidden" -- which meant the cheapest way past R11
+    was to keep the observed claim R5 counts by and add a second field nothing
+    counts by. Stating an evasion does not close it.
+
+    R5 keys its provenance contract on ONE field. A second field saying
+    ``synthetic`` does not make the first one true; it makes the record read
+    one way to the counter and the other way to a human, which is the defect
+    this module exists for rather than an exemption from it.
+
+    The honest fixture is still silent, and that pair is one test down:
+    ``test_negative_control_the_same_code_labelled_synthetic_is_silent``
+    declares simulation and claims nothing.
     """
-    assert scan(
+    findings = scan(
         """
         import numpy as np
 
@@ -399,6 +409,226 @@ def test_negative_a_record_declaring_itself_anywhere_is_not_adjudicated():
                     "label_origin": "observed_ccc",
                     "evidence_mode": "synthetic",
                 }
+                for y in years
+            ]
+        """
+    )
+    assert len(findings) == 1, [f.render() for f in findings]
+    assert findings[0].rule == ft.CONTRADICTED_STAMP
+    # The OBSERVED stamp is reported, because that is the one that travels
+    # into a manifest; the declaration is carried as the conflict.
+    assert findings[0].claim_field == "label_origin"
+    assert any("evidence_mode" in c for c in findings[0].corroborating)
+
+
+def test_positive_one_value_that_both_claims_and_declares_is_a_finding():
+    """POSITIVE. arabica's rejected pre-registration label, held as a control.
+
+    ``synthetic_weather_real_isd_fallback`` was pre-registered in
+    resilient-arabica as the repair for E-046 and rejected by the control
+    written alongside it: ``classify_claim`` let the simulation token beat the
+    observation token in the same string, so R11 went quiet while the label
+    still said "real ISD" to every human who read it. That precedence rule is
+    gone.
+    """
+    for label in ("synthetic_weather_real_isd_fallback",
+                  "synthetic_farm_sensor_fallback",
+                  "simulated_gauge_record"):
+        findings = scan(INCIDENT.format(label_origin=label))
+        assert len(findings) == 1, (label, [f.render() for f in findings])
+        assert findings[0].rule == ft.CONTRADICTED_STAMP, label
+        assert findings[0].claim_value == label
+
+
+def test_positive_a_synthetic_loader_named_after_a_real_product_is_a_finding():
+    """POSITIVE, and the shape R11 could not fire on at all.
+
+    ``ERA5LandBaselineLoader.iter_grid`` in resilient-arabica, reduced. Every
+    yielded field comes from ``self.rng``; the stamp is ``source="era5_land"``,
+    which tokenises to ``{era5, land, era5land}`` and met neither claim
+    vocabulary, so it classified OPAQUE and OPAQUE never triggered. The repo
+    recorded it as an honest negative in E-051 and left it standing, because
+    the check as written had nothing to say about it.
+
+    Nothing about the string decides this. The record is a finding because
+    every value on it was manufactured in this process, so the source it names
+    cannot have supplied any of them.
+    """
+    findings = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            class ERA5LandBaselineLoader:
+                def __init__(self, seed=44):
+                    self.rng = np.random.default_rng(seed)
+
+                def iter_grid(self, lat_min=-20.0, lat_max=22.0, resolution=0.5, days=365):
+                    lats = np.arange(lat_min, lat_max + resolution, resolution)
+                    for lat in lats:
+                        for d in range(days):
+                            seasonal = 4.0 * np.sin(2.0 * np.pi * (d % 365) / 365.0)
+                            t2m = 22.0 + seasonal + self.rng.normal(0, 1.2)
+                            precip = max(0.0, self.rng.gamma(2.0, 2.8))
+                            yield GridSample(
+                                lat=float(lat),
+                                elevation=1000.0,
+                                t2m=float(t2m),
+                                precip=float(precip),
+                                source="era5_land",
+                            )
+            """
+        ),
+        "src/training/finetune_aurora_coffee.py",
+    )
+    assert len(findings) == 1, [f.render() for f in findings]
+    assert findings[0].rule == ft.CONTRADICTED_SOURCE
+    assert findings[0].claim_field == "source"
+    assert findings[0].claim_value == "era5_land"
+
+
+def test_negative_the_same_loader_declaring_itself_is_silent():
+    """NEGATIVE, the matched half. One string, and it is a fixture again.
+
+    This is the pair that says the new rule adjudicates the CONSTRUCTION and
+    not the product name: the construction is byte-identical to the positive
+    control above.
+    """
+    assert ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            class ERA5LandBaselineLoader:
+                def __init__(self, seed=44):
+                    self.rng = np.random.default_rng(seed)
+
+                def iter_grid(self, lat_min=-20.0, lat_max=22.0, resolution=0.5, days=365):
+                    lats = np.arange(lat_min, lat_max + resolution, resolution)
+                    for lat in lats:
+                        for d in range(days):
+                            seasonal = 4.0 * np.sin(2.0 * np.pi * (d % 365) / 365.0)
+                            t2m = 22.0 + seasonal + self.rng.normal(0, 1.2)
+                            precip = max(0.0, self.rng.gamma(2.0, 2.8))
+                            yield GridSample(
+                                lat=float(lat),
+                                elevation=1000.0,
+                                t2m=float(t2m),
+                                precip=float(precip),
+                                source="era5_land_shaped_synthetic_grid",
+                            )
+            """
+        ),
+        "src/training/finetune_aurora_coffee.py",
+    ) == []
+
+
+def test_positive_a_fabricated_gauge_network_is_a_finding_and_its_honest_twin_is_not():
+    """POSITIVE + NEGATIVE in one file, both from resilient-surge as shipped.
+
+    ``fetch_ntslf`` claims in its docstring to fetch from the UK National Tidal
+    and Sea Level Facility, performs no fetch, and returns
+    ``water_level_m=np.random.normal(3.0, 0.3, 24)`` stamped ``source="ntslf"``.
+    Twenty lines above it, the same construction stamped
+    ``source="noaa_coops_synthetic"`` is an honest offline fixture.
+
+    The caller's ``station_id`` flows onto the record untouched, and that must
+    not excuse it: a source stamp is a claim about where the MEASUREMENTS came
+    from, and an identifier passed through is not a measurement. Requiring
+    every field to be manufactured is the same naming defeat one level down.
+    """
+    findings = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+            import pandas as pd
+
+            class GaugeIngestion:
+                WMO_QC_GOOD = 1
+
+                async def fetch_ntslf(self, station_id: str) -> pd.DataFrame:
+                    '''Fetch from UK National Tidal and Sea Level Facility.'''
+                    times = pd.date_range("2024-01-01", periods=24, freq="h")
+                    return pd.DataFrame(
+                        {
+                            "station_id": [station_id] * 24,
+                            "lat": [53.5],
+                            "lon": [-3.0],
+                            "timestamp": times,
+                            "water_level_m": np.random.normal(3.0, 0.3, 24),
+                            "qc_flag": [self.WMO_QC_GOOD] * 24,
+                            "source": "ntslf",
+                        }
+                    )
+
+                async def fetch_offline(self, station_id: str) -> pd.DataFrame:
+                    '''Synthetic data for offline tests only.'''
+                    times = pd.date_range("2024-01-01", periods=24, freq="h")
+                    return pd.DataFrame(
+                        {
+                            "station_id": [station_id] * 24,
+                            "lat": [53.5],
+                            "lon": [-3.0],
+                            "timestamp": times,
+                            "water_level_m": np.random.normal(3.0, 0.3, 24),
+                            "qc_flag": [self.WMO_QC_GOOD] * 24,
+                            "source": "noaa_coops_synthetic",
+                        }
+                    )
+            """
+        ),
+        "src/resilient_surge/assimilation/gauge_ingestion.py",
+    )
+    assert len(findings) == 1, [f.render() for f in findings]
+    assert findings[0].rule == ft.CONTRADICTED_SOURCE
+    assert findings[0].claim_value == "ntslf"
+    assert findings[0].field == "water_level_m"
+
+
+def test_negative_a_real_loader_wearing_the_same_source_name_is_silent():
+    """NEGATIVE, and the one this rule would be worthless without.
+
+    Same stamp, same jitter, same everything -- except one value on the record
+    was read from a file. The moment anything could have come from outside,
+    the source label may well describe where it came from, and the rule stops.
+    """
+    assert scan(
+        """
+        import numpy as np
+        import xarray as xr
+
+        def load_grid(path, seed=0):
+            rng = np.random.default_rng(seed)
+            ds = xr.open_dataset(path)
+            return [
+                {
+                    "t2m": float(row.t2m) + rng.normal(0, 0.01),
+                    "elevation": 1000.0,
+                    "source": "era5_land",
+                }
+                for row in ds
+            ]
+        """
+    ) == []
+
+
+def test_negative_an_opaque_stamp_on_data_passed_in_is_silent():
+    """NEGATIVE. A parameter with no default is how data arrives.
+
+    ``def build(years)`` may be handed a real index. The record is not wholly
+    manufactured, so the opaque source id is not adjudicated -- which is what
+    keeps ``test_negative_control_an_opaque_stamp_alone_never_triggers``
+    green rather than a threshold being loosened to spare it.
+    """
+    assert scan(
+        """
+        import numpy as np
+
+        def build(years):
+            rng = np.random.default_rng(0)
+            return [
+                {"year": y, "tonnes": float(rng.normal(4500.0, 90.0)),
+                 "source_id": "civ_ccc_regional"}
                 for y in years
             ]
         """
@@ -443,12 +673,31 @@ def test_claim_classification():
     assert ft.classify_claim("NOAA CO-OPS gauge record") == ft.OBSERVED
     assert ft.classify_claim("synthetic") == ft.SIMULATED
     assert ft.classify_claim("bootstrap_resample") == ft.SIMULATED
-    # A declaration beats a claim, so an honestly-hedged label stays silent.
-    assert ft.classify_claim("synthetic observed-style panel") == ft.SIMULATED
+    # A value that does BOTH is neither honest nor adjudicable as a hedge: it
+    # reads SIMULATED to the gate and "real ISD" to a human. That precedence
+    # rule was the stamp-both evasion, and it is now a finding of its own.
+    assert ft.classify_claim("synthetic observed-style panel") == ft.CONTRADICTED
+    assert ft.classify_claim("synthetic_weather_real_isd_fallback") == ft.CONTRADICTED
+    # ...and a declaration with no observation token in it is still honest,
+    # which is the property arabica's replacement labels were held to.
+    assert ft.classify_claim("synthetic_farm_canopy_fixture") == ft.SIMULATED
     # Names something; adjudicates nothing.
     assert ft.classify_claim("civ_ccc_regional") == ft.OPAQUE
     assert ft.classify_claim("era5_monthly_reduction") == ft.OPAQUE
     assert ft.classify_claim("") == ft.OPAQUE
+
+
+def test_identifier_vocabulary():
+    """Identifiers key a record; they are not what a source stamp claims."""
+    assert ft.is_identifier_field("station_id")
+    assert ft.is_identifier_field("filename")
+    assert ft.is_identifier_field("url")
+    # Deliberately NOT identifiers: these can be the axis a real measurement
+    # was taken along, and treating them as keys would let the rule adjudicate
+    # records built from a caller's index.
+    assert not ft.is_identifier_field("year")
+    assert not ft.is_identifier_field("lat")
+    assert not ft.is_identifier_field("water_level_m")
 
 
 def test_target_and_config_vocabularies():
