@@ -805,9 +805,10 @@ branch; blocked on an R10 change being scoped as its own work.
 
 **Raised by:** adversarial verification of the R11 repair
 (`fix/r11-tokeniser-defeated-by-naming`, `74919f8`), 2026-08-29.
-**Status: CONFIRMED, NOT CLOSED.** Not a regression — the branch is a real
-improvement and the four findings it discovers are all real. This is the
-residue.
+**Status: PARTIALLY CLOSED by T8-4 (`fix/e-m17-value-side-source-adjudication`),
+2026-08-29. The field-NAME half is closed. Two measured residuals remain and
+are recorded below.** Not a regression — the branch is a real improvement and
+the four findings it discovers are all real. This is the residue.
 
 ### What was measured
 
@@ -883,3 +884,61 @@ budget has to buy off.
 **Reserved to the owner of R11, not to a verification branch.** The two real
 findings named above are reported here rather than repaired: repairing them is
 each repo's own change.
+
+### What T8-4 closed, and how it was measured (2026-08-29)
+
+`CONTRADICTED_SOURCE` no longer consults the field name at all on the second
+pass. On a record `manufactured_of` already proves WHOLLY manufactured —
+precondition unchanged — any string-valued field is a source claim when its
+value (a) claims observation on `OBSERVED_CLAIM_TOKENS` **and is a label
+rather than a sentence**, or (b) reproduces two or more parts of a product
+name in the repo's own signed `docs/allowlist.yaml` (one part suffices when it
+is a designator: letters and digits, four characters or more). The allowlist
+is READ, never written; the controls assert it is byte-unchanged after a scan.
+
+Neither `PROVENANCE_FIELDS`, `SOURCE_NAMING_FIELDS` nor `OBSERVED_CLAIM_TOKENS`
+gained an entry, and a control asserts that none of the 24 field names above is
+in any of them while the check fires on all 24 — plus a 25th name generated
+from `secrets` at test time, which no list can be extended to hold.
+
+| | before T8-4 | after T8-4 |
+|---|---|---|
+| the 24 measured field renames, module's own positive control | 0 of 24 fire | 24 of 24 fire |
+| a field name generated at test time | silent | fires |
+| fleet findings, all 14 `resilient-*` checkouts | 4 | 4, finding-for-finding identical |
+
+The false-positive budget the inversion could not pay was bought two ways,
+both measured rather than argued:
+
+* Branch (a) reads a LABEL, not prose. Without that guard it fired on three
+  honest disclaimers — `empirical_coverage_unmeasured_reason` and
+  `interpretation` in `resilient-blackout`, `vintage_delta_verdict="MEASURED"`
+  in `resilient-surge`. All three were false.
+* Two of those three had a second, deeper cause: `manufactured_of` read
+  `payload["k"] = "literal"` as proof that `payload` was built in-process,
+  because the target-name helper reports the base of a subscript. Element
+  writes now prove nothing about the container. That is a fix to the
+  conservative pass itself and it makes R11 quieter, not louder.
+
+### What measurably REMAINS open under E-M17
+
+1. **A manufactured record naming a product in NO allowlist.** The chokepoint
+   `climate_model_runners.py` case above is still invisible: no chokepoint
+   allowlist entry mentions CMIP6 (measured 2026-08-29,
+   `grep -c cmip6 resilient-chokepoint/docs/allowlist.yaml` → 0), so branch (b)
+   has nothing to match, and the value claims no observation, so branch (a)
+   does not fire. Repairing the record is chokepoint's change; closing the
+   DETECTION needs a source of truth for "is this a real product" that the
+   portfolio does not have where the product is not allowlisted.
+2. **A one-part, letters-only product name** — `product="chirps"`,
+   `"aurora"`, `"prithvi"`, `"soilgrids"`. Two parts is what separates a
+   compound of a registered name from a word two pieces of code happen to
+   share; `coffee` is a part of five of arabica's forty entries.
+3. **A stamp applied outside the record's own scope** (`_stamp(row)`): the
+   record arrives as a parameter, so it is not provably manufactured.
+
+**Residual tests, expected to FAIL the day each is closed:**
+`tests/test_fabricated_targets.py::test_residual_a_product_in_no_allowlist_is_still_invisible`
+and `::test_residual_a_stamp_applied_in_a_helper_is_still_invisible`. Both
+assert the current, wrong silence. When one goes red, update this section
+rather than re-pinning the silence.

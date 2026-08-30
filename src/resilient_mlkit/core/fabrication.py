@@ -286,6 +286,29 @@ _TOKEN_SPLIT = re.compile(r"[^0-9a-zA-Z]+")
 _CAMEL_SPLIT = re.compile(r"(?<=[a-z])(?=[A-Z])")
 
 
+def tokenise_parts(name: str) -> list[str]:
+    """The BASE tokens of an identifier, in order, before any joining.
+
+    ``tokenise`` below is this list plus its adjacent-pair joins plus the
+    depluralised forms, all flattened into one bag. That bag is the right
+    shape for vocabulary lookups and the wrong shape for anything that needs
+    to know which tokens were ADJACENT -- ``gee-era5-land-daily`` and
+    ``era5_land`` share ``era5land`` only because ``era5`` and ``land`` are
+    neighbours in both, and a caller matching a value against a registry of
+    product names has to be able to see that. Split out rather than
+    re-implemented at the call site: two spellings of "split this identifier"
+    is the same as none.
+    """
+    parts: list[str] = []
+    for chunk in _TOKEN_SPLIT.split(name):
+        if not chunk:
+            continue
+        for piece in _CAMEL_SPLIT.split(chunk):
+            if piece:
+                parts.append(piece.lower())
+    return parts
+
+
 def tokenise(name: str) -> list[str]:
     """Split an identifier into lowercase tokens.
 
@@ -296,13 +319,7 @@ def tokenise(name: str) -> list[str]:
     ``chi2`` survive as single tokens instead of degrading into a bare ``r``
     that would match half the identifiers in a codebase.
     """
-    parts: list[str] = []
-    for chunk in _TOKEN_SPLIT.split(name):
-        if not chunk:
-            continue
-        for piece in _CAMEL_SPLIT.split(chunk):
-            if piece:
-                parts.append(piece.lower())
+    parts: list[str] = tokenise_parts(name)
     # Adjacent pairs are joined as well, because the portfolio writes the same
     # quantity both ways: ``pretrend_pvalue`` is one token but ``p_value`` is
     # two, and ``std_err``, ``ci_low``, ``effect_size`` and ``r_squared`` all

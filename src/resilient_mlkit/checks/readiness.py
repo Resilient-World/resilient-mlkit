@@ -657,7 +657,8 @@ def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
     therefore no NA path for an undeclared tree: every repo has Python files,
     so every repo is measurable here.
     """
-    findings = fabricated_targets.scan_repo(repo.path)
+    registry = fabricated_targets.load_source_registry(repo.path)
+    findings = fabricated_targets.scan_repo(repo.path, registry)
     files = fabricated_targets.count_python_files([repo.path])
 
     by_rule: dict[str, int] = {}
@@ -668,10 +669,22 @@ def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
     in_holdout = [f for f in findings if f.split.lower() in {"val", "test", "valid", "validation"}]
 
     report_path = repo.path / R11_REPORT_RELPATH
-    _write_r11_report(report_path, repo, ctx, findings, files)
+    _write_r11_report(report_path, repo, ctx, findings, files, registry)
 
     evidence = {
         "files_walked": files,
+        # WHICH registry the value-side source rule adjudicated against, and
+        # whether there was one at all. Reported rather than assumed: without
+        # this, renaming docs/allowlist.yaml turns half of CONTRADICTED_SOURCE
+        # off and R11 goes on printing PASS with nothing to say it lost a
+        # conjunct. R9 and T5 ESCALATE on the same absence; this is the line
+        # that makes it visible HERE, where it changes what was measured.
+        "source_registry": {
+            "path": registry.path,
+            "present": registry.present,
+            "entries": len(registry.entries),
+            "parse_error": registry.parse_error,
+        },
         "findings": len(findings),
         "target_fabricated": len(targets),
         "input_fabricated": len(inputs),
@@ -722,6 +735,7 @@ def _write_r11_report(
     ctx: RunContext,
     findings: list[fabricated_targets.Finding],
     files: int,
+    registry: fabricated_targets.SourceRegistry,
 ) -> None:
     """Write every finding out, because a truncated reason is not evidence."""
     lines = [
@@ -732,6 +746,12 @@ def _write_r11_report(
         (f"- files walked: {files} (every `.py` in the repo, excluding vendored "
          "directories and `tests/`)"),
         f"- findings: {len(findings)}",
+        (f"- real-source registry: `{registry.path}` — "
+         + (f"{len(registry.entries)} signed entries"
+            if registry.present else "ABSENT")
+         + (f" (parse error: {registry.parse_error})" if registry.parse_error else "")
+         + ". The value-side half of `CONTRADICTED_SOURCE` adjudicates against"
+           " it, so an absent registry means that half measured nothing here."),
         "",
         "Each row is a record whose numbers can be traced back to a random draw and",
         "whose provenance stamp does not say so. The `claim` column is the specific",
@@ -748,25 +768,35 @@ def _write_r11_report(
         "- `CONTRADICTED_SOURCE` — the stamp names an external dataset, and every",
         "  value on the record was manufactured inside this process: RNG draws,",
         "  literals, and arithmetic over a loop index. Nothing on the record came",
-        "  from the named source because nothing on it came from anywhere.",
+        "  from the named source because nothing on it came from anywhere. The",
+        "  stamp is recognised either by its FIELD NAME (a declared provenance",
+        "  field) or, whatever it is called, by its VALUE — see `matched on`.",
+        "",
+        "`matched on` says what made a value a source claim when its field name did",
+        "not: `allowlist:<entry>` means the value reproduces two or more parts of a",
+        "product this repo's own signed `docs/allowlist.yaml` records as real;",
+        "`observed-token:<token>` means the value claims observation outright. Blank",
+        "means the field name was itself a declared provenance field.",
         "",
         "`TARGET_FABRICATED` marks a draw reaching the field a model is trained to",
         "predict. `INPUT_FABRICATED` marks one reaching another data field of the",
         "same stamped record.",
         "",
-        "| rule | severity | record | field | drawn at | claim | split | drawn fields | corroborating |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| rule | severity | record | field | drawn at | claim | matched on | split | drawn fields | corroborating |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for f in findings:
         corroborating = ", ".join(f"`{c}`" for c in f.corroborating) or "—"
         lines.append(
             f"| {f.rule} | {f.severity} | `{f.path}:{f.line}` | `{f.field}` | "
             f"`{f.origin_symbol}` = `{f.origin_call}` (line {f.origin_line}) | "
-            f'`{f.claim_field}="{f.claim_value}"` | {f.split or "—"} | '
+            f'`{f.claim_field}="{f.claim_value}"` | '
+            f'{f"`{f.matched_on}`" if f.matched_on else "field name"} | '
+            f'{f.split or "—"} | '
             f"{f.tainted_fields}/{f.data_fields} | {corroborating} |"
         )
     if not findings:
-        lines.append("| — | — | — | — | — | — | — | — | (none) |")
+        lines.append("| — | — | — | — | — | — | — | — | — | (none) |")
     lines.append("")
     # Unguarded: static analysis, no repo imports. See core/report.py.
     report.guarded_write(
@@ -882,6 +912,12 @@ def _write_r12_report(
          "directories and `tests/`)"),
         f"- contract: `{served_reimplementation.CONTRACT_MODULE}`",
         f"- findings: {len(findings)}",
+        (f"- real-source registry: `{registry.path}` — "
+         + (f"{len(registry.entries)} signed entries"
+            if registry.present else "ABSENT")
+         + (f" (parse error: {registry.parse_error})" if registry.parse_error else "")
+         + ". The value-side half of `CONTRADICTED_SOURCE` adjudicates against"
+           " it, so an absent registry means that half measured nothing here."),
         "",
         "Each row is a place where this repo answers, in its own code, a question",
         "the served-model contract exists to answer once: is this the artifact that",
