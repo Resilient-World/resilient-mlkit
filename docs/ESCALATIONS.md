@@ -699,3 +699,102 @@ re-measures the branch dependence first, updates the adapter notes and
 the ten moved cells read and explained one by one rather than absorbed. It is
 not urgent and it is not a gate change; it is a re-reading, and it should not
 be done in the same breath as anything else.
+
+---
+
+## E-M16 — surge's E-038 is CONFIRMED and NOT CLOSED: the token list it proposes fires on Conv2d flags and crop growth stages
+
+**Raised** 2026-08-29 on `fix/r11-tokeniser-defeated-by-naming`, while repairing
+R11's own naming defeat. resilient-surge asked the mlkit owner to close E-038
+by adding fifteen tokens to `MEASURED_TOKENS`. This entry measures both halves
+of that request and closes neither.
+
+### The blind spot is real, and it is still open today
+
+`resilient_mlkit.core.fabrication.is_measured_name` returns `False` for every
+one of the seven score-shaped names E-038 lists:
+
+    peak_obs_m  peak_pred_m  val_peak_timing_error  val_peak_magnitude_error
+    pred_std    truth_std    train_mean_used_for_constant
+
+Measured 2026-08-29 from this branch's `fabrication.py`. E-038's conclusion
+stands: a green R10 in surge means "no fabricated default was found under a
+name in the fleet token list", not "no fabricated default was found".
+
+### E-038's counts are stale, and the corrected ones are recorded here
+
+Re-running E-038's own procedure over the three artifacts it names, as they
+stand in resilient-surge on 2026-08-29:
+
+| quantity | E-038, 2026-08-23 | re-measured 2026-08-29 |
+|---|---|---|
+| numeric key names | 54 | 33 |
+| recognised as measured | 17 | 15 |
+| not recognised | 37 | 18 |
+
+The artifacts changed between the two dates; `val_peak_timing_error` and
+`val_peak_magnitude_error` now ship as `test_peak_timing_error` and
+`test_peak_magnitude_error`, and `pred_std`, `truth_std` and
+`train_mean_used_for_constant` are no longer present. All four surviving names
+remain invisible to `is_measured_name`. **The defect is unchanged; only its
+extent was overstated.**
+
+### Why the proposed repair is not applied
+
+E-038's fifteen tokens were applied to a throwaway copy of `fabrication.py`
+and R10 was run over two repos' `src/` trees, current vocabulary against
+proposed:
+
+| repo | R10 findings, `src/` only, today | with E-038's tokens |
+|---|---|---|
+| resilient-surge | 0 | 9 |
+| resilient-torrent | 1 | 9 |
+
+Seventeen new findings on two `src/` trees, and inspecting them is the point:
+
+* **Real, and serious.** `torrent/scs/ingest/usgs_nwis.py:112` —
+  `discharge_cfs` returned from `fetch_discharge_cfs()` as `rng.normal(...)`.
+  `surge/serve/hazard_obs_bias.py` — seven `bias_m <- 0.0` returns from
+  absence and except branches of `coops_hazard_bias_m()`, which is a zero bias
+  reported when the comparison could not be made.
+* **Over-fire, from the same list.** `torrent/eo/prithvi_cafe/model.py:42` —
+  `bias <- True`, passed as `Conv2d(bias=...)`. That is a layer flag.
+  `torrent/scs/vulnerability/agricultural_damage.py:122,174` —
+  `stage_factor <- 1.0`, where "stage" is a crop growth stage in a damage
+  curve, not river stage. `bias`, `stage`, `setup` and `yield` are polysemous
+  in this fleet, and three of the fifteen tokens put R10 onto PyTorch
+  constructor arguments and agronomy.
+
+A vocabulary change that fires on `Conv2d(bias=True)` is a check that gets
+turned off, which costs more than the seven names it would gain. The list
+cannot be adopted as proposed, and pruning it to the safe tokens is a decision
+about R10's own definition of a measurement — not a by-product of an R11
+branch whose controls establish nothing about R10.
+
+### What should close it, and why it is not a longer list
+
+This branch fixed the same shape one check over. R11 could not fire on a fully
+synthetic loader stamped `source="era5_land"` because it read the LABEL rather
+than the thing the label describes, and the repair was not another token: it
+asks whether every value on the record was manufactured in this process. R10
+has the same shape of defect. It decides whether a number is a measurement by
+whether its NAME is in a list, so the cheapest evasion is a name not on the
+list — and the next unrecognised metric will be called something else, exactly
+as the next synthetic loader would have been.
+
+The substantive repair is for R10 to ask of the VALUE what R11 now asks of the
+record: was this number computed from anything, or was it written down? A
+literal returned from a function that reads no input is a fabricated default
+whatever it is called, and a number computed from real inputs is not one even
+when its name is `bias`. That is a change to R10's trigger, it moves R10
+across all fourteen repos, and it needs its own controls and its own fleet
+delta.
+
+Note also that R10 and R11 disagree about `usgs_nwis.py:112`, and R11 is right
+there: the record is stamped `source="synthetic_ci_smoke"`, which declares what
+it is, so R11 is correctly silent. A widened R10 would report it. That
+disagreement is another thing the owner must settle before the vocabulary
+lands.
+
+**Status: E-038 CONFIRMED, NOT CLOSED.** Not blocked by anything in this
+branch; blocked on an R10 change being scoped as its own work.

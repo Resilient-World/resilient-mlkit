@@ -27,6 +27,63 @@ true before the tag was cut. It is withdrawn here rather than quietly dropped,
 and `tests/test_version_declaration.py` now FIRES on it: the newest entry may
 not restate it, and must name at least one of the checks whose verdict moved.
 
+### R11 `FABRICATED_TARGETS` was defeated by naming; it fires on four records it could not see
+
+**R11 changes verdict on unchanged repo code in two repos**, so this is
+another **major** entry by the scale at the top of this file. Measured over
+every `.py` file in all fourteen `resilient-*` checkouts, 3,385 files walked:
+findings go from **0 to 4**, resilient-arabica 0 → 1 and resilient-surge
+0 → 3. Every other repo is unchanged at 0. All four were inspected one by one
+and all four are real; none is an over-fire.
+
+R11 asked whether the STRING beside a number sounded observed. Two ways past
+that, both used in the fleet:
+
+* **An opaque product name.** `ERA5LandBaselineLoader.iter_grid` in
+  resilient-arabica draws all eight of `t2m, tmax, tmin, precip, rh, vpd,
+  srad, wind` from `self.rng` and stamps the record `source="era5_land"`,
+  which tokenised to `{era5, land, era5land}` — neither claim vocabulary, so
+  OPAQUE, so silent. That repo recorded it as an honest negative in its E-051
+  and left it standing, because the check as written had nothing to say. The
+  same escape was open to any synthetic loader willing to name itself after a
+  real product, and resilient-surge had three: `fetch_ntslf`, `fetch_bom` and
+  `fetch_jcomm` each return `np.random.normal(...)` as `water_level_m`
+  stamped with the name of a real tide-gauge network.
+* **Stamp both.** A record declaring simulation in any provenance field was
+  exempt even while another field claimed observation, and the module said so
+  in its own docstring. Stating an evasion does not close it. arabica
+  pre-registered `synthetic_weather_real_isd_fallback` as a repair label and
+  its own control rejected it.
+
+The repair is not another token in a list — the next loader will be called
+something else. R11 now asks whether the values came from an RNG and whether
+the label is contradicted by the construction it labels. A source stamp
+naming an external dataset, on a record whose every value was manufactured in
+this process (RNG draws, literals, literal-defaulted knobs, arithmetic over a
+loop index), is `CONTRADICTED_SOURCE`. A value or a record that both claims
+observation and declares simulation is `CONTRADICTED_STAMP`. The rule that
+fired is carried on every finding, in the FAIL reason and as a new column in
+`reports/fabricated_targets.md`.
+
+**What did not change, and it is the half that matters.** An honestly-labelled
+fixture is still silent, and the negative controls prove it against the same
+constructions: byte-identical to the era5 positive control but stamped
+`era5_land_shaped_synthetic_grid`; the `source="noaa_coops_synthetic"` loader
+sitting twenty lines above `fetch_ntslf` in the same shipped surge file; a
+real loader that reads a dataset and jitters it, wearing `source="era5_land"`.
+That last one was written as a control and **fired**, which was a genuine
+false positive in the first cut of this change — `_is_random_draw` answers
+"contains a draw anywhere", so `float(row.t2m) + rng.normal(0, 0.01)` read as
+manufactured. Fixed at the root, in two places: the manufactured-value rule
+asks whether a node IS a draw rather than contains one, and the pass is no
+longer seeded from the taint map.
+
+Two tests in `tests/test_fabricated_targets.py` asserted the stamp-both
+exemption and now assert the opposite. They were the specification of the
+defect, not a threshold loosened to go green: no gate file, no holdout and no
+range was touched, and the other twenty-three tests in that file are
+unchanged and still pass.
+
 ### The principal event: seven checks change verdict on unchanged repo code
 
 By the scale at the top of this file that is a **major** release, and it is
