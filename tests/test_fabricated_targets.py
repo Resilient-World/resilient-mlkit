@@ -1590,3 +1590,274 @@ def test_the_registry_match_needs_two_parts_of_a_name_not_one(registry):
     hit = registry.match("era5_land")
     assert hit.entry == "gee-era5-land-daily"
     assert hit.parts == ("era5", "land")
+
+
+# ---------------------------------------------------------------------------
+# T8-4 ATTACK CONTROLS — the evasions found by attacking the repair, not by
+# reading it. Every one of these was LIVE against the first cut of the
+# value-side rule; each is paired with the honest twin that must stay silent,
+# because a rule that fires on all five spellings and cannot tell a fixture
+# from a fabrication has bought nothing.
+# ---------------------------------------------------------------------------
+
+SPELLING_ATTACKS = [
+    # (label, the record's stamp entry, must fire)
+    ("plain", '"source": "era5_land"', True),
+    ("renamed field", '"zq7lk": "era5_land"', True),
+    ("shortest spelling", '"zq7lk": "ERA5"', True),
+    ("joined spelling", '"zq7lk": "era5land"', True),
+    ("f-string with no placeholder", '"zq7lk": f"era5_land"', True),
+    ("string concatenation", '"zq7lk": "era5" + "_land"', True),
+    ("list-valued stamp", '"sources": ["era5_land"]', True),
+    ("tuple under a renamed field", '"zq7lk": ("era5_land",)', True),
+    # ... and the honest twin of each, one string different.
+    ("honest twin, plain", '"source": "era5_land_shaped_synthetic_grid"', False),
+    ("honest twin, renamed", '"zq7lk": "era5_land_shaped_synthetic_grid"', False),
+    ("honest twin, list", '"sources": ["era5_land_shaped_synthetic_grid"]', False),
+    ("honest twin, f-string", '"zq7lk": f"era5_land_shaped_synthetic_grid"', False),
+    # An f-string this module cannot fold is unreadable, and unreadable is
+    # always the quiet direction.
+    ("unresolvable placeholder", '"zq7lk": f"era5_{d}"', False),
+]
+
+SPELLING_RECORD = """
+    import numpy as np
+
+    def build(days=365, seed=0):
+        rng = np.random.default_rng(seed)
+        return [
+            {{"t2m": float(22.0 + rng.normal(0, 1.2)), {stamp}}}
+            for d in range(days)
+        ]
+"""
+
+
+@pytest.mark.parametrize(
+    ("label", "stamp", "fires"),
+    [pytest.param(*case, id=case[0].replace(" ", "-")) for case in SPELLING_ATTACKS],
+)
+def test_attack_the_value_is_read_however_it_is_spelled(label, stamp, fires, registry):
+    """ATTACK. Five ways to write the same three tokens, and the honest twins.
+
+    The brief for this check is that it survive REFORMATTING. ``f"era5_land"``,
+    ``"era5" + "_land"`` and ``["era5_land"]`` are the same claim the parser
+    already holds; a rule that read one and not the others was reading the
+    layout again, which is the defect E-M17 is an instance of. All three were
+    live evasions of the first cut of this repair.
+
+    Folding, never evaluation: an f-string whose placeholder this module
+    cannot resolve makes the whole value unreadable and the check silent.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(SPELLING_RECORD.format(stamp=stamp)),
+        "src/loaders/grid.py",
+        registry,
+    )
+    if fires:
+        assert len(findings) == 1, (label, [f.render() for f in findings])
+        assert findings[0].rule == ft.CONTRADICTED_SOURCE
+    else:
+        assert findings == [], (label, [f.render() for f in findings])
+
+
+def test_attack_hoisting_the_stamp_into_a_constant_is_still_a_finding(registry):
+    """ATTACK. The cheapest refactor with no semantic content: hoist the string.
+
+    VERIFY-R11-A4 made this argument about NUMERIC constants -- moving
+    ``22.0`` into the module or the class body turned the finding off, because
+    a constant is exactly as manufactured wherever it is written down. The
+    identical hoist worked on the STAMP: ``SOURCE = "era5_land"`` at module
+    level, or ``FEED = "era5_land"`` in the class body, and R11 went silent on
+    a loader that was still 100% noise.
+
+    The class case resolves against the ENCLOSING class only. The third
+    fixture is the control for that: a sibling class holding the same
+    attribute name must not lend its value, or the rule would invent findings
+    out of a name collision.
+    """
+    assert_bound_to_this_worktree()
+    module_level = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            SOURCE = "era5_land"
+
+            def build(days=365, seed=0):
+                rng = np.random.default_rng(seed)
+                return [
+                    {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": SOURCE}
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert len(module_level) == 1, [f.render() for f in module_level]
+    assert module_level[0].claim_value == "era5_land"
+
+    class_level = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            class Loader:
+                FEED = "era5_land"
+
+                def build(self, days=365, seed=0):
+                    rng = np.random.default_rng(seed)
+                    return [
+                        {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": self.FEED}
+                        for d in range(days)
+                    ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert len(class_level) == 1, [f.render() for f in class_level]
+
+    borrowed = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            class Real:
+                FEED = "era5_land"
+
+            class Other:
+                def build(self, days=365, seed=0):
+                    rng = np.random.default_rng(seed)
+                    return [
+                        {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": self.FEED}
+                        for d in range(days)
+                    ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert borrowed == [], [f.render() for f in borrowed]
+
+
+def test_attack_a_malformed_registry_is_reported_not_treated_as_empty(tmp_path):
+    """ATTACK. Corrupt the file the check reads and see whether it skips quietly.
+
+    A registry that fails to parse is indistinguishable from an empty one
+    unless somebody records the difference. R9 FAILS on the same parse error;
+    R11 carries it in its own evidence, because it is R11's conjunct that
+    stopped working.
+    """
+    from resilient_mlkit.checks.readiness import r11_fabricated_targets
+
+    assert_bound_to_this_worktree()
+    repo = _repo(
+        tmp_path,
+        '[repo]\nname = "x"\n',
+        {"scripts/build_panel.py": "x = 1\n"},
+    )
+    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs" / "allowlist.yaml").write_text("entries: [ this is not: yaml: {\n")
+    result = r11_fabricated_targets(repo, _ctx(tmp_path))
+    reg = result.evidence["source_registry"]
+    assert reg["present"] is True
+    assert reg["entries"] == 0
+    assert reg["parse_error"], reg
+    assert "parse error" in (tmp_path / "reports" / "fabricated_targets.md").read_text()
+
+
+def test_residual_a_product_in_no_allowlist_is_still_invisible(registry):
+    """RESIDUAL, pinned so the day it closes is visible.
+
+    The chokepoint shape: ``scenario_name="SSP1-2.6 vs SSP5-8.5
+    (CMIP6-driven)"`` on throughput deltas built from four literals plus
+    ``rng.normal``, in a module with no CMIP6 in it. No chokepoint allowlist
+    entry mentions CMIP6, so branch (b) has nothing to match; the value claims
+    no observation, so branch (a) does not fire either.
+
+    This test asserts the CURRENT, WRONG behaviour on purpose. It is the
+    residual test E-M17 asks for: when someone closes the gap, this test goes
+    red and that is the signal to update E-M17, not to re-pin the silence.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def compare(baseline=42.0, seed=0):
+                rng = np.random.default_rng(seed)
+                factual = baseline * 1.02 + rng.normal(0, 0.3)
+                counterfactual = baseline * 0.87 + rng.normal(0, 0.3)
+                return {
+                    "factual_throughput_mtpd": float(factual),
+                    "counterfactual_throughput_mtpd": float(counterfactual),
+                    "scenario_name": "SSP1-2.6 vs SSP5-8.5 (CMIP6-driven)",
+                }
+            """
+        ),
+        "src/resilient_chokepoint/counterfactual/climate_model_runners.py",
+        registry,
+    )
+    assert findings == [], (
+        "E-M17's remaining half has been closed. Update the escalation and the "
+        "module docstring rather than re-pinning this silence: "
+        f"{[f.render() for f in findings]}"
+    )
+
+
+def test_residual_a_stamp_applied_in_a_helper_is_still_invisible(registry):
+    """RESIDUAL, pinned. The record is not provably manufactured across a call.
+
+    ``_stamp(row)`` receives its record as a parameter with no default, which
+    is how data arrives, so ``manufactured_of`` cannot prove the record was
+    built in-process and CONTRADICTED_SOURCE stays quiet. That is the
+    conservative lean working as designed, and it is also an evasion. Under-
+    report, stated rather than papered over.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def _stamp(row):
+                row["zq7lk"] = "era5_land"
+                return row
+
+            def build(days=365, seed=0):
+                rng = np.random.default_rng(seed)
+                return [
+                    _stamp({"t2m": float(22.0 + rng.normal(0, 1.2))})
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert findings == [], (
+        "the inter-procedural under-report has been closed; update the module "
+        f"docstring rather than re-pinning it: {[f.render() for f in findings]}"
+    )
+
+
+def test_the_registry_designator_rule_and_its_noise_budget(registry):
+    """One token can name a product only when it mixes letters and digits.
+
+    ``era5`` and ``sentinel2`` are product designators; ``coffee``, ``daily``
+    and ``global`` are words that happen to appear in an entry id. ``co2`` is
+    the reason for the length floor -- it is a part of a real allowlist entry
+    and also the name of a gas, and matching ``species="CO2"`` would be the
+    ``currency="USD"`` class of noise all over again.
+    """
+    assert_bound_to_this_worktree()
+    assert registry.match("ERA5") is not None
+    assert registry.match("era5") is not None
+    assert registry.match("chirps") is None      # letters only, one part
+    assert registry.match("coffee") is None
+    assert registry.match("co2") is None         # designator, below the floor
+    assert registry.match("v1") is None
+    assert registry.match("2017") is None        # digits only

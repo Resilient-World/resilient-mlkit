@@ -218,6 +218,15 @@ truth rather than by a list this module made up. The control that pins it
 renames the stamp through all 24 measured names PLUS a name generated at test
 time, so the check cannot be satisfied by adding names to any frozenset.
 
+The VALUE is read however it is spelled, because the brief for this check is
+that it survive reformatting. ``era5_land``, ``era5land``, ``ERA5-Land``,
+``ERA5``, ``f"era5_land"``, ``"era5" + "_land"``, ``["era5_land"]``, a module
+constant and a class attribute all reach the same adjudication; every one of
+those was a live evasion of the first cut of this repair and each is now a
+control with its honest twin beside it. Folding, never evaluation: an
+f-string whose placeholder cannot be resolved makes the value unreadable and
+the check silent.
+
 The honesty rule is UNCHANGED and still runs first: a simulation token in any
 provenance field of the record ends the adjudication before either source rule
 is reached. That is what keeps torrent's ``v4_orchestrator`` note ("these
@@ -240,13 +249,25 @@ WHAT MEASURABLY REMAINS (still E-M17, not closed)
   it fired on three honest NA disclaimers in the fleet -- exactly the prose
   class that sank the inversion. ``data_product="NOAA CO-OPS"`` therefore
   reaches branch (b) only. Stated, not hidden.
-* **A one-part product name.** ``product="chirps"`` reproduces one part of
-  ``chirps-daily-precip`` and scores 1, below the threshold. Two parts is what
-  separates a compound of a registered name from a word two pieces of code
-  happen to share (``coffee`` is a part of five of arabica's forty entries);
-  the cost is single-token product names.
+* **A one-part product name made only of letters.** ``product="chirps"``
+  reproduces one part of ``chirps-daily-precip`` and scores 1, below the
+  threshold. Two parts is what separates a compound of a registered name from
+  a word two pieces of code happen to share -- ``coffee`` is a part of five of
+  arabica's forty entries, ``daily`` of three. A one-part match IS enough when
+  the part is a designator (letters and digits, four characters or more:
+  ``era5``, ``sentinel2``, ``vjepa2``), because that shape is a product
+  identity and almost never an English word. ``chirps``, ``aurora``,
+  ``soilgrids`` and ``prithvi`` are the residue.
+* **A stamp applied outside the record's own scope.** ``_stamp(row)`` takes
+  the record as a parameter with no default, which is how data arrives, so
+  ``manufactured_of`` cannot prove the record was built in-process. Pinned as
+  a residual control.
 * Everything under WHAT THIS MODULE DOES NOT CLAIM TO CATCH above still
   stands, unchanged.
+
+Both residual shapes are pinned as tests that assert the CURRENT, WRONG
+silence, so the day one of them closes the suite goes red and the escalation
+gets updated instead of the silence being re-pinned.
 """
 
 from __future__ import annotations
@@ -427,9 +448,39 @@ REGISTRY_MATCH_MIN_PARTS = 2
 REGISTRY_TOKEN_MIN_LENGTH = 3
 
 
+#: Shortest token that can name a product on its own. A DESIGNATOR is a token
+#: that mixes letters and digits -- ``era5``, ``cmip6``, ``sentinel2``,
+#: ``glo30``, ``vjepa2``. That shape is how the earth-observation world writes
+#: a product identity and it is essentially never how English writes an
+#: ordinary word, which is why one designator is evidence where one word
+#: (``coffee``, ``daily``, ``global``) is not. This is a property of the
+#: string, measured, not a list of tokens this module chose.
+#:
+#: The length floor is what keeps ``co2`` (a part of
+#: ``noaa-gml-co2-monthly-global``), ``l30``, ``s30`` and ``v1`` out: three
+#: characters is a units string or a version as often as it is a product, and
+#: matching ``species="CO2"`` would be the ``currency="USD"`` class of noise
+#: all over again.
+REGISTRY_DESIGNATOR_MIN_LENGTH = 4
+
+
 def _is_naming_token(token: str) -> bool:
     """True when a token can carry the identity of a product."""
     return len(token) >= REGISTRY_TOKEN_MIN_LENGTH and any(c.isalpha() for c in token)
+
+
+def _is_designator_token(token: str) -> bool:
+    """True when a token names a product ON ITS OWN.
+
+    Without this, ``data_product="ERA5"`` on a record of pure noise scored one
+    part against ``gee-era5-land-daily`` and went silent -- found by attacking
+    the T8-4 repair with the shortest spelling of the same claim.
+    """
+    return (
+        len(token) >= REGISTRY_DESIGNATOR_MIN_LENGTH
+        and any(c.isalpha() for c in token)
+        and any(c.isdigit() for c in token)
+    )
 
 
 def is_label_value(value: str) -> bool:
@@ -516,6 +567,7 @@ class SourceRegistry:
         best: RegistryHit | None = None
         for entry_id, status, parts in self.entries:
             hit: set[str] = set()
+            score = 0
             for part in parts:
                 if _is_naming_token(part) and part in bag:
                     hit.add(part)
@@ -524,7 +576,11 @@ class SourceRegistry:
                 if _is_naming_token(joined) and joined in bag:
                     hit.add(left)
                     hit.add(right)
-            if len(hit) < REGISTRY_MATCH_MIN_PARTS:
+            # A designator carries a product identity by itself; an ordinary
+            # word does not. Everything else counts one.
+            for part in hit:
+                score += 2 if _is_designator_token(part) else 1
+            if score < REGISTRY_MATCH_MIN_PARTS:
                 continue
             ordered = tuple(p for p in parts if p in hit)
             if best is None or len(ordered) > len(best.parts):
@@ -882,6 +938,8 @@ class _ModuleScanner:
         self._findings: list[Finding] = []
         self._seen: set[tuple[int, str, str]] = set()
         self._module_dicts = self._collect_module_dicts()
+        self._module_strings = self._collect_module_strings()
+        self._class_string_cache: dict[int, dict[str, str]] = {}
         self._tainted_functions: dict[str, Origin] = {}
 
     # -- source helpers ----------------------------------------------------
@@ -918,6 +976,112 @@ class _ModuleScanner:
                     if isinstance(target, ast.Name):
                         out[target.id] = stmt.value
         return out
+
+    def _collect_module_strings(self) -> dict[str, str]:
+        """Module-level ``NAME = "literal"``, for stamps written indirectly.
+
+        ``SOURCE = "era5_land"`` at the top of the file and ``source=SOURCE``
+        on the record is a rename with no semantic content, and it defeated
+        every rule in this module: nothing here read anything but an
+        ``ast.Constant``, so the stamp simply was not a stamp. Found by
+        attacking the T8-4 repair, not by reading the code.
+
+        Only DIRECT module-level bindings, and only string literals. A name
+        this cannot resolve is left unresolved, which is the quiet direction.
+        """
+        out: dict[str, str] = {}
+        for stmt in self.tree.body:
+            if not isinstance(stmt, ast.Assign):
+                continue
+            if not (isinstance(stmt.value, ast.Constant)
+                    and isinstance(stmt.value.value, str)):
+                continue
+            for target in stmt.targets:
+                if isinstance(target, ast.Name):
+                    out[target.id] = stmt.value.value
+        return out
+
+    def _class_strings(self, klass: ast.ClassDef) -> dict[str, str]:
+        """Direct ``NAME = "literal"`` bindings in one class body."""
+        cached = self._class_string_cache.get(id(klass))
+        if cached is None:
+            cached = {}
+            for stmt in klass.body:
+                if not isinstance(stmt, ast.Assign):
+                    continue
+                if not (isinstance(stmt.value, ast.Constant)
+                        and isinstance(stmt.value.value, str)):
+                    continue
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name):
+                        cached[target.id] = stmt.value.value
+            self._class_string_cache[id(klass)] = cached
+        return cached
+
+    def _string_of(self, node: ast.AST | None) -> str | None:
+        """The string this expression IS: constants, one hop, and folding.
+
+        FOLDING, never evaluation. ``f"era5_land"`` and ``"era5" + "_land"``
+        are the same three tokens the parser already has, written two other
+        ways; a rule that could read one spelling and not the others was
+        reading the layout again. Every one of these was a live evasion of the
+        T8-4 repair when it was attacked:
+
+            "source": f"era5_land"          # JoinedStr, no placeholder
+            "source": "era5" + "_land"      # BinOp
+            SOURCE = "era5_land"; "source": SOURCE
+
+        A placeholder whose value this cannot resolve makes the whole
+        expression unreadable and the rule silent, which is the quiet
+        direction.
+        """
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        if isinstance(node, ast.Name):
+            return self._module_strings.get(node.id)
+        if isinstance(node, ast.Attribute):
+            # ``self.FEED`` where the class body says ``FEED = "era5_land"``.
+            # VERIFY-R11-A4 made exactly this argument about NUMERIC
+            # constants: a constant is as manufactured wherever it is written
+            # down, and a rule that saw it in one place and not the other was
+            # reading the layout. The same hoist worked on the STAMP until
+            # this line -- moving one string into the class body turned the
+            # finding off. Resolved against the ENCLOSING class only, so two
+            # classes with the same attribute name cannot borrow each other's
+            # value and invent a finding.
+            klass = self._enclosing_class(node)
+            if klass is None:
+                return None
+            return self._class_strings(klass).get(node.attr)
+        if isinstance(node, ast.JoinedStr):
+            parts = [self._string_of(v) for v in node.values]
+            if any(p is None for p in parts):
+                return None
+            return "".join(p for p in parts if p is not None)
+        if isinstance(node, ast.FormattedValue):
+            return self._string_of(node.value)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            left = self._string_of(node.left)
+            right = self._string_of(node.right)
+            if left is None or right is None:
+                return None
+            return left + right
+        return None
+
+    def _strings_of(self, node: ast.AST | None) -> list[str]:
+        """Every string this expression carries, unwrapping one container.
+
+        ``sources=["era5_land"]`` and ``feeds=("era5_land",)`` are how a
+        record names more than one origin, and reading only scalars made the
+        list spelling a free evasion.
+        """
+        if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            out: list[str] = []
+            for element in node.elts:
+                out.extend(self._strings_of(element))
+            return out
+        text = self._string_of(node)
+        return [text] if text is not None else []
 
     # -- taint -------------------------------------------------------------
 
@@ -1358,12 +1522,13 @@ class _ModuleScanner:
 
     # -- records -----------------------------------------------------------
 
-    def _stamp_from(self, name: str, value: ast.AST) -> Stamp | None:
+    def _stamps_from(self, name: str, value: ast.AST) -> list[Stamp]:
+        """Every provenance stamp this field carries. Empty when it is not one."""
         if name not in PROVENANCE_FIELDS:
-            return None
-        if not (isinstance(value, ast.Constant) and isinstance(value.value, str)):
-            return None
-        text = value.value
+            return []
+        return [self._stamp_of(name, text) for text in self._strings_of(value)]
+
+    def _stamp_of(self, name: str, text: str) -> Stamp:
         if name in SPLIT_FIELDS:
             return Stamp(name, text, OPAQUE)
         if name in LICENCE_FIELDS:
@@ -1388,11 +1553,10 @@ class _ModuleScanner:
             if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
                 continue
             name = key.value
-            if isinstance(value, ast.Constant) and isinstance(value.value, str):
-                record.literals.append((name, value.value))
-            stamp = self._stamp_from(name, value)
-            if stamp is not None:
-                record.stamps.append(stamp)
+            record.literals.extend((name, t) for t in self._strings_of(value))
+            stamps = self._stamps_from(name, value)
+            if stamps:
+                record.stamps.extend(stamps)
                 continue
             if name in PROVENANCE_FIELDS:
                 continue
@@ -1411,12 +1575,12 @@ class _ModuleScanner:
                     record.stamps.extend(spread.stamps)
                     record.literals.extend(spread.literals)
                 continue
-            if isinstance(keyword.value, ast.Constant) \
-                    and isinstance(keyword.value.value, str):
-                record.literals.append((keyword.arg, keyword.value.value))
-            stamp = self._stamp_from(keyword.arg, keyword.value)
-            if stamp is not None:
-                record.stamps.append(stamp)
+            record.literals.extend(
+                (keyword.arg, t) for t in self._strings_of(keyword.value)
+            )
+            stamps = self._stamps_from(keyword.arg, keyword.value)
+            if stamps:
+                record.stamps.extend(stamps)
                 continue
             if keyword.arg in PROVENANCE_FIELDS:
                 continue
@@ -1452,13 +1616,16 @@ class _ModuleScanner:
             if not (holder_name and isinstance(slot, ast.Constant)
                     and isinstance(slot.value, str)):
                 continue
-            if isinstance(sub.value, ast.Constant) and isinstance(sub.value.value, str):
-                literals.setdefault(holder_name, []).append((slot.value, sub.value.value))
+            texts = self._strings_of(sub.value)
+            if texts:
+                literals.setdefault(holder_name, []).extend(
+                    (slot.value, t) for t in texts
+                )
                 anchors.setdefault(holder_name, sub)
-            stamp = self._stamp_from(slot.value, sub.value)
-            if stamp is None:
+            found = self._stamps_from(slot.value, sub.value)
+            if not found:
                 continue
-            stamps.setdefault(holder_name, []).append(stamp)
+            stamps.setdefault(holder_name, []).extend(found)
             anchors.setdefault(holder_name, sub)
         out: list[_Record] = []
         for name in anchors:
