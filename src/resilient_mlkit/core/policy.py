@@ -72,6 +72,9 @@ class Allowlist:
 
     path: Path
     signed: bool = False
+    #: What the FILE claims, before verification. Never read as a signature --
+    #: it is the input to :func:`_verify_signature`, not its output.
+    claims_signed: bool = False
     signed_by: str = ""
     signed_at: str = ""
     #: SHA-256 the signatory recorded over the entries. Mismatch voids signing.
@@ -98,9 +101,18 @@ class Allowlist:
         return [e for e in self.entries.values() if e.attribution.strip()]
 
 
-def load(repo: Repo) -> Allowlist:
-    """Parse a repo's allowlist. Never raises; malformed files become parse_error."""
-    path = repo.path / ALLOWLIST_RELPATH
+def read(path: Path) -> Allowlist:
+    """Parse an allowlist FILE. Never raises; malformed files become parse_error.
+
+    Returns an allowlist with ``signed`` left False regardless of what the
+    file claims: signature verification needs the repo's git history, which a
+    path does not carry. :func:`load` is the entry point that verifies.
+
+    Split out from :func:`load` so a caller that only needs the DETERMINATIONS
+    -- which real products this repo's signatory has recorded -- can read them
+    without constructing a Repo, and without a second parser growing beside
+    this one. R11's value-side source adjudication is that caller.
+    """
     allowlist = Allowlist(path=path)
     if not path.is_file():
         return allowlist
@@ -134,10 +146,17 @@ def load(repo: Repo) -> Allowlist:
         )
         allowlist.entries[entry.id] = entry
 
+    allowlist.claims_signed = claimed
+    return allowlist
+
+
+def load(repo: Repo) -> Allowlist:
+    """Parse a repo's allowlist and verify its signature."""
+    allowlist = read(repo.path / ALLOWLIST_RELPATH)
     # A boolean in a file an agent can write is not a signature. Treat the
     # claim as true only if it also survives an integrity check, so that
     # editing entries after signing revokes the signature automatically.
-    allowlist.signed = _verify_signature(allowlist, claimed, repo)
+    allowlist.signed = _verify_signature(allowlist, allowlist.claims_signed, repo)
     return allowlist
 
 

@@ -170,32 +170,83 @@ Both are under-reports, and an under-report from this rule is a record a
 reader still has to open. What it must never do is fire on a loader that reads
 real data, and every conjunct above is chosen to keep it off that.
 
-AND ONE MORE, WHICH IS THE SAME DEFEAT ONE LEVEL UP (VERIFY-R11)
-----------------------------------------------------------------
-``CONTRADICTED_SOURCE`` no longer adjudicates the provenance VALUE. It still
-adjudicates the provenance FIELD NAME: a stamp only becomes a source claim
-when its field is in :data:`SOURCE_NAMING_FIELDS`. So the same wholly
-manufactured ERA5 loader, with ``source=`` renamed to ``data_product=``,
-``feed=``, ``provider=``, ``network=``, ``archive=``, ``product=`` or twenty
-other plausible names, is silent again. Measured: 24 of 24 invented field
-names evade, against the same construction the module's own positive control
-fires on. Nothing about R5 closes it either -- R5 counts by whatever field a
-repo's own ``provenance()`` adapter reads, so a repo is free to key its
-manifest on a name this list does not hold.
+AND ONE MORE, WHICH IS THE SAME DEFEAT ONE LEVEL UP (VERIFY-R11, E-M17)
+-----------------------------------------------------------------------
+``CONTRADICTED_SOURCE`` no longer adjudicates the provenance VALUE. For a
+while it still adjudicated the provenance FIELD NAME: a stamp only became a
+source claim when its field was in :data:`SOURCE_NAMING_FIELDS`. So the same
+wholly manufactured ERA5 loader, with ``source=`` renamed to
+``data_product=``, ``feed=``, ``provider=``, ``network=``, ``archive=``,
+``product=`` or twenty other plausible names, went silent again. Measured: 24
+of 24 invented field names evaded, against the same construction the module's
+own positive control fires on. R5 did not close it either -- R5 counts by
+whatever field a repo's own ``provenance()`` adapter reads, so a repo is free
+to key its manifest on a name this list does not hold.
 
-This is NOT closed here, and it is not closed by extending the list, because
-the next stamp will be called something else -- the identical argument this
-module makes against a deny-list of product names. Inverting the direction
-(treat every opaque string field on a wholly manufactured record as a source
-claim) WAS measured on a throwaway copy across all fourteen repos: 4 findings
-becomes 29. Some are real and serious -- ``resilient-chokepoint``'s
-``climate_model_runners.py`` returns throughput deltas built from four
-literals plus ``rng.normal`` under ``scenario_name="SSP1-2.6 vs SSP5-8.5
-(CMIP6-driven)"``, with no CMIP6 anywhere in the module -- and some are noise:
+Extending the list was refused, and the refusal still stands: the next stamp
+will be called something else, which is the identical argument this module
+makes against a deny-list of product names. Inverting the direction (treat
+every opaque string field on a wholly manufactured record as a source claim)
+was measured across all fourteen repos: 4 findings becomes 29, including
 ``freq="h"``, ``currency="USD"``, ``country_code="GLO"``,
-``generator_version="1.0.0"``, and prose ``note=`` fields matched on the word
-"observed" inside a sentence that was declaring the data synthetic. The
-inversion cannot ship as measured. Recorded as E-M17.
+``generator_version="1.0.0"`` and prose ``note=`` fields matched on the word
+"observed" inside a sentence declaring the data synthetic. The inversion could
+not ship as measured.
+
+WHAT IS CLOSED (T8-4)
+~~~~~~~~~~~~~~~~~~~~~
+The adjudication moved to the VALUE and off the field name entirely, gated on
+two things this module did not invent. On a record ``manufactured_of`` already
+proves WHOLLY manufactured -- the precondition is unchanged and is what keeps
+the conservative lean -- ANY string-valued field is read as a source claim
+when its value
+
+(a) claims observation on the vocabulary that already shipped
+    (:data:`OBSERVED_CLAIM_TOKENS`), now applied wherever the string is
+    written rather than only under a listed field name; or
+
+(b) reproduces at least :data:`REGISTRY_MATCH_MIN_PARTS` parts of a product
+    name in the repo's own signed ``docs/allowlist.yaml``. The allowlist is
+    the human signatory's record of which sources are real. READING it is
+    permitted; extending it is reserved (CLAUDE.md rule 14) and this module
+    never proposes an entry.
+
+Branch (b) is what makes ``era5_land`` a finding under ANY field name:
+ERA5-Land is allowlisted where it is used, so a value naming it on a record
+proven drawn from ``rng`` is contradicted by the portfolio's own source of
+truth rather than by a list this module made up. The control that pins it
+renames the stamp through all 24 measured names PLUS a name generated at test
+time, so the check cannot be satisfied by adding names to any frozenset.
+
+The honesty rule is UNCHANGED and still runs first: a simulation token in any
+provenance field of the record ends the adjudication before either source rule
+is reached. That is what keeps torrent's ``v4_orchestrator`` note ("these
+annual maxima were DRAWN, not observed") silent, and the value-side branch
+additionally skips any value that declares itself.
+
+WHAT MEASURABLY REMAINS (still E-M17, not closed)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* **A product in NO allowlist.** ``resilient-chokepoint``'s
+  ``climate_model_runners.py`` returns throughput deltas built from four
+  literals plus ``rng.normal`` under ``scenario_name="SSP1-2.6 vs SSP5-8.5
+  (CMIP6-driven)"``, and no chokepoint allowlist entry mentions CMIP6
+  (measured 2026-08-29: ``grep -c cmip6 docs/allowlist.yaml`` -> 0). Branch
+  (b) has nothing to match, and branch (a) does not fire because the value
+  claims no observation. This record is STILL invisible to R11. It is the
+  pre-escalation shape and it is reported in ``docs/ESCALATIONS.md`` E-M17
+  rather than repaired here, because repairing it is chokepoint's change.
+* **A source claim written with spaces.** The observed-token branch requires a
+  LABEL, not a sentence (:func:`is_label_value`), because without that guard
+  it fired on three honest NA disclaimers in the fleet -- exactly the prose
+  class that sank the inversion. ``data_product="NOAA CO-OPS"`` therefore
+  reaches branch (b) only. Stated, not hidden.
+* **A one-part product name.** ``product="chirps"`` reproduces one part of
+  ``chirps-daily-precip`` and scores 1, below the threshold. Two parts is what
+  separates a compound of a registered name from a word two pieces of code
+  happen to share (``coffee`` is a part of five of arabica's forty entries);
+  the cost is single-token product names.
+* Everything under WHAT THIS MODULE DOES NOT CLAIM TO CATCH above still
+  stands, unchanged.
 """
 
 from __future__ import annotations
@@ -205,8 +256,8 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import fabrication
-from .fabrication import HARD_CONFIG_TOKENS, tokenise
+from . import fabrication, policy
+from .fabrication import HARD_CONFIG_TOKENS, tokenise, tokenise_parts
 
 # ---------------------------------------------------------------------------
 # Vocabulary
@@ -345,6 +396,166 @@ IDENTIFIER_TOKENS: frozenset[str] = frozenset(
     }
 )
 
+
+
+#: Minimum number of an allowlist entry's own name-parts a value must
+#: reproduce before it counts as naming that product. TWO, not one, and the
+#: threshold is the whole difference between this rule and the inversion that
+#: could not ship.
+#:
+#: Every allowlist in the portfolio is a list of hyphenated compounds --
+#: ``gee-era5-land-daily``, ``noaa-coops-water-levels``,
+#: ``usda-nass-quickstats`` -- and the parts of those compounds include
+#: ordinary descriptive words: ``coffee`` appears in five of arabica's forty
+#: entries, ``daily`` in three, ``global`` in one. A one-token rule makes
+#: ``crop="coffee"`` and ``freq="daily"`` on any manufactured record into
+#: source claims, which is exactly the ``currency="USD"`` class of noise that
+#: sank the naive inversion. Requiring two parts means the value has to
+#: reproduce a COMPOUND of the registered name, and a compound is not a word
+#: two pieces of code happen to share.
+#:
+#: An adjacent-pair join counts as both of its parts, so ``era5land`` scores
+#: the same 2 as ``era5_land``: the joined spelling is not an evasion.
+REGISTRY_MATCH_MIN_PARTS = 2
+
+#: A token carries no naming evidence unless it has letters and some length.
+#: ``h``, ``sr`` and ``1`` are not product names, and ``1.0.0`` tokenises to
+#: digits whose adjacent join ``10`` collides with the ``-1-0`` in
+#: ``ecmwf-aifs-single-1-0``. That collision is not hypothetical: it is the
+#: pinned ``generator_version="1.0.0"`` negative control, and without this
+#: filter the registry branch fires on it.
+REGISTRY_TOKEN_MIN_LENGTH = 3
+
+
+def _is_naming_token(token: str) -> bool:
+    """True when a token can carry the identity of a product."""
+    return len(token) >= REGISTRY_TOKEN_MIN_LENGTH and any(c.isalpha() for c in token)
+
+
+def is_label_value(value: str) -> bool:
+    """True when a string is a LABEL rather than a sentence about the data.
+
+    R5 counts rows by the provenance value as a CATEGORY -- ``{"train":
+    {"real": n, "synthetic": n}}`` -- and a category key has no spaces in it.
+    ``observed_ccc``, ``era5_land``, ``real``, ``noaa_coops_synthetic``: all
+    labels. ``"No observational asset-level labels exist to score against"``
+    is a disclaimer a human wrote for a human, it enters no manifest, and
+    nothing counts rows by it.
+
+    This is the guard on the observed-token branch, and it is the difference
+    between that branch shipping and not. MEASURED across the fleet without
+    it: three findings, all false, all on prose --
+    ``empirical_coverage_unmeasured_reason="... empirical coverage is
+    unmeasured"`` and ``interpretation="... No observational asset-level
+    labels exist ..."`` in resilient-blackout, both of which are the honest
+    NA disclaimer this instrument asks people to write. Firing on an honest
+    disclaimer teaches authors to delete the disclaimer, which is the exact
+    opposite of what R11 is for.
+
+    The cost is stated rather than hidden: a source claim written WITH a space
+    (``"NOAA CO-OPS"``) is not read by the observed-token branch. The registry
+    branch does not use this guard and is unaffected, because reproducing two
+    parts of a registered product name is evidence whatever the spacing.
+    """
+    return bool(value.strip()) and not any(c.isspace() for c in value)
+
+
+@dataclass(frozen=True)
+class RegistryHit:
+    """A value that reproduces the name of a registered real source."""
+
+    #: The allowlist entry id, verbatim, so a reader can look it up.
+    entry: str
+    #: ALLOWED / BLOCKED / EVAL-ONLY, as the signatory recorded it.
+    status: str
+    #: The parts of the entry's own name the value reproduced.
+    parts: tuple[str, ...]
+
+    def render(self) -> str:
+        return f"allowlist:{self.entry} [{self.status}] via {'+'.join(self.parts)}"
+
+
+@dataclass(frozen=True)
+class SourceRegistry:
+    """The real sources this repo's human signatory has recorded.
+
+    Read from ``docs/allowlist.yaml`` -- READ, never written: extending it is
+    reserved to the signatory (CLAUDE.md rule 14), and this module has no
+    business proposing an entry. What it takes from the file is the one thing
+    a static check cannot invent: which strings name a real external product
+    IN THIS REPO'S OWN JUDGEMENT. That is why a match here is a measurement
+    against the portfolio's source of truth rather than against a token list
+    this module made up, and it is the whole answer to "the next stamp will be
+    called something else".
+
+    ``present=False`` is not the same as an empty registry and is carried
+    separately so a caller can REPORT it. A registry that silently is not
+    there would turn this branch off with no signal, which is the failure mode
+    this module keeps finding in other people's checks.
+    """
+
+    path: str = ""
+    present: bool = False
+    parse_error: str = ""
+    #: (entry id, status, base name-parts) for every entry, in file order.
+    entries: tuple[tuple[str, str, tuple[str, ...]], ...] = ()
+
+    def match(self, value: str) -> RegistryHit | None:
+        """The registered product this value names, if any.
+
+        Scored against the entry's OWN name-parts: a part counts when the
+        value's token bag contains it, and an adjacent pair of parts both
+        count when the bag contains their join. ``REGISTRY_MATCH_MIN_PARTS``
+        parts must land before the value is read as naming the product.
+        """
+        if not self.entries:
+            return None
+        bag = set(tokenise(value))
+        if not bag:
+            return None
+        best: RegistryHit | None = None
+        for entry_id, status, parts in self.entries:
+            hit: set[str] = set()
+            for part in parts:
+                if _is_naming_token(part) and part in bag:
+                    hit.add(part)
+            for left, right in zip(parts, parts[1:]):
+                joined = left + right
+                if _is_naming_token(joined) and joined in bag:
+                    hit.add(left)
+                    hit.add(right)
+            if len(hit) < REGISTRY_MATCH_MIN_PARTS:
+                continue
+            ordered = tuple(p for p in parts if p in hit)
+            if best is None or len(ordered) > len(best.parts):
+                best = RegistryHit(entry_id, status or "UNSPECIFIED", ordered)
+        return best
+
+
+#: An empty registry. Every entry point defaults to this, so a caller that
+#: supplies nothing gets branch (a) only and never a crash.
+NO_REGISTRY = SourceRegistry()
+
+
+def load_source_registry(root: Path) -> SourceRegistry:
+    """Read a repo's signed allowlist as a registry of real product names.
+
+    Parsed by :func:`policy.read`, which is the portfolio's one allowlist
+    parser. A missing or malformed file yields a registry that says so rather
+    than one that quietly holds nothing.
+    """
+    path = root / policy.ALLOWLIST_RELPATH
+    allowlist = policy.read(path)
+    entries = tuple(
+        (entry.id, entry.status, tuple(tokenise_parts(entry.id)))
+        for entry in allowlist.entries.values()
+    )
+    return SourceRegistry(
+        path=str(policy.ALLOWLIST_RELPATH),
+        present=allowlist.exists,
+        parse_error=allowlist.parse_error,
+        entries=entries,
+    )
 
 
 #: Severity of a finding, ranked. Both are defects; only the first puts noise
@@ -549,6 +760,14 @@ class Finding:
     #: Which of the three rules fired. Independent of severity: severity says
     #: where the noise landed, this says what made the label false.
     rule: str = OBSERVED_STAMP
+    #: WHY this value was read as a source claim, when the field name alone
+    #: did not say so. Either ``allowlist:<entry> [<status>] via <parts>`` --
+    #: the value reproduces a compound of a product the repo's own signatory
+    #: registered -- or ``observed-token:<token>``. Empty when the finding
+    #: came from the field name being a declared provenance field, which needs
+    #: no such evidence. A finding a reader cannot re-derive is not evidence,
+    #: so this is quoted in the reason, the report and ``to_dict``.
+    matched_on: str = ""
     #: How many of the record's data fields carry a draw, and how many it has.
     #: One finding is emitted per record rather than one per field -- eight
     #: findings for one row would bury seven other rows -- so this pair is
@@ -560,11 +779,12 @@ class Finding:
     def render(self) -> str:
         extra = f"; corroborated by {', '.join(self.corroborating)}" if self.corroborating else ""
         split = f"; split={self.split}" if self.split else ""
+        matched = f"; matched on {self.matched_on}" if self.matched_on else ""
         return (
             f"{self.path}:{self.line}  {self.field} <- {self.origin_symbol} "
             f"({self.origin_call} at line {self.origin_line}) stamped "
             f'{self.claim_field}="{self.claim_value}" [{self.rule}/{self.severity}{split}; '
-            f"{self.tainted_fields}/{self.data_fields} data fields drawn{extra}]"
+            f"{self.tainted_fields}/{self.data_fields} data fields drawn{matched}{extra}]"
             f"\n      {self.snippet}"
         )
 
@@ -583,6 +803,7 @@ class Finding:
             "snippet": self.snippet,
             "severity": self.severity,
             "rule": self.rule,
+            "matched_on": self.matched_on,
             "tainted_fields": self.tainted_fields,
             "data_fields": self.data_fields,
         }
@@ -610,16 +831,28 @@ class _Record:
     line: int
     stamps: list[Stamp] = field(default_factory=list)
     data: list[tuple[str, ast.AST]] = field(default_factory=list)
+    #: Every string-literal field on the record, whatever it is called --
+    #: including the ones that ARE declared provenance fields. The field-name
+    #: rules read ``stamps``; the value-side rule reads this, because the
+    #: field name is the thing an author renames and therefore the thing this
+    #: half must not depend on.
+    literals: list[tuple[str, str]] = field(default_factory=list)
     #: Names whose taint reaches this record without a nameable field, used by
     #: the frame shape where columns are assigned separately.
     carried: list[str] = field(default_factory=list)
 
 
 class _ModuleScanner:
-    def __init__(self, path: str, source: str, tree: ast.Module) -> None:
+    def __init__(self, path: str, source: str, tree: ast.Module,
+                 registry: SourceRegistry | None = None) -> None:
         self.path = path
         self.lines = source.splitlines()
         self.tree = tree
+        #: The real-source registry the value-side rule adjudicates against.
+        #: Absent means branch (b) cannot fire, which is why every caller
+        #: REPORTS whether it had one -- see R11's ``source_registry``
+        #: evidence.
+        self.registry = registry or NO_REGISTRY
         self.parents: dict[int, ast.AST] = {}
         for parent in ast.walk(tree):
             for child in ast.iter_child_nodes(parent):
@@ -922,9 +1155,9 @@ class _ModuleScanner:
             changed = False
             for sub in body:
                 if isinstance(sub, ast.Assign):
-                    pairs = [(self._target_names(t), sub.value) for t in sub.targets]
+                    pairs = [(self._bound_names(t), sub.value) for t in sub.targets]
                 elif isinstance(sub, ast.AnnAssign):
-                    pairs = [(self._target_names(sub.target), sub.value)]
+                    pairs = [(self._bound_names(sub.target), sub.value)]
                 else:
                     continue
                 for targets, value in pairs:
@@ -993,6 +1226,38 @@ class _ModuleScanner:
                 assigned.update(self._target_names(sub.target))
         return outer - assigned
 
+    @staticmethod
+    def _bound_names(target: ast.AST) -> list[str]:
+        """Names this target proves something about. NOT ``obj[k] = v``.
+
+        ``_target_names`` deliberately reports the BASE of a subscript, so
+        ``df["water_level_m"] = rng.normal(...)`` taints ``df`` -- correct for
+        the taint pass, whose whole job is to over-approximate.
+
+        It is wrong here, and measurably so. ``payload["verdict"] =
+        "MEASURED"`` writes one literal into one key and says NOTHING about
+        the other forty values in ``payload``; treating it as a proof that
+        ``payload`` was manufactured is precisely the over-approximation this
+        pass documents that it must never make. MEASURED on the fleet: it put
+        ``scripts/measure_coops_vintage_delta.py``'s payload -- a record built
+        from ``_git()`` output and a live NOAA CO-OPS fetch -- into
+        ``manufactured_of``, and two of resilient-blackout's honestly-labelled
+        metrics dicts with it. Three false CONTRADICTED_SOURCE findings, all
+        three on code that reads real data, all three from this one line.
+
+        Attribute targets stay: ``self.BASE_T = 22.0`` binds a whole value,
+        and ``_manufactured_expr`` reads ``self.BASE_T`` back by that same
+        attribute name, so the two halves agree.
+        """
+        if isinstance(target, ast.Subscript):
+            return []
+        if isinstance(target, (ast.Tuple, ast.List)):
+            out: list[str] = []
+            for element in target.elts:
+                out.extend(_ModuleScanner._bound_names(element))
+            return out
+        return _ModuleScanner._target_names(target)
+
     def manufactured_of(self, scope: ast.AST) -> set[str]:
         """Names in ``scope`` that provably came from inside this process.
 
@@ -1003,7 +1268,9 @@ class _ModuleScanner:
         Over-approximating here would be UNSAFE -- it is the conjunct that
         makes an opaque source label a finding -- so unlike ``taint_of`` this
         pass is deliberately conservative. Anything it cannot prove
-        manufactured stays out, and the check stays quiet.
+        manufactured stays out, and the check stays quiet. Element writes
+        (``obj[k] = v``) prove nothing about ``obj`` and are dropped here; see
+        :meth:`_bound_names`.
         """
         key = id(scope)
         cached = self._manufactured_cache.get(key)
@@ -1021,11 +1288,11 @@ class _ModuleScanner:
             for sub in self._statements(scope):
                 pairs: list[tuple[list[str], ast.AST | None]] = []
                 if isinstance(sub, ast.Assign):
-                    pairs = [(self._target_names(t), sub.value) for t in sub.targets]
+                    pairs = [(self._bound_names(t), sub.value) for t in sub.targets]
                 elif isinstance(sub, (ast.AnnAssign, ast.AugAssign, ast.NamedExpr)):
-                    pairs = [(self._target_names(sub.target), sub.value)]
+                    pairs = [(self._bound_names(sub.target), sub.value)]
                 elif isinstance(sub, (ast.For, ast.AsyncFor, ast.comprehension)):
-                    pairs = [(self._target_names(sub.target), sub.iter)]
+                    pairs = [(self._bound_names(sub.target), sub.iter)]
                 else:
                     continue
                 for targets, value in pairs:
@@ -1095,12 +1362,15 @@ class _ModuleScanner:
                 if isinstance(value, ast.Name) and value.id in self._module_dicts:
                     spread = self._record_from_dict(self._module_dicts[value.id])
                     record.stamps.extend(spread.stamps)
+                    record.literals.extend(spread.literals)
                 else:
                     record.carried.extend(self._target_names(value) or [])
                 continue
             if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
                 continue
             name = key.value
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                record.literals.append((name, value.value))
             stamp = self._stamp_from(name, value)
             if stamp is not None:
                 record.stamps.append(stamp)
@@ -1120,7 +1390,11 @@ class _ModuleScanner:
                         and keyword.value.id in self._module_dicts:
                     spread = self._record_from_dict(self._module_dicts[keyword.value.id])
                     record.stamps.extend(spread.stamps)
+                    record.literals.extend(spread.literals)
                 continue
+            if isinstance(keyword.value, ast.Constant) \
+                    and isinstance(keyword.value.value, str):
+                record.literals.append((keyword.arg, keyword.value.value))
             stamp = self._stamp_from(keyword.arg, keyword.value)
             if stamp is not None:
                 record.stamps.append(stamp)
@@ -1136,8 +1410,15 @@ class _ModuleScanner:
         The pandas shape: the data goes in when the frame is built and the
         stamp is bolted on afterwards as a column. Nothing about it is one
         expression, so the record has to be assembled from the scope.
+
+        Every string-literal column is collected, not only the ones whose NAME
+        is a declared provenance field. Collecting only the latter would leave
+        the whole value-side rule blind to ``df["data_product"] =
+        "era5_land"`` -- the same rename this rule exists to survive, one
+        syntax over.
         """
         stamps: dict[str, list[Stamp]] = {}
+        literals: dict[str, list[tuple[str, str]]] = {}
         anchors: dict[str, ast.AST] = {}
         for sub in self._statements(scope):
             if not isinstance(sub, ast.Assign) or len(sub.targets) != 1:
@@ -1152,28 +1433,88 @@ class _ModuleScanner:
             if not (holder_name and isinstance(slot, ast.Constant)
                     and isinstance(slot.value, str)):
                 continue
+            if isinstance(sub.value, ast.Constant) and isinstance(sub.value.value, str):
+                literals.setdefault(holder_name, []).append((slot.value, sub.value.value))
+                anchors.setdefault(holder_name, sub)
             stamp = self._stamp_from(slot.value, sub.value)
             if stamp is None:
                 continue
             stamps.setdefault(holder_name, []).append(stamp)
             anchors.setdefault(holder_name, sub)
         out: list[_Record] = []
-        for name, found in stamps.items():
+        for name in anchors:
             anchor = anchors[name]
             record = _Record(anchor, getattr(anchor, "lineno", 0))
-            record.stamps = found
+            record.stamps = stamps.get(name, [])
+            record.literals = literals.get(name, [])
             record.carried = [name]
             out.append(record)
         return out
 
     # -- adjudication ------------------------------------------------------
 
-    def _decide(self, record: _Record) -> tuple[str, Stamp] | None:
-        """Which rule this record's STAMPS trip, and the stamp that trips it.
+    def _value_side_claim(self, record: _Record) -> tuple[Stamp, str] | None:
+        """A source claim read off a VALUE, whatever the field is called.
 
-        Three rules, in the order a reader should hear them. The record's
+        This is the half that survives a rename. The field-name rules above
+        adjudicate ``source=``, ``label_origin=`` and twenty-odd siblings, and
+        E-M17 measured what that costs: the same wholly manufactured ERA5
+        loader with ``source=`` renamed to ``data_product=``, ``feed=``,
+        ``provider=``, ``archive=`` or any of 24 measured names went silent,
+        24 of 24. Extending the list closes 24 names and no more, which is the
+        identical argument this module already makes against a deny-list of
+        product names.
+
+        So the field name is not consulted at all here. What is consulted is
+        the VALUE, against two vocabularies neither of which this rule
+        invented:
+
+        (a) :data:`OBSERVED_CLAIM_TOKENS` -- already shipped, already the
+            thing that makes ``label_origin="observed_ccc"`` a finding, now
+            applied wherever the string is written.
+
+        (b) the repo's own signed ``docs/allowlist.yaml`` -- the human
+            signatory's record of which products are real. A value naming an
+            allowlisted product, on a record already PROVEN drawn from an RNG
+            and literals, is contradicted by the portfolio's own source of
+            truth. ``era5_land`` is a finding under any field name because
+            ERA5-Land is registered where it is used, not because this module
+            holds an opinion about ERA5.
+
+        Two guards, both load-bearing, both measured:
+
+        * The value must not declare itself. ``SIMULATED`` and
+          ``CONTRADICTED`` values are skipped, so
+          ``data_product="era5_land_shaped_synthetic_grid"`` stays a fixture
+          and the ``note="... DRAWN, not observed ..."`` disclaimer in
+          torrent's ``v4_orchestrator`` stays silent on its own value, on top
+          of the record-level honesty rule that already covers it.
+        * The caller must have proved the record WHOLLY manufactured. That
+          precondition is the reason this can read every field instead of a
+          list of them, and relaxing it is what turned 4 findings into 29.
+        """
+        observed_hit: tuple[Stamp, str] | None = None
+        registry_hit: tuple[Stamp, str] | None = None
+        for name, text in record.literals:
+            claim = classify_claim(text)
+            if claim is SIMULATED or claim is CONTRADICTED:
+                continue
+            if claim is OBSERVED and observed_hit is None and is_label_value(text):
+                token = sorted(set(tokenise(text)) & OBSERVED_CLAIM_TOKENS)[0]
+                observed_hit = (Stamp(name, text, OBSERVED), f"observed-token:{token}")
+                continue
+            if registry_hit is None:
+                hit = self.registry.match(text)
+                if hit is not None:
+                    registry_hit = (Stamp(name, text, OPAQUE), hit.render())
+        return observed_hit or registry_hit
+
+    def _decide(self, record: _Record) -> tuple[str, Stamp, str] | None:
+        """Which rule this record trips, the stamp that trips it, and why.
+
+        Four gates, in the order a reader should hear them. The record's
         construction is not consulted here -- that is the caller's job, and it
-        is what settles the third.
+        is what settles the last two.
         """
         observed = [s for s in record.stamps if s.claim is OBSERVED]
         declared = [s for s in record.stamps if s.claim is SIMULATED]
@@ -1182,7 +1523,7 @@ class _ModuleScanner:
         if both_in_one:
             # One string that claims and declares at once:
             # ``synthetic_weather_real_isd_fallback``.
-            return CONTRADICTED_STAMP, both_in_one[0]
+            return CONTRADICTED_STAMP, both_in_one[0], ""
         if observed and declared:
             # Two stamps on one record saying opposite things. This used to be
             # an exemption -- "a record that says synthetic somewhere is not
@@ -1191,11 +1532,14 @@ class _ModuleScanner:
             # field nothing counts by. Report the OBSERVED stamp, because that
             # is the one that travels into a manifest, and carry the
             # declaration in the corroboration so a reader sees the conflict.
-            return CONTRADICTED_STAMP, observed[0]
+            return CONTRADICTED_STAMP, observed[0], ""
         if observed:
-            return OBSERVED_STAMP, observed[0]
+            return OBSERVED_STAMP, observed[0], ""
         if declared:
-            # Declares itself and claims nothing. A fixture. Silent.
+            # Declares itself and claims nothing. A fixture. Silent. This is
+            # the honesty rule, and it is UNCHANGED: a simulation token in any
+            # provenance field of the record ends the adjudication here,
+            # before either source rule below is reached.
             return None
 
         named = [
@@ -1203,7 +1547,13 @@ class _ModuleScanner:
             if s.field in SOURCE_NAMING_FIELDS and s.claim is OPAQUE and tokenise(s.value)
         ]
         if named:
-            return CONTRADICTED_SOURCE, named[0]
+            return CONTRADICTED_SOURCE, named[0], ""
+
+        # The field name said nothing. Ask the value.
+        value_side = self._value_side_claim(record)
+        if value_side is not None:
+            stamp, matched_on = value_side
+            return CONTRADICTED_SOURCE, stamp, matched_on
         return None
 
     def _wholly_manufactured(self, record: _Record, scope: ast.AST) -> bool:
@@ -1237,7 +1587,7 @@ class _ModuleScanner:
         decision = self._decide(record)
         if decision is None:
             return
-        rule, claim = decision
+        rule, claim, matched_on = decision
         if rule is CONTRADICTED_SOURCE and not self._wholly_manufactured(record, scope):
             return
 
@@ -1294,6 +1644,7 @@ class _ModuleScanner:
                     snippet=self.snippet(record.node),
                     severity=TARGET_FABRICATED if is_target_field(name) else INPUT_FABRICATED,
                     rule=rule,
+                    matched_on=matched_on,
                     tainted_fields=len(hits),
                     data_fields=max(data_fields, len(hits)),
                 )
@@ -1351,29 +1702,39 @@ def iter_repo_python_files(root: Path) -> Iterator[Path]:
     return fabrication.iter_python_files([root], skip=REPO_SKIP_DIRS)
 
 
-def scan_source(source: str, display: str) -> list[Finding]:
+def scan_source(source: str, display: str,
+                registry: SourceRegistry | None = None) -> list[Finding]:
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return []
-    return _ModuleScanner(display, source, tree).scan()
+    return _ModuleScanner(display, source, tree, registry).scan()
 
 
-def scan_file(path: Path, display: str | None = None) -> list[Finding]:
+def scan_file(path: Path, display: str | None = None,
+              registry: SourceRegistry | None = None) -> list[Finding]:
     """Findings for one Python file. Unreadable or unparseable files yield none."""
     try:
         source = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return []
-    return scan_source(source, display or str(path))
+    return scan_source(source, display or str(path), registry)
 
 
-def scan_repo(root: Path) -> list[Finding]:
-    """Findings across every Python file in a repo."""
+def scan_repo(root: Path, registry: SourceRegistry | None = None) -> list[Finding]:
+    """Findings across every Python file in a repo.
+
+    The registry defaults to the repo's OWN signed allowlist, read fresh.
+    Passing one explicitly is for callers that already loaded it (and for
+    controls); passing :data:`NO_REGISTRY` deliberately disables branch (b),
+    which is a thing a control does and never a thing production does.
+    """
+    if registry is None:
+        registry = load_source_registry(root)
     findings: list[Finding] = []
     for path in iter_repo_python_files(root):
         display = str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
-        findings.extend(scan_file(path, display))
+        findings.extend(scan_file(path, display, registry))
     findings.sort(key=lambda f: (f.path, f.line, f.field))
     return findings
 
