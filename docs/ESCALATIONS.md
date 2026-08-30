@@ -798,3 +798,88 @@ lands.
 
 **Status: E-038 CONFIRMED, NOT CLOSED.** Not blocked by anything in this
 branch; blocked on an R10 change being scoped as its own work.
+
+---
+
+## E-M17 — R11's `CONTRADICTED_SOURCE` is still decided by a field-NAME list
+
+**Raised by:** adversarial verification of the R11 repair
+(`fix/r11-tokeniser-defeated-by-naming`, `74919f8`), 2026-08-29.
+**Status: CONFIRMED, NOT CLOSED.** Not a regression — the branch is a real
+improvement and the four findings it discovers are all real. This is the
+residue.
+
+### What was measured
+
+The repair removed the naming defeat from the provenance VALUE: a wholly
+manufactured record stamped `source="era5_land"` is now `CONTRADICTED_SOURCE`,
+and the byte-identical record stamped `source="era5_land_shaped_synthetic_grid"`
+is still silent. That half holds under attack — an invented value
+(`label_origin="ccc_regional_returns_2019_2024"`) still fires, so the rule is
+not reading a token list of product names.
+
+The defeat moved up one level. A stamp only becomes a source claim when its
+FIELD is in `SOURCE_NAMING_FIELDS`. Taking the module's own positive control
+and renaming nothing but the field:
+
+| field carrying `"era5_land"` on the identical wholly-manufactured record | R11 |
+|---|---|
+| `source` (the shipped control) | CONTRADICTED_SOURCE |
+| `data_product`, `product`, `feed`, `provider`, `network`, `archive`, `registry`, `upstream`, `repository`, `portal`, `reanalysis`, `vendor`, `series`, `feed_name`, `api`, `corpus`, `supplier`, `channel`, `stream`, `obtained_from`, `retrieved_from`, `derived_from`, `input_dataset`, `basis` | SILENT (24 of 24) |
+
+R5 does not close the gap. R5 reads whatever a repo's own `provenance()`
+adapter returns as `{split: {kind: count}}`, so the field a repo keys its
+manifest on is repo-local and arbitrary; a repo keying on `data_product` would
+have its fabricated rows counted as `real` with R11 silent.
+
+### Why the obvious repair is not applied
+
+Extending `SOURCE_NAMING_FIELDS` is the repair this branch spent itself
+arguing against one level down: the next stamp will be called something else.
+
+Inverting the direction — on a wholly manufactured record, treat ANY opaque
+string-constant field as a source claim — was applied to a throwaway copy in
+scratch (not committed) and run over all fourteen `resilient-*` checkouts:
+
+| | shipped rule | inverted probe |
+|---|---|---|
+| fleet findings | 4 | 29 |
+
+Inspecting the 25 new ones, it is the E-038 pattern again — part discovery,
+part noise from the same change:
+
+* **Real, and serious.** `resilient-chokepoint/src/resilient_chokepoint/counterfactual/climate_model_runners.py:27,52,76,99` —
+  `factual_throughput_mtpd` and `counterfactual_throughput_mtpd` built from
+  four literals plus `rng.normal(0, 0.3)`, returned under
+  `scenario_name="SSP1-2.6 vs SSP5-8.5 (CMIP6-driven)"` from a function whose
+  docstring says "using CMIP6 temperature deltas". There is no CMIP6 in the
+  module. `avoided_disruption_days` is derived from those numbers.
+  `resilient-choco/scripts/train_cqr.py:294` — `yield_observed_t_ha` assigned
+  from `rng.normal(...)`, on a record stamped `country_iso3="GHA"`.
+* **Over-fire, from the same change.** `freq="h"`
+  (surge `storm_loader.py:205`), `currency="USD"` (torrent
+  `loss_metrics.py:76`), `country_code="GLO"` (triage), `generator_version="1.0.0"`
+  (torrent `event_set.py:350`), `match_role="treated"` (blackout and
+  chokepoint `did_impact.py`), and prose `note=` / `interpretation=` fields
+  matched on the word "observed" appearing inside a sentence that was
+  declaring the data synthetic — torrent `v4_orchestrator.py:1287` fires on a
+  note whose text is "these annual maxima were DRAWN, not observed".
+
+A rule that reports a units string and an honest disclaimer is a rule that
+gets turned off. It cannot ship as measured.
+
+### What should close it
+
+The same question one level further in: not "is this field name a source
+field", but "does this string name something outside the process, and does
+anything in this module reach outside to it". A record naming a source in a
+module that performs no read, no request and no client construction is
+contradicted by the module whatever the field is called. That is a change to
+what `CONTRADICTED_SOURCE` triggers on, it moves R11 across all fourteen
+repos, and it needs its own controls, its own fleet delta and its own
+false-positive budget — the units/version/prose classes above are what that
+budget has to buy off.
+
+**Reserved to the owner of R11, not to a verification branch.** The two real
+findings named above are reported here rather than repaired: repairing them is
+each repo's own change.

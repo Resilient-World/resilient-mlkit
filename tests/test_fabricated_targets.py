@@ -635,6 +635,131 @@ def test_negative_an_opaque_stamp_on_data_passed_in_is_silent():
     ) == []
 
 
+def test_positive_hoisting_a_literal_out_of_the_function_is_still_a_finding():
+    """POSITIVE x2. VERIFY-R11-A4, found by attacking the repair.
+
+    The repair made ``CONTRADICTED_SOURCE`` read the construction instead of
+    the label, and the construction was then defeated by a refactor with no
+    semantic content: move one literal out of the function body. Both of
+    these are the shipped ERA5 loader with ``22.0`` written somewhere else,
+    and both were SILENT before this control existed.
+    """
+    module_level = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            BASE_T = 22.0
+
+            class Loader:
+                def __init__(self, seed=44):
+                    self.rng = np.random.default_rng(seed)
+
+                def iter_grid(self, days=365):
+                    for d in range(days):
+                        yield GridSample(
+                            t2m=float(BASE_T + self.rng.normal(0, 1.2)),
+                            precip=float(max(0.0, self.rng.gamma(2.0, 2.8))),
+                            source="era5_land",
+                        )
+            """
+        ),
+        "src/loaders/grid.py",
+    )
+    assert len(module_level) == 1, [f.render() for f in module_level]
+    assert module_level[0].rule == ft.CONTRADICTED_SOURCE
+
+    class_attribute = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            class Loader:
+                BASE_T = 22.0
+
+                def __init__(self, seed=44):
+                    self.rng = np.random.default_rng(seed)
+
+                def iter_grid(self, days=365):
+                    for d in range(days):
+                        yield GridSample(
+                            t2m=float(self.BASE_T + self.rng.normal(0, 1.2)),
+                            precip=float(max(0.0, self.rng.gamma(2.0, 2.8))),
+                            source="era5_land",
+                        )
+            """
+        ),
+        "src/loaders/grid.py",
+    )
+    assert len(class_attribute) == 1, [f.render() for f in class_attribute]
+    assert class_attribute[0].rule == ft.CONTRADICTED_SOURCE
+
+
+def test_negative_an_outer_binding_that_reads_a_file_is_not_a_constant():
+    """NEGATIVE x3, the matched half of the control above.
+
+    Seeding a scope with names bound outside it is only safe while the
+    binding is provably manufactured. Each of these puts a file read where
+    the literal was, and each must stay silent -- otherwise the seed has
+    become an over-approximation, which is the one direction
+    ``manufactured_of`` may never lean.
+    """
+    from_module = """
+        import numpy as np
+        import pandas as pd
+
+        BASELINE = pd.read_csv("baseline.csv")
+
+        class Loader:
+            def __init__(self, seed=44):
+                self.rng = np.random.default_rng(seed)
+
+            def iter_grid(self, days=365):
+                for d in range(days):
+                    yield GridSample(
+                        t2m=float(BASELINE.t2m.mean() + self.rng.normal(0, 1.2)),
+                        source="era5_land",
+                    )
+    """
+    from_class = """
+        import numpy as np
+        import pandas as pd
+
+        class Loader:
+            TABLE = pd.read_parquet("t.pq")
+
+            def __init__(self, seed=44):
+                self.rng = np.random.default_rng(seed)
+
+            def iter_grid(self, days=365):
+                for d in range(days):
+                    yield GridSample(
+                        t2m=float(self.TABLE.t2m.mean() + self.rng.normal(0, 1.2)),
+                        source="era5_land",
+                    )
+    """
+    shadowed = """
+        import numpy as np
+        import xarray as xr
+
+        BASE_T = 22.0
+
+        class Loader:
+            def __init__(self, seed=44):
+                self.rng = np.random.default_rng(seed)
+
+            def iter_grid(self, path, days=365):
+                BASE_T = xr.open_dataset(path).t2m.mean()
+                for d in range(days):
+                    yield GridSample(
+                        t2m=float(BASE_T + self.rng.normal(0, 1.2)),
+                        source="era5_land",
+                    )
+    """
+    for src in (from_module, from_class, shadowed):
+        assert scan(src) == [], src
+
+
 def test_negative_a_simulation_word_outside_a_provenance_field_does_not_excuse():
     """POSITIVE in effect: the excusal vocabulary is read from stamps only.
 
