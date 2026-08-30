@@ -1861,3 +1861,56 @@ def test_the_registry_designator_rule_and_its_noise_budget(registry):
     assert registry.match("co2") is None         # designator, below the floor
     assert registry.match("v1") is None
     assert registry.match("2017") is None        # digits only
+
+
+# ---------------------------------------------------------------------------
+# CONTROL C — the registry disclosure landed in R11's report, and ONLY there
+# ---------------------------------------------------------------------------
+def test_control_c_the_registry_disclosure_is_r11s_and_r12_still_runs(tmp_path):
+    """Both readiness report writers are DRIVEN, not read.
+
+    The registry line this change adds is a fact about R11's value-side source
+    rule. It was also pasted into ``_write_r12_report``, which has no
+    ``registry`` in scope, so every call of R12 -- on every repo, findings or
+    none, since that writer is unconditional -- raised
+    ``NameError: name 'registry' is not defined``. R12's own control suite
+    caught it in five places; it reached a pushed branch because that file was
+    not run.
+
+    So this control runs BOTH checks end to end against a minimal repo and
+    asserts the disclosure is where it belongs. A report writer is only
+    reachable by execution: nothing about reading it says whether its names
+    are bound.
+    """
+    assert_bound_to_this_worktree()
+    from resilient_mlkit.checks import RunContext
+    from resilient_mlkit.checks.readiness import (
+        r11_fabricated_targets,
+        r12_served_contract,
+    )
+    from resilient_mlkit.core.repo import Repo
+    from resilient_mlkit.core.result import Status
+
+    (tmp_path / "src").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "src" / "plain.py").write_text("VALUE = 1\n")
+    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs" / "allowlist.yaml").write_text(ALLOWLIST_FIXTURE)
+    repo = Repo(name="fixture", path=tmp_path)
+    ctx = RunContext(nonce="test-nonce", root=tmp_path)
+
+    r11 = r11_fabricated_targets(repo, ctx)
+    r12 = r12_served_contract(repo, ctx)
+    assert r11.status is Status.PASS, r11.reason
+    assert r12.status is Status.PASS, r12.reason
+
+    r11_report = (tmp_path / "reports" / "fabricated_targets.md").read_text()
+    r12_report = (tmp_path / "reports" / "served_contract.md").read_text()
+    assert "real-source registry" in r11_report, r11_report
+    assert "docs/allowlist.yaml" in r11_report, r11_report
+    assert "real-source registry" not in r12_report, (
+        "R12 is the served-model contract check. It does not adjudicate "
+        "source claims and has no registry to disclose; a line saying it does "
+        "is a fact about a different measurement.\n" + r12_report
+    )
+    assert r11.evidence["source_registry"]["present"] is True
+    assert "source_registry" not in r12.evidence
