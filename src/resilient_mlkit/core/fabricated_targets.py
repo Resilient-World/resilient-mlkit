@@ -169,6 +169,33 @@ formality. ``iter_daily`` in the same arabica module reads its farms off
 Both are under-reports, and an under-report from this rule is a record a
 reader still has to open. What it must never do is fire on a loader that reads
 real data, and every conjunct above is chosen to keep it off that.
+
+AND ONE MORE, WHICH IS THE SAME DEFEAT ONE LEVEL UP (VERIFY-R11)
+----------------------------------------------------------------
+``CONTRADICTED_SOURCE`` no longer adjudicates the provenance VALUE. It still
+adjudicates the provenance FIELD NAME: a stamp only becomes a source claim
+when its field is in :data:`SOURCE_NAMING_FIELDS`. So the same wholly
+manufactured ERA5 loader, with ``source=`` renamed to ``data_product=``,
+``feed=``, ``provider=``, ``network=``, ``archive=``, ``product=`` or twenty
+other plausible names, is silent again. Measured: 24 of 24 invented field
+names evade, against the same construction the module's own positive control
+fires on. Nothing about R5 closes it either -- R5 counts by whatever field a
+repo's own ``provenance()`` adapter reads, so a repo is free to key its
+manifest on a name this list does not hold.
+
+This is NOT closed here, and it is not closed by extending the list, because
+the next stamp will be called something else -- the identical argument this
+module makes against a deny-list of product names. Inverting the direction
+(treat every opaque string field on a wholly manufactured record as a source
+claim) WAS measured on a throwaway copy across all fourteen repos: 4 findings
+becomes 29. Some are real and serious -- ``resilient-chokepoint``'s
+``climate_model_runners.py`` returns throughput deltas built from four
+literals plus ``rng.normal`` under ``scenario_name="SSP1-2.6 vs SSP5-8.5
+(CMIP6-driven)"``, with no CMIP6 anywhere in the module -- and some are noise:
+``freq="h"``, ``currency="USD"``, ``country_code="GLO"``,
+``generator_version="1.0.0"``, and prose ``note=`` fields matched on the word
+"observed" inside a sentence that was declaring the data synthetic. The
+inversion cannot ship as measured. Recorded as E-M17.
 """
 
 from __future__ import annotations
@@ -599,6 +626,7 @@ class _ModuleScanner:
                 self.parents[id(child)] = parent
         self._taint_cache: dict[int, dict[str, Origin]] = {}
         self._manufactured_cache: dict[int, set[str]] = {}
+        self._module_constant_cache: set[str] | None = None
         self._findings: list[Finding] = []
         self._seen: set[tuple[int, str, str]] = set()
         self._module_dicts = self._collect_module_dicts()
@@ -880,6 +908,91 @@ class _ModuleScanner:
             return all(self._manufactured_expr(c, names) for c in values)
         return False
 
+    def _literal_bindings(self, body: list[ast.stmt]) -> set[str]:
+        """Names bound to manufactured expressions by the statements in ``body``.
+
+        Only the DIRECT statements of a module or class body -- never a nested
+        function -- run to a fixpoint against the same expression rule the
+        scope pass uses. A binding this cannot prove manufactured is left out,
+        which is the quiet direction.
+        """
+        names: set[str] = set()
+        changed = True
+        while changed:
+            changed = False
+            for sub in body:
+                if isinstance(sub, ast.Assign):
+                    pairs = [(self._target_names(t), sub.value) for t in sub.targets]
+                elif isinstance(sub, ast.AnnAssign):
+                    pairs = [(self._target_names(sub.target), sub.value)]
+                else:
+                    continue
+                for targets, value in pairs:
+                    if not self._manufactured_expr(value, names):
+                        continue
+                    for name in targets:
+                        if name not in names:
+                            names.add(name)
+                            changed = True
+        return names
+
+    def _module_constants(self) -> set[str]:
+        cached = self._module_constant_cache
+        if cached is None:
+            cached = self._literal_bindings(self.tree.body)
+            self._module_constant_cache = cached
+        return cached
+
+    def _enclosing_class(self, scope: ast.AST) -> ast.ClassDef | None:
+        node: ast.AST | None = scope
+        while node is not None:
+            parent = self.parents.get(id(node))
+            if isinstance(parent, ast.ClassDef):
+                return parent
+            node = parent
+        return None
+
+    def _outer_constants(self, scope: ast.AST) -> set[str]:
+        """Literal constants bound OUTSIDE ``scope`` but visible inside it.
+
+        VERIFY-R11-A4. Without this, the cheapest evasion of
+        ``CONTRADICTED_SOURCE`` was a refactor with no semantic content: hoist
+        one literal out of the function.
+
+            BASE_T = 22.0                          # module constant, or
+            class L:
+                BASE_T = 22.0                      # class attribute
+                ...
+                t2m = float(self.BASE_T + self.rng.normal(0, 1.2))
+
+        made ``t2m`` unprovable, so the record stopped being wholly
+        manufactured and the rule went silent on a loader that was still 100%
+        noise. Measured on the shipped ERA5 shape: moving ``22.0`` to either
+        place turned the finding off. A constant is exactly as manufactured
+        wherever it is written down, and a rule that could see it in one place
+        and not the other was reading the layout rather than the code.
+
+        A name the scope ASSIGNS is dropped from this seed: the outer binding
+        is shadowed, and re-adding it would be the over-approximation this
+        pass must never make. The local fixpoint re-adds it if the local value
+        is itself manufactured.
+        """
+        outer = set(self._module_constants())
+        klass = self._enclosing_class(scope)
+        if klass is not None:
+            outer |= self._literal_bindings(klass.body)
+        if not outer:
+            return outer
+        assigned: set[str] = set()
+        for sub in self._statements(scope):
+            if isinstance(sub, ast.Assign):
+                for t in sub.targets:
+                    assigned.update(self._target_names(t))
+            elif isinstance(sub, (ast.AnnAssign, ast.AugAssign, ast.NamedExpr,
+                                  ast.For, ast.AsyncFor, ast.comprehension)):
+                assigned.update(self._target_names(sub.target))
+        return outer - assigned
+
     def manufactured_of(self, scope: ast.AST) -> set[str]:
         """Names in ``scope`` that provably came from inside this process.
 
@@ -901,7 +1014,7 @@ class _ModuleScanner:
         # is tainted while being half real data; seeding from it would carry
         # that same false positive one hop further and out of sight of the
         # expression rule below.
-        names: set[str] = self._scope_parameters(scope)
+        names: set[str] = self._scope_parameters(scope) | self._outer_constants(scope)
         changed = True
         while changed:
             changed = False
