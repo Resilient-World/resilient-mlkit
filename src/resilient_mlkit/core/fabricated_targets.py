@@ -613,6 +613,17 @@ PURE_CALLS: frozenset[str] = frozenset(
         "date_range", "period_range", "timedelta_range",
         "to_datetime", "to_timedelta", "Timestamp", "Timedelta",
         "datetime", "timedelta", "date",
+        # CONTAINERS over their own arguments, on the same terms as ``array``
+        # and ``concatenate`` above: the recursion still requires every
+        # argument to be manufactured, so ``pd.DataFrame(xr.open_dataset(p))``
+        # is not manufactured and neither is ``pd.DataFrame(rows_passed_in)``.
+        # Without them the pandas shape -- data in at construction, stamp
+        # bolted on afterwards as a column -- could never satisfy the
+        # wholly-manufactured conjunct, so ``frame["data_product"] =
+        # "era5_land"`` on a frame of pure noise was silent whatever the
+        # column was called. MEASURED across all fourteen repos when adding
+        # them: fleet findings 4 -> 4, byte identical.
+        "DataFrame", "Series", "dict",
     }
 )
 
@@ -768,6 +779,12 @@ class Finding:
     #: no such evidence. A finding a reader cannot re-derive is not evidence,
     #: so this is quoted in the reason, the report and ``to_dict``.
     matched_on: str = ""
+    #: The other half of a ``CONTRADICTED_SOURCE`` finding, stated rather than
+    #: implied: what the record was BUILT from. A source claim is only
+    #: contradicted because nothing on the record came from outside, and a
+    #: reader who cannot see that sentence has to reconstruct the rule from
+    #: memory before they can judge the finding.
+    construction: str = ""
     #: How many of the record's data fields carry a draw, and how many it has.
     #: One finding is emitted per record rather than one per field -- eight
     #: findings for one row would bury seven other rows -- so this pair is
@@ -780,12 +797,13 @@ class Finding:
         extra = f"; corroborated by {', '.join(self.corroborating)}" if self.corroborating else ""
         split = f"; split={self.split}" if self.split else ""
         matched = f"; matched on {self.matched_on}" if self.matched_on else ""
+        built = f"\n      {self.construction}" if self.construction else ""
         return (
             f"{self.path}:{self.line}  {self.field} <- {self.origin_symbol} "
             f"({self.origin_call} at line {self.origin_line}) stamped "
             f'{self.claim_field}="{self.claim_value}" [{self.rule}/{self.severity}{split}; '
             f"{self.tainted_fields}/{self.data_fields} data fields drawn{matched}{extra}]"
-            f"\n      {self.snippet}"
+            f"\n      {self.snippet}{built}"
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -804,6 +822,7 @@ class Finding:
             "severity": self.severity,
             "rule": self.rule,
             "matched_on": self.matched_on,
+            "construction": self.construction,
             "tainted_fields": self.tainted_fields,
             "data_fields": self.data_fields,
         }
@@ -1624,6 +1643,18 @@ class _ModuleScanner:
         hits.sort(key=lambda h: (not is_target_field(h[0]), h[0]))
         data_fields = sum(1 for name, _ in record.data if not is_config_field(name)) \
             + len(record.carried)
+        construction = ""
+        if rule is CONTRADICTED_SOURCE:
+            drawn = ", ".join(sorted({n for n, _ in hits}))
+            construction = (
+                f"construction: wholly manufactured in this process -- "
+                f"{len(hits)} of {max(data_fields, len(hits))} data field(s) "
+                f"({drawn}) carry an RNG draw, and every remaining value is a "
+                f"literal, a literal-defaulted parameter, or arithmetic over "
+                f"those. Nothing on the record came from "
+                f'{claim.field}="{claim.value}" because nothing on it came '
+                f"from anywhere."
+            )
         for name, origin in hits[:1]:
             key = (record.line, name, claim.field)
             if key in self._seen:
@@ -1645,6 +1676,7 @@ class _ModuleScanner:
                     severity=TARGET_FABRICATED if is_target_field(name) else INPUT_FABRICATED,
                     rule=rule,
                     matched_on=matched_on,
+                    construction=construction,
                     tainted_fields=len(hits),
                     data_fields=max(data_fields, len(hits)),
                 )

@@ -1044,3 +1044,549 @@ def test_r11_needs_no_declared_tree_at_all(tmp_path):
     result = r11_fabricated_targets(repo, _ctx(tmp_path))
     assert result.status is Status.FAIL
     assert result.evidence["files_walked"] == 1
+
+
+# ---------------------------------------------------------------------------
+# T8-4 / E-M17: the source claim is adjudicated on the VALUE, not the field name
+#
+# CONTROL A must FIRE and CONTROL B must STAY SILENT, and neither half is worth
+# anything without the other. A must fail on a tree where the value-side rule
+# has been reverted to `if name not in PROVENANCE_FIELDS: return None`; B must
+# hold on the clean tree with nothing else in the fleet table moved.
+#
+# The anti-renaming clause lives in CONTROL A: the 24 field names E-M17
+# measured, PLUS one generated at test time. No frozenset can be extended to
+# hold a name that does not exist until the test runs.
+# ---------------------------------------------------------------------------
+
+import secrets
+from pathlib import Path
+
+import pytest
+
+#: The 24 field names measured in docs/ESCALATIONS.md E-M17, verbatim. Every
+#: one of them carried "era5_land" on the module's own positive-control
+#: construction and every one of them was SILENT.
+EM17_MEASURED_FIELD_NAMES = (
+    "data_product", "product", "feed", "provider", "network", "archive",
+    "registry", "upstream", "repository", "portal", "reanalysis", "vendor",
+    "series", "feed_name", "api", "corpus", "supplier", "channel", "stream",
+    "obtained_from", "retrieved_from", "derived_from", "input_dataset", "basis",
+)
+
+#: The module's own positive control (``ERA5LandBaselineLoader.iter_grid`` in
+#: resilient-arabica, reduced), parameterised on NOTHING BUT the name of the
+#: field carrying the stamp. Every value on the yielded record is an RNG draw,
+#: a literal, or arithmetic over a literal-defaulted parameter.
+ERA5_LOADER = """
+    import numpy as np
+
+    class ERA5LandBaselineLoader:
+        def __init__(self, seed=44):
+            self.rng = np.random.default_rng(seed)
+
+        def iter_grid(self, lat_min=-20.0, lat_max=22.0, resolution=0.5, days=365):
+            lats = np.arange(lat_min, lat_max + resolution, resolution)
+            for lat in lats:
+                for d in range(days):
+                    seasonal = 4.0 * np.sin(2.0 * np.pi * (d % 365) / 365.0)
+                    t2m = 22.0 + seasonal + self.rng.normal(0, 1.2)
+                    precip = max(0.0, self.rng.gamma(2.0, 2.8))
+                    yield GridSample(
+                        lat=float(lat),
+                        elevation=1000.0,
+                        t2m=float(t2m),
+                        precip=float(precip),
+                        {stamp_field}="{stamp_value}",
+                    )
+"""
+
+#: One entry, copied in shape from the signed allowlist every model repo
+#: keeps. ``gee-era5-land-daily`` is arabica's real entry id for ERA5-Land;
+#: it is written into a tmp file here so the control does not depend on
+#: another checkout being present, and so the registry it reads is one the
+#: test can point at and a reader can see.
+ALLOWLIST_FIXTURE = """\
+version: 1
+signature:
+  signed: true
+  signed_by: 'Fixture signatory'
+  signed_at: '2026-08-22'
+  entries_sha256: 'not-verified-by-read'
+entries:
+- id: gee-era5-land-daily
+  kind: data
+  status: ALLOWED
+  licence_url: https://apps.ecmwf.int/datasets/licences/copernicus/
+  retrieval_date: '2026-08-14'
+- id: chirps-daily-precip
+  kind: data
+  status: ALLOWED
+  licence_url: https://www.chc.ucsb.edu/data/chirps
+  retrieval_date: '2026-08-14'
+- id: fdp-coffee-probability-2025b
+  kind: data
+  status: ALLOWED
+  licence_url: https://example.invalid/licence
+  retrieval_date: '2026-08-14'
+- id: ecmwf-aifs-single-1-0
+  kind: weights
+  status: ALLOWED
+  licence_url: https://creativecommons.org/licenses/by/4.0/
+  retrieval_date: '2026-08-14'
+"""
+
+
+def assert_bound_to_this_worktree() -> Path:
+    """Print and ASSERT which fabricated_targets.py is under test.
+
+    A control that passed against an installed wheel while the worktree said
+    something else would be a control that measures the wrong file. The
+    binding is printed so it appears in ``pytest -s`` output and asserted so
+    it cannot be wrong silently.
+    """
+    bound = Path(ft.__file__).resolve()
+    expected = (
+        Path(__file__).resolve().parent.parent
+        / "src" / "resilient_mlkit" / "core" / "fabricated_targets.py"
+    ).resolve()
+    print(f"R11 module binding under test: {bound}")
+    assert bound == expected, (
+        f"R11 controls are bound to {bound}, not to this worktree's "
+        f"{expected}. The controls would be measuring another copy of the "
+        "module; fix PYTHONPATH or the editable install before reading any "
+        "verdict below."
+    )
+    return bound
+
+
+@pytest.fixture
+def registry(tmp_path) -> ft.SourceRegistry:
+    """A repo-shaped tree carrying a signed allowlist, read as a registry."""
+    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs" / "allowlist.yaml").write_text(ALLOWLIST_FIXTURE)
+    loaded = ft.load_source_registry(tmp_path)
+    assert loaded.present and len(loaded.entries) == 4, loaded
+    return loaded
+
+
+def scan_loader(stamp_field: str, registry: ft.SourceRegistry,
+                stamp_value: str = "era5_land") -> list[ft.Finding]:
+    return ft.scan_source(
+        textwrap.dedent(
+            ERA5_LOADER.format(stamp_field=stamp_field, stamp_value=stamp_value)
+        ),
+        "src/training/finetune_aurora_coffee.py",
+        registry,
+    )
+
+
+# ---------------------------------------------------------------------------
+# CONTROL A — must FIRE
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "stamp_field",
+    ("source",) + EM17_MEASURED_FIELD_NAMES + ("__generated_at_test_time__",),
+)
+def test_control_a_the_source_claim_survives_any_field_name(stamp_field, registry):
+    """CONTROL A. E-M17's exact defeat, re-run across 26 field names.
+
+    The construction is byte-identical in every case and is 100% RNG draws,
+    literals and arithmetic over literal-defaulted parameters. Only the NAME
+    of the field carrying ``"era5_land"`` changes. Before T8-4 the first case
+    fired and the other 24 measured names were silent, 24 of 24.
+
+    The last parameter is not a name at all until the test runs: it is
+    generated fresh from ``secrets``, so it cannot be in
+    ``SOURCE_NAMING_FIELDS``, ``PROVENANCE_FIELDS``, or any other list an
+    implementer could extend. If this control can be satisfied by adding
+    names to a frozenset, this case is the one that says so.
+
+    Each finding must carry all four things a reader needs to check it without
+    re-deriving the rule: the field name it saw, the value, WHICH branch
+    matched, and the construction that contradicts the claim.
+    """
+    assert_bound_to_this_worktree()
+    if stamp_field == "__generated_at_test_time__":
+        stamp_field = f"z{secrets.token_hex(8)}"
+        assert stamp_field not in ft.PROVENANCE_FIELDS
+        assert stamp_field not in ft.SOURCE_NAMING_FIELDS
+
+    findings = scan_loader(stamp_field, registry)
+
+    assert len(findings) == 1, (
+        f"R11 is SILENT on the wholly manufactured ERA5 loader when the stamp "
+        f"is called {stamp_field}=. Findings: {[f.render() for f in findings]}"
+    )
+    finding = findings[0]
+    assert finding.rule == ft.CONTRADICTED_SOURCE
+    assert finding.claim_field == stamp_field, finding.render()
+    assert finding.claim_value == "era5_land", finding.render()
+    if stamp_field == "source":
+        # The pre-existing field-name path. Unchanged by T8-4, and it is here
+        # so a regression in the OLD half is caught by the NEW control.
+        assert finding.matched_on == ""
+    else:
+        assert finding.matched_on == (
+            "allowlist:gee-era5-land-daily [ALLOWED] via era5+land"
+        ), finding.render()
+    assert "wholly manufactured in this process" in finding.construction
+    assert "rng.gamma" in finding.origin_call or "rng.normal" in finding.origin_call
+
+
+def test_control_a_fires_on_the_pandas_column_shape_under_a_renamed_column(registry):
+    """CONTROL A, second syntax. The stamp bolted on as a frame column.
+
+    ``_frame_records`` used to collect only columns whose NAME was a declared
+    provenance field, so the identical rename defeated it there too -- one
+    syntax over from the case above and invisible to it.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+            import pandas as pd
+
+            def build(days=365, seed=0):
+                rng = np.random.default_rng(seed)
+                frame = pd.DataFrame({"t2m": rng.normal(22.0, 1.2, days)})
+                frame["data_product"] = "era5_land"
+                return frame
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert len(findings) == 1, [f.render() for f in findings]
+    assert findings[0].claim_field == "data_product"
+    assert findings[0].matched_on.startswith("allowlist:gee-era5-land-daily")
+
+
+def test_control_a_fires_on_a_bare_observation_claim_under_a_renamed_field(registry):
+    """CONTROL A, branch (a). No allowlist entry involved.
+
+    ``label_origin="observed_ccc"`` is the incident. Renamed to a field name
+    nothing has heard of, the OBSERVED vocabulary still reads the value --
+    which is the half that has to work in a repo whose allowlist does not
+    happen to name the product being impersonated.
+    """
+    assert_bound_to_this_worktree()
+    findings = scan_loader("thing_we_pulled_it_from", registry,
+                           stamp_value="observed_ccc")
+    assert len(findings) == 1, [f.render() for f in findings]
+    assert findings[0].rule == ft.CONTRADICTED_SOURCE
+    assert findings[0].matched_on == "observed-token:observed"
+
+
+# ---------------------------------------------------------------------------
+# CONTROL B — must STAY SILENT
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("freq", "h"),                      # surge storm_loader.py:205
+        ("currency", "USD"),                # torrent loss_metrics.py:76
+        ("country_code", "GLO"),            # triage
+        ("generator_version", "1.0.0"),     # torrent event_set.py:350
+        ("match_role", "treated"),          # blackout + chokepoint did_impact.py
+        ("crop", "coffee"),                 # one part of fdp-coffee-probability-2025b
+        ("freq_label", "daily"),            # one part of chirps-daily-precip
+    ],
+)
+def test_control_b_the_measured_over_fire_cases_stay_silent(field_name, value, registry):
+    """CONTROL B. The seven values that made the naive inversion unshippable.
+
+    Every one of these sits on a WHOLLY MANUFACTURED record -- the same
+    precondition the real findings satisfy -- so the record's construction
+    cannot be what separates them. Only the value can.
+
+    ``generator_version="1.0.0"`` is the sharpest of them: its tokens are
+    ``1``, ``0`` and the adjacent join ``10``, and ``10`` is also the join of
+    the trailing ``-1-0`` in the allowlisted ``ecmwf-aifs-single-1-0``. Without
+    the naming-token filter the registry branch scores 2 and fires on a version
+    string. ``crop="coffee"`` and ``freq_label="daily"`` are the one-part
+    collisions: both words are parts of real allowlist entries, and one shared
+    word is not a name.
+    """
+    assert_bound_to_this_worktree()
+    findings = scan_loader(field_name, registry, stamp_value=value)
+    assert findings == [], (
+        f'R11 fired on {field_name}="{value}", which is not a source claim: '
+        f"{[f.render() for f in findings]}"
+    )
+
+
+def test_control_b_an_honest_disclaimer_naming_observation_stays_silent(registry):
+    """CONTROL B. torrent ``v4_orchestrator.py:1287``, as shipped.
+
+    The note says the annual maxima "were DRAWN, not observed" -- the most
+    honest thing an author can write about a synthetic fallback -- and it
+    contains the word ``observed``. Two independent guards keep R11 quiet
+    here, and the test asserts the record is silent with BOTH in place:
+    ``evidence_mode="synthetic"`` is the record-level honesty rule, and the
+    note's own text declares itself, so the value-side branch skips it too.
+
+    A rule that reports an honest disclaimer teaches authors to delete the
+    disclaimer. That is the opposite of what R11 is for.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def _return_period_map(mode="synthetic"):
+                rng = np.random.default_rng(44)
+                drawn = rng.lognormal(4.5, 0.6, size=50)
+                return {
+                    "method": "synthetic_lognormal_annual_maxima",
+                    "evidence_mode": "synthetic",
+                    "n_annual_maxima": int(len(drawn)),
+                    "source": "numpy.random.default_rng(44).lognormal(4.5, 0.6)",
+                    "hydrology_mode": mode,
+                    "note": (
+                        "these annual maxima were DRAWN, not observed. Every return "
+                        "period derived from this map, and every stage, depth and "
+                        "avoided-loss figure downstream of it, is synthetic."
+                    ),
+                }
+            """
+        ),
+        "src/torrent/engine/v4_orchestrator.py",
+        registry,
+    )
+    assert findings == [], [f.render() for f in findings]
+
+
+def test_control_b_an_honest_NA_disclaimer_is_not_a_source_claim(registry):
+    """CONTROL B. The three false findings the first cut of branch (a) made.
+
+    resilient-blackout writes exactly the disclaimer this instrument asks for
+    -- "No observational asset-level labels exist to score against" -- on a
+    record whose numbers ARE drawn, because the honest thing to report is that
+    nothing was measured. ``observational`` is in the observed vocabulary.
+    Reading a sentence as a provenance stamp is how a check starts firing on
+    honesty; ``is_label_value`` is the guard, and this is its control.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def calibrate(alpha=0.1, method="split"):
+                rng = np.random.default_rng(42)
+                residuals = np.abs(rng.normal(0, 20, 500))
+                threshold = float(np.quantile(residuals, 1 - alpha))
+                return {
+                    "method": method,
+                    "alpha": alpha,
+                    "threshold": round(threshold, 3),
+                    "empirical_coverage_status": "NA",
+                    "empirical_coverage_unmeasured_reason": (
+                        "no labelled holdout supplied to this task; empirical "
+                        "coverage is unmeasured"
+                    ),
+                }
+            """
+        ),
+        "resilient_blackout/api/tasks.py",
+        registry,
+    )
+    assert findings == [], [f.render() for f in findings]
+
+
+def test_control_b_writing_one_key_does_not_make_the_container_manufactured(registry):
+    """CONTROL B. The root cause behind two of those three false findings.
+
+    ``payload["vintage_delta_verdict"] = "MEASURED"`` writes one literal into
+    one key. ``manufactured_of`` used to read that as proof that ``payload``
+    -- forty other values, including a live NOAA CO-OPS fetch and ``_git()``
+    output -- was built in-process, which is the over-approximation that pass
+    documents it must never make.
+
+    The pair: the same subscript write, once on a container holding an
+    external read (silent), once on a container that really was built from
+    literals and a draw (a finding). If the first half of this pair ever goes
+    red, R11 is inventing manufactured-ness again.
+    """
+    assert_bound_to_this_worktree()
+    external = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def measure(seed=0):
+                rng = np.random.default_rng(seed)
+                stations = fetch_coops_verified_heights()
+                payload = {
+                    "stations": stations,
+                    "sample": rng.choice(stations, size=3),
+                }
+                payload["vintage_delta_verdict"] = "MEASURED"
+                return payload
+            """
+        ),
+        "scripts/measure_coops_vintage_delta.py",
+        registry,
+    )
+    assert external == [], [f.render() for f in external]
+
+    manufactured = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def measure(seed=0, n=3):
+                rng = np.random.default_rng(seed)
+                heights = rng.normal(3.0, 0.3, n)
+                payload = {"water_level_m": heights, "gauge_count": n}
+                payload["source"] = "ntslf"
+                return payload
+            """
+        ),
+        "scripts/fake_gauges.py",
+        registry,
+    )
+    assert len(manufactured) == 1, [f.render() for f in manufactured]
+    assert manufactured[0].claim_value == "ntslf"
+
+
+def test_control_b_a_loader_that_reads_real_data_is_silent_under_every_name(registry):
+    """CONTROL B, and the one this rule would be worthless without.
+
+    Same stamp value, same jitter, same everything -- except one value on the
+    record was read from a file. Renaming the field must not change that: if
+    the value-side branch fired here it would fire on every real loader in the
+    fleet that happens to name its own source.
+    """
+    assert_bound_to_this_worktree()
+    for field_name in ("source", "data_product", f"z{secrets.token_hex(6)}"):
+        findings = ft.scan_source(
+            textwrap.dedent(
+                f"""
+                import numpy as np
+                import xarray as xr
+
+                def load_grid(path, seed=0):
+                    rng = np.random.default_rng(seed)
+                    ds = xr.open_dataset(path)
+                    return [
+                        {{
+                            "t2m": float(row.t2m) + rng.normal(0, 0.01),
+                            "elevation": 1000.0,
+                            "{field_name}": "era5_land",
+                        }}
+                        for row in ds
+                    ]
+                """
+            ),
+            "src/loaders/era5.py",
+            registry,
+        )
+        assert findings == [], (field_name, [f.render() for f in findings])
+
+
+def test_control_b_the_same_loader_declaring_itself_is_silent_under_every_name(registry):
+    """CONTROL B. One string, and it is a fixture again -- under any field name.
+
+    ``era5_land_shaped_synthetic_grid`` reproduces the same two parts of
+    ``gee-era5-land-daily`` that ``era5_land`` does. If the registry branch
+    ignored the value's own declaration, renaming the field would turn every
+    honestly-labelled fixture in the fleet into a finding.
+    """
+    assert_bound_to_this_worktree()
+    for field_name in ("source", "data_product", f"z{secrets.token_hex(6)}"):
+        findings = scan_loader(
+            field_name, registry, stamp_value="era5_land_shaped_synthetic_grid"
+        )
+        assert findings == [], (field_name, [f.render() for f in findings])
+
+
+def test_control_b_the_repair_is_not_a_longer_field_name_list(registry):
+    """CONTROL B. The mechanism, asserted directly.
+
+    E-M17 exists because the check read a list of field names. If the repair
+    were "add the 24 names", this test is what would catch it: none of them
+    may be in either frozenset, and the check must still fire on all 24. The
+    two halves together say the findings above came from the value.
+    """
+    assert_bound_to_this_worktree()
+    leaked = [
+        n for n in EM17_MEASURED_FIELD_NAMES
+        if n in ft.PROVENANCE_FIELDS or n in ft.SOURCE_NAMING_FIELDS
+    ]
+    assert leaked == [], (
+        "E-M17's field names were added to the frozensets instead of the rule "
+        f"being moved to the value: {leaked}"
+    )
+
+
+def test_control_b_an_absent_registry_is_reported_not_silently_skipped(tmp_path):
+    """CONTROL B. Renaming the file the check reads must not be a silent skip.
+
+    Branch (b) cannot fire without a registry. A check that loses a conjunct
+    and goes on printing PASS is the failure mode this module keeps finding in
+    other people's checks, so R11's evidence carries what it read and whether
+    it was there. R9 and T5 escalate on the same absence; this is the line
+    that makes it visible where it changed what was measured.
+    """
+    from resilient_mlkit.checks.readiness import r11_fabricated_targets
+
+    assert_bound_to_this_worktree()
+    repo = _repo(
+        tmp_path,
+        '[repo]\nname = "x"\n',
+        {"scripts/build_panel.py": "x = 1\n"},
+    )
+    result = r11_fabricated_targets(repo, _ctx(tmp_path))
+    assert result.evidence["source_registry"] == {
+        "path": "docs/allowlist.yaml",
+        "present": False,
+        "entries": 0,
+        "parse_error": "",
+    }
+
+    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs" / "allowlist.yaml").write_text(ALLOWLIST_FIXTURE)
+    result = r11_fabricated_targets(repo, _ctx(tmp_path))
+    assert result.evidence["source_registry"]["present"] is True
+    assert result.evidence["source_registry"]["entries"] == 4
+    report_text = (tmp_path / "reports" / "fabricated_targets.md").read_text()
+    assert "real-source registry" in report_text
+    assert "4 signed entries" in report_text
+
+
+def test_the_registry_reads_the_allowlist_and_never_writes_it(tmp_path, registry):
+    """The registry is READ. Extending it is reserved to the human signatory.
+
+    Asserted by bytes: the file this rule depends on is unchanged after a full
+    scan. An agent that "closed" a finding by adding an allowlist entry would
+    be doing the one thing CLAUDE.md rule 14 forbids.
+    """
+    assert_bound_to_this_worktree()
+    before = (tmp_path / "docs" / "allowlist.yaml").read_bytes()
+    scan_loader("data_product", registry)
+    ft.scan_repo(tmp_path)
+    assert (tmp_path / "docs" / "allowlist.yaml").read_bytes() == before
+
+
+def test_the_registry_match_needs_two_parts_of_a_name_not_one(registry):
+    """The threshold, held as a unit fact rather than inferred from a scan."""
+    assert_bound_to_this_worktree()
+    assert registry.match("era5_land") is not None
+    assert registry.match("era5land") is not None          # joined spelling
+    assert registry.match("ERA5-Land") is not None         # any separator
+    assert registry.match("coffee") is None                # one part of an entry
+    assert registry.match("daily") is None                 # one part of an entry
+    assert registry.match("1.0.0") is None                 # digits are not a name
+    assert registry.match("USD") is None
+    assert registry.match("h") is None
+    hit = registry.match("era5_land")
+    assert hit.entry == "gee-era5-land-daily"
+    assert hit.parts == ("era5", "land")
