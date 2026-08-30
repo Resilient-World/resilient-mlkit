@@ -936,6 +936,37 @@ both measured rather than argued:
    share; `coffee` is a part of five of arabica's forty entries.
 3. **A stamp applied outside the record's own scope** (`_stamp(row)`): the
    record arrives as a parameter, so it is not provably manufactured.
+4. **A source value the folder cannot read.** `_string_of` folds constants,
+   one Name hop, one Attribute hop off the enclosing class, `JoinedStr` and
+   `BinOp(+)`. Four other spellings of the SAME literal were measured SILENT
+   against this branch on the otherwise-firing `data_product=` positive
+   (adversarial verification 2026-08-29, driven against the branch worktree,
+   arabica's own allowlist as the registry):
+   `"_".join(["era5", "land"])`, `"era5_%s" % "land"`,
+   `"era5_{}".format("land")`, and a module-level `FEEDS = {"primary":
+   "era5_land"}` read back as `FEEDS["primary"]`. Silence on an expression the
+   folder cannot resolve is the module's stated and deliberate direction, so
+   this is a limit rather than a defect — but it is a limit, it is four more
+   spellings than the six the branch closed, and it is recorded here because
+   it was not.
+
+### Adversarial verification of this branch (2026-08-29)
+
+The R11 repair itself held: control A fires on all 26 field names and goes
+silent on 25 of 26 with the value-side branch deleted (`25 failed, 1 passed`,
+reproduced independently); control B holds on both trees; the fleet sweep over
+all 14 `resilient-*` checkouts is byte-identical to main at 4 findings.
+
+One defect was found and is fixed on `verify/t8-4-r12-report-nameerror`: the
+registry disclosure line was pasted into `_write_r12_report`, which has no
+`registry` in scope. That writer is unconditional, so **R12 raised
+`NameError: name 'registry' is not defined` on every repo** — measured PASS on
+main and RAISED on the branch for the same fixture repo. `tests/` on the
+branch was `6 failed, 696 passed`; the five `test_served_reimplementation.py`
+failures are that NameError, and the file had not been run. After the fix:
+`703 passed, 3 skipped`, and every readiness check matches main's status on
+the same fixture. `::test_control_c_the_registry_disclosure_is_r11s_and_r12_still_runs`
+drives both report writers and fails when the line is put back.
 
 **Residual tests, expected to FAIL the day each is closed:**
 `tests/test_fabricated_targets.py::test_residual_a_product_in_no_allowlist_is_still_invisible`

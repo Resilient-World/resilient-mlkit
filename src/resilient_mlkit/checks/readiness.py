@@ -912,12 +912,6 @@ def _write_r12_report(
          "directories and `tests/`)"),
         f"- contract: `{served_reimplementation.CONTRACT_MODULE}`",
         f"- findings: {len(findings)}",
-        (f"- real-source registry: `{registry.path}` — "
-         + (f"{len(registry.entries)} signed entries"
-            if registry.present else "ABSENT")
-         + (f" (parse error: {registry.parse_error})" if registry.parse_error else "")
-         + ". The value-side half of `CONTRADICTED_SOURCE` adjudicates against"
-           " it, so an absent registry means that half measured nothing here."),
         "",
         "Each row is a place where this repo answers, in its own code, a question",
         "the served-model contract exists to answer once: is this the artifact that",
