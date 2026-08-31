@@ -898,3 +898,78 @@ def test_r10_passes_on_a_clean_tree(tmp_path):
     assert result.status is Status.PASS
     assert result.evidence["findings"] == 0
     assert result.evidence["files_walked"] == 1
+
+
+# ---------------------------------------------------------------------------
+# E-M19 / CONTROL C — the narrowing must not be a refactor recipe
+#
+# #21 narrowed this shape by reading the OPERANDS: silence when every operand
+# is part of the absence guard. The guard legs are name-blind by construction
+# -- `not <name>` is a guard whatever the name means, and a Compare against a
+# constant is a "degeneracy test" whenever the left side merely MENTIONS a
+# size, at any magnitude. So the defect could be silenced by rewriting it,
+# without changing what it decides. Each case below fires on pre-#21 `main`,
+# went silent on #21, and fires again once the operand test is conjoined with
+# the POSITION test.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            "mae_exceeded = holdout_mae is not None and holdout_mae > threshold\n"
+            "            mae_gate_ok = holdout_mae is None or not mae_exceeded",
+            id="threshold-hoisted-into-a-negated-flag",
+        ),
+        pytest.param(
+            "mae_gate_ok = holdout_mae is None or n_violations <= 10",
+            id="threshold-counted-not-compared",
+        ),
+        pytest.param(
+            "mae_gate_ok = holdout_mae is None or holdout_mae <= 0.0",
+            id="degeneracy-spelled-as-the-verdict",
+        ),
+    ],
+)
+def test_control_c_a_verdict_stays_reportable_however_it_is_spelled(body):
+    """The rewrite decides the same thing, so it must be reported the same way.
+
+    ``mae_gate_ok = holdout_mae is None or not mae_exceeded`` is
+    ``holdout_mae is None or holdout_mae <= threshold`` with the comparison
+    hoisted into a local: identical truth table, and an absent ``holdout_mae``
+    still passes. A narrowing that reads only the operands cannot tell the two
+    apart, so the position is read as well -- this is a bare boolean verdict,
+    not the ``None if ... else <figure>`` NA report the seven fleet sites are.
+    """
+    findings = scan(
+        f"""
+        def decide(holdout_mae, threshold, n_violations, out_path):
+            {body}
+            out_path.write_text(json.dumps({{"mae_gate_ok": mae_gate_ok}}))
+        """
+    )
+    assert [
+        f.symbol for f in findings if f.shape == "absence adjudicated as a pass"
+    ] == ["mae_gate_ok"]
+
+
+def test_control_c_the_na_report_position_is_what_earns_the_silence():
+    """The SAME operands, in the two positions, get the two verdicts.
+
+    Pinning the discriminator itself: an absence guard that decides whether to
+    write ``None`` into a report is silent; the identical guard deciding a
+    bare boolean is a verdict over a figure that may not exist, and is
+    reported.
+    """
+    findings = scan(
+        """
+        def report(holdout_mae, out_path):
+            reported_mae = None if holdout_mae is None or np.isnan(holdout_mae) else round(holdout_mae, 6)
+            mae_gate_ok = holdout_mae is None or np.isnan(holdout_mae)
+            out_path.write_text(json.dumps({"mae": reported_mae, "mae_gate_ok": mae_gate_ok}))
+        """
+    )
+    assert [
+        f.symbol for f in findings if f.shape == "absence adjudicated as a pass"
+    ] == ["mae_gate_ok"]

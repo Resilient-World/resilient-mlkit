@@ -78,12 +78,44 @@ shape and was measured and discarded. Both halves are pinned as a control pair
 in `tests/test_fabricated_defaults.py` (8 fixtures red against the pre-fix
 scanner, 7 more that must stay green on both).
 
-Residual, disclosed and open as **E-M19**: a verdict whose other operand is
-itself a degeneracy test on the guarded figure — `rmse_gate_passed = rmse is
-None or rmse <= 0.0` — is now read as an absence guard and goes silent. That
-follows from this module's own long-standing definition of a degeneracy test
-and has no instance anywhere in the fleet, but it is a narrowing and it is
-recorded rather than left to be discovered.
+**The operand test alone was a refactor recipe, and is now conjoined with a
+position test.** Reading only the operands cannot hold, because every leg of
+the guard is name-blind by construction. `not <name>` is a guard whatever the
+name means, and a `Compare` counts as a degeneracy test whenever its left side
+merely MENTIONS a size — `n_violations <= 10` qualifies, at any magnitude, on
+any quantity, not only on the guarded one. So
+
+```python
+mae_exceeded = holdout_mae is not None and holdout_mae > threshold
+mae_gate_ok  = holdout_mae is None or not mae_exceeded
+```
+
+decides exactly what `holdout_mae is None or holdout_mae <= threshold` decides
+— an absent `holdout_mae` still passes — and the operand test alone silenced
+it. Driven end-to-end: that rewrite planted into `chokepoint`'s promotion
+decision at remote `main` `74f4ab1` (throwaway worktree) makes `promoted` come
+out `True` with `holdout_mae` `None` and no reason recorded, and R10 read the
+tree as **NA, 0 findings**. Pre-fix `main` `c65b2e7` named it; so does the rule
+below (`FAIL`, 1 `SATISFIES_GATE`, `fit_corridor_ensemble_weights.py:385`).
+
+The guard-operand test is therefore required **together with** the position:
+the expression must also sit where absence is REPORTED rather than
+adjudicated — the test of `None if <guard> else <computed figure>`, or an `if`
+clause of a comprehension. All seven fleet sites are in one of those two
+positions (six the first, `backend` the second); a bare boolean assignment is
+a verdict and stays reportable. The silence set is a strict subset of the
+operand-only one, so nothing the operand test kept is lost. Pinned as
+CONTROL C in `tests/test_fabricated_defaults.py`: four fixtures, all four red
+against the operand-only scanner, three of them green against pre-fix `main`
+(the fourth is E-M18 itself).
+
+Residual, still open as **E-M19**: `rmse_gate_passed = rmse is None or rmse <=
+0.0` written directly into an NA report — `None if rmse is None or rmse <= 0.0
+else <figure>` — is silent, because that is `fray
+src/validation/error_decomposition.py:131` verbatim. Separating those two
+needs to read what the guarded figure MEANS, which this module cannot do. No
+instance of the silenced form outside the honest family exists in any of the
+ten checkouts; the fleet walk is the measurement.
 
 ### R10 `FABRICATED_DEFAULTS` checked mlkit's word list, not the adopter's metrics (E-038)
 

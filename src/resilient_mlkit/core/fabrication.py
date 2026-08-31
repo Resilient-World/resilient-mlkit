@@ -1233,6 +1233,36 @@ class _ModuleScanner:
                 config_context=_reads_config(node.args[0]) or self.at_module_level(node),
             ))
 
+    def _reports_na(self, node: ast.BoolOp) -> bool:
+        """True when ``node`` decides whether to report NA, not whether to pass.
+
+        Two positions, and no more:
+
+        * the test of ``None if <node> else <computed figure>`` -- the true
+          branch writes ``None`` into the report, so an absent figure comes
+          out absent. ``orelse`` must be computed, not another literal:
+          ``None if <node> else False`` produces no figure on either branch
+          and is a verdict wearing a report's clothes.
+        * an ``if`` clause of a comprehension -- a filter, which selects rows
+          and adjudicates nothing (resilient-backend
+          ``src/resilient_backend/api/services/investment_case.py:350``).
+
+        Anything else -- above all a bare assignment to a boolean -- is a
+        verdict, and a verdict over a missing figure is the defect.
+        """
+        parent = self.parents.get(id(node))
+        if isinstance(parent, ast.IfExp) and parent.test is node:
+            return (
+                isinstance(parent.body, ast.Constant)
+                and parent.body.value is None
+                and not isinstance(parent.orelse, ast.Constant)
+            )
+        if isinstance(parent, ast.comprehension) and any(
+            clause is node for clause in parent.ifs
+        ):
+            return True
+        return False
+
     def _scan_or(self, node: ast.BoolOp) -> None:
         literal = _numeric_literal(node.values[-1])
         if literal is not None:
@@ -1282,7 +1312,31 @@ class _ModuleScanner:
         guarded = frozenset(
             target for target in (_is_none_target(v) for v in node.values) if target
         )
-        if all(_tests_absence_of(v, guarded) for v in node.values):
+        # TWO conditions, and BOTH are required to go silent. Reading the
+        # operands alone is not enough, because "part of the absence guard" is
+        # a shape question and the shapes are name-blind: `not <name>` is the
+        # guard leg whatever the name means, so hoisting the adjudication into
+        # a flag --
+        #
+        #     mae_exceeded = holdout_mae is not None and holdout_mae > threshold
+        #     mae_gate_ok  = holdout_mae is None or not mae_exceeded
+        #
+        # -- is a semantics-preserving rewrite of `holdout_mae is None or
+        # holdout_mae <= threshold` that would otherwise silence it. Same for
+        # the degeneracy leg, which asks nothing about WHICH figure and
+        # accepts any magnitude: `n_violations <= 10` reads as degeneracy
+        # because the name starts with `n_`.
+        #
+        # So the operand test is conjoined with the POSITION test: the
+        # expression must also sit where absence is REPORTED rather than
+        # adjudicated. All seven fleet sites do -- six are the test of
+        # `None if <guard> else <computed figure>`, one is a comprehension
+        # filter -- and in that position a missing figure yields `None`, never
+        # True. Where the same guard decides a bare boolean, it is a verdict
+        # and stays reportable.
+        if self._reports_na(node) and all(
+            _tests_absence_of(v, guarded) for v in node.values
+        ):
             return
         symbols = self._context_symbols(node)
         for symbol in symbols[:1]:
