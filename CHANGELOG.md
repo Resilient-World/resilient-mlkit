@@ -86,6 +86,37 @@ flip.
 name. Pinned by `test_residual_a_metric_computed_inside_a_call_is_still_invisible`,
 which fails the day it closes.
 
+**Corrected in adversarial verification of the above, no verdict moved.** The
+fleet sweep is unchanged — the eight repos' findings are byte-identical to the
+repair's own, and `surge`/`blackout`/`arabica` keep NA/NA/FAIL.
+
+* `metric_registry.derive` read every file under a declared tree with an
+  unguarded `read_text`, so ONE unreadable `*.py` raised out of R10. Measured
+  on a dangling symlink inside a declared tree: `main` reported PASS and the
+  repair raised `FileNotFoundError`, which the harness renders as "check
+  raised an unhandled exception". `fabrication.scan_file` skips such a file,
+  and the registry now skips it too — the two must not disagree about which
+  files a repo has. Skipping rather than refusing is deliberate: `derive`'s
+  refusal short-circuits R10 into NA, so a refusal here would be a
+  one-symlink lever for turning a MEASURED FAIL into "could not measure". The
+  skip is disclosed in the evidence and in `reports/fabricated_defaults.md`.
+* The derivation refusal was adjudicated BEFORE the defect lane. Driven with
+  the anchor broken over a fixture carrying `rmse = 0.0`, R10 reported **NA
+  with `satisfies_gate: 1` in its own evidence** and no mention of the defect
+  in the reason — the collapse `core.result.Status` refuses by name. The
+  vocabulary leg does not consult the registry for its severity, so a broken
+  derivation downgrades the REASON, never the verdict. FAIL now outranks the
+  refusal, and the refusal is carried into the FAIL reason ahead of the
+  "+N more" tail so truncation cannot eat it.
+* **A residual promoted from a code comment to the disclosure:** a callable
+  whose only parameter is `self`/`cls` never enters the universe. Measured
+  across the eight repos at remote main, admitting them would make NINETEEN
+  further sites visible (arabica 2, blackout 1, chokepoint 3, torrent 12,
+  triage 1) — all in the `UNCLASSIFIED_NAME` lane, every affected repo
+  already non-PASS, so no verdict is bought by the exclusion, and the widened
+  universe drags in bare `mean` on torrent. Pinned by
+  `test_residual_a_self_only_callable_is_outside_the_registry`.
+
 ### R11 `FABRICATED_TARGETS` was defeated by naming; it fires on four records it could not see
 
 **R11 changes verdict on unchanged repo code in two repos**, so this is
