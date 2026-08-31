@@ -29,11 +29,12 @@ not restate it, and must name at least one of the checks whose verdict moved.
 
 ### R10 `FABRICATED_DEFAULTS` checked mlkit's word list, not the adopter's metrics (E-038)
 
-**R10 changes verdict on unchanged repo code in one repo**, so this belongs to
-the same major event as the seven checks below. `resilient-surge` at `8b71343`
-moves PASS → NA. `resilient-fray` (`89b7d04`) and `resilient-chokepoint`
-(`52ac929`) stay FAIL with every pre-existing finding intact at the same line,
-same symbol, same severity.
+**R10 changes verdict on unchanged repo code in three of the eight repos**, so
+this belongs to the same major event as the seven checks below. Driven at every
+repo's REMOTE main: `surge` (`8b71343`) and `blackout` (`141108c`) move PASS →
+NA; `arabica` (`f659de5`) moves PASS → **FAIL** on a real finding. The other
+five stay FAIL with every pre-existing finding intact at the same line, same
+symbol, same severity — 0 lost and 0 severities changed across all eight.
 
 **What was wrong.** `is_measured_name` keyed on `MEASURED_TOKENS`, a literal
 list of words inside the check, and that list was silently also the entire
@@ -66,14 +67,19 @@ passes the gate, and `calculate_payout` returning `0.0` below its trigger is
 correct domain behaviour. Before this, that case was SILENCE. A derivation
 whose own anchor probe fails also renders NA.
 
-**Measured at the adopters' mains, 2026-08-30.** Registry size, and how much of
-it mlkit's vocabulary already knew: surge 103 names / 7 known; chokepoint 110 /
-1; fray 50 / 1. Findings: surge 0 → 16 (all `UNCLASSIFIED_NAME`), chokepoint
-2 → 8, fray 5 → 6. Nothing was lost and no severity moved. New names that
-surfaced include `false_alarm_ratio`, `critical_success_index`,
-`missed_detection_rate`, `aal_bias`, `peak_magnitude_error` in surge, and
-`_montiel_olea_effective_f = 0.0` — a weak-instrument F statistic — in
-chokepoint.
+**Measured at all eight remote mains, 2026-08-30.** Registry size, and how much
+of it mlkit's vocabulary already knew: arabica 157 / 4, torrent 148 / 6, choco
+138 / 4, chokepoint 110 / 1, blackout 109 / **0**, surge 103 / 7, triage 103 /
+1, fray 50 / 1. **R10 was checking none of the 109 names blackout computes
+figures under, and one of chokepoint's 110.** Fleet finding delta: 0 lost, 0
+severities changed, 84 added — 81 in the new NA lane and 3 in the FAIL lane,
+each named in `docs/ESCALATIONS.md` E-M18. New names that surfaced include
+`false_alarm_ratio`, `critical_success_index`, `missed_detection_rate`,
+`aal_bias` and `peak_magnitude_error` in surge; `_montiel_olea_effective_f =
+0.0`, a weak-instrument F statistic, in chokepoint; and
+`clr_loss_fraction = ....get("clr_loss_fraction", 0.0)` in arabica, a
+coffee-leaf-rust loss fraction defaulting to "no rust", which is the arabica
+flip.
 
 **A limit, stated:** a computation performed entirely inside a call
 (`float(np.divide(fp, fp + tp))`) leaves no arithmetic behind and derives no

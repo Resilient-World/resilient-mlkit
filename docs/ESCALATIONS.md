@@ -1037,20 +1037,50 @@ Driven with `mlkit` at `7d36930` (main) and at this branch, in separate
 interpreters, each asserting its own `resilient_mlkit.__file__` before
 answering.
 
-| repo | main | derived registry | of those, mlkit's vocabulary already knew | branch |
-|---|---|---|---|---|
-| surge `8b71343` | PASS, 0 findings | 103 | 7 | **NA**, 16 `UNCLASSIFIED_NAME`, 0 defects |
-| fray `89b7d04` | FAIL, 5 findings | 50 | 1 | FAIL, same 5 + 1 `UNCLASSIFIED_NAME` |
-| chokepoint `52ac929` | FAIL, 2 findings | 110 | 1 | FAIL, same 2 + 6 `UNCLASSIFIED_NAME` |
+All eight repos at their REMOTE mains, R10's verdict on each:
 
-Those middle columns are E-038 as a number: on chokepoint, **fifty-nine of the
-sixty**, and after the annotation restriction was dropped **109 of 110**, of the
-names the repo computes figures under were outside the universe R10 checked.
+| repo | main SHA | main R10 | branch R10 | registry | of those, mlkit's vocabulary knew |
+|---|---|---|---|---|---|
+| choco | `422b758` | FAIL, 1 defect | FAIL, 2 defects + 9 unclassified | 138 | 4 |
+| arabica | `f659de5` | PASS | **FAIL, 2 defects** + 9 unclassified | 157 | 4 |
+| fray | `89b7d04` | FAIL, 5 defects | FAIL, same 5 + 1 unclassified | 50 | 1 |
+| torrent | `4a159ac` | FAIL, 1 defect | FAIL, same 1 + 15 unclassified | 148 | 6 |
+| chokepoint | `52ac929` | FAIL, 2 defects | FAIL, same 2 + 6 unclassified | 110 | 1 |
+| surge | `8b71343` | PASS | **NA**, 16 unclassified | 103 | 7 |
+| triage | `7578f51` | FAIL, 3 defects | FAIL, same 3 + 11 unclassified | 103 | 1 |
+| blackout | `141108c` | PASS | **NA**, 15 unclassified | 109 | **0** |
 
-Finding-level diff across all three: **0 lost, 0 severities changed, 23 added.**
-Accepted-set diff over a 482-name universe (mlkit's three token sets plus every
-adopter's registry), both `config_context` values: **0 names newly accepted**;
-96 / 49 / 109 newly refused.
+**The last column is E-038 as a number.** On blackout, R10 was checking NONE of
+the 109 names that repo computes figures under. On chokepoint, 1 of 110. Every
+green R10 in this fleet meant "no fabricated default under a name in mlkit's
+word list", and on three repos that word list overlapped the repo's actual
+metric surface by at most four names.
+
+Finding-level diff across all eight: **0 lost, 0 severities changed, 84 added**
+— 81 `UNCLASSIFIED_NAME` (the NA lane) and 3 in the FAIL lane, which are named
+below. Accepted-set diff over a 482-name universe (mlkit's three token sets plus
+every adopter's registry), both `config_context` values: **0 names newly
+accepted**; 96 / 49 / 109 newly refused on surge / fray / chokepoint.
+
+### Three additions land in the FAIL lane, and they are disclosed, not hidden
+
+Widening the name question also widens SINK detection: a function whose name the
+adopter's registry recognises as figure-producing now counts as returning a
+figure, so a VOCABULARY-named symbol that previously reached no sink can now
+reach one. Three such, and the severity still rests on the vocabulary leg — the
+polarity claim is never made from a derived name:
+
+* `arabica src/analysis/coffee_mediation_pipeline.py:140,141` —
+  `clr_loss_fraction = biotic_baseline.get("clr_loss_fraction", 0.0)`, and the
+  mediation effect `float(p - b)` is returned from
+  `_resolve_mediator_scalar()`. A coffee-leaf-rust LOSS FRACTION defaulting to
+  zero, i.e. "no rust", when the key is absent. **This flips arabica PASS →
+  FAIL and it is a real finding of R10's own defect class.**
+* `choco src/models/process/bma.py:50` — `score = sum(weights.get(k, 0.0) * v
+  ...)`; a BMA weight missing from the weights file contributes zero silently.
+  `PUBLISHES_UNMEASURED`; choco was already FAIL, so no verdict moved.
+
+Repairing all three is those repos' change, not mlkit's (rule 7).
 
 ### surge's PASS did move, and it moved onto real defects
 
