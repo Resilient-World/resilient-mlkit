@@ -27,6 +27,59 @@ true before the tag was cut. It is withdrawn here rather than quietly dropped,
 and `tests/test_version_declaration.py` now FIRES on it: the newest entry may
 not restate it, and must name at least one of the checks whose verdict moved.
 
+### R10 `FABRICATED_DEFAULTS` checked mlkit's word list, not the adopter's metrics (E-038)
+
+**R10 changes verdict on unchanged repo code in one repo**, so this belongs to
+the same major event as the seven checks below. `resilient-surge` at `8b71343`
+moves PASS → NA. `resilient-fray` (`89b7d04`) and `resilient-chokepoint`
+(`52ac929`) stay FAIL with every pre-existing finding intact at the same line,
+same symbol, same severity.
+
+**What was wrong.** `is_measured_name` keyed on `MEASURED_TOKENS`, a literal
+list of words inside the check, and that list was silently also the entire
+universe of names R10 would ever look at. A metric published under any other
+word was never read, and R10 said PASS.
+
+The cost is visible in surge's own source, not in the abstract. Of the twelve
+public metric callables in `src/resilient_surge/evaluation/metrics.py`, the
+word list saw eight and was blind to four — `peak_timing_error`,
+`peak_magnitude_error`, `false_alarm_ratio`, `aal_bias`. In that same file
+`f1_score`, `iou` and `hit_rate` raise `Unmeasured` on a 0/0 denominator, and
+`false_alarm_ratio` returns `0.0` — a perfect no-false-alarm score reported
+from nothing — on the identical degeneracy. **The repair had stopped exactly
+where the word list stopped.** Spelling defeated it too: `csi` is IN the list
+and `critical_success_index` never reaches it, because the tokeniser splits it
+into `critical`/`success`/`index`.
+
+**What changed.** `core/metric_registry.py` derives the universe from the
+ADOPTER: every callable in the trees the repo declares under `[source]` that
+arithmetically computes a number from its own parameters. No name list is
+involved, so no rename evades it — the anti-rename control generates its metric
+name from `secrets` at drive time and no edit to any vocabulary can satisfy it.
+
+**Three verdicts, structurally distinct.** A finding at a name mlkit's
+vocabulary knows is a FAIL exactly as before. A finding whose only measured
+name came from the adopter's registry is `UNCLASSIFIED_NAME` and renders **NA
+with the name quoted** — `satisfies_a_gate` reads polarity off the vocabulary,
+so mlkit cannot claim a literal at a name it does not know is the value that
+passes the gate, and `calculate_payout` returning `0.0` below its trigger is
+correct domain behaviour. Before this, that case was SILENCE. A derivation
+whose own anchor probe fails also renders NA.
+
+**Measured at the adopters' mains, 2026-08-30.** Registry size, and how much of
+it mlkit's vocabulary already knew: surge 103 names / 7 known; chokepoint 110 /
+1; fray 50 / 1. Findings: surge 0 → 16 (all `UNCLASSIFIED_NAME`), chokepoint
+2 → 8, fray 5 → 6. Nothing was lost and no severity moved. New names that
+surfaced include `false_alarm_ratio`, `critical_success_index`,
+`missed_detection_rate`, `aal_bias`, `peak_magnitude_error` in surge, and
+`_montiel_olea_effective_f = 0.0` — a weak-instrument F statistic — in
+chokepoint.
+
+**A limit, stated:** a computation performed entirely inside a call
+(`float(np.divide(fp, fp + tp))`) leaves no arithmetic behind and derives no
+name. Pinned by `test_residual_a_metric_computed_inside_a_call_is_still_invisible`,
+which fails the day it closes.
+
 ### R11 `FABRICATED_TARGETS` was defeated by naming; it fires on four records it could not see
 
 **R11 changes verdict on unchanged repo code in two repos**, so this is

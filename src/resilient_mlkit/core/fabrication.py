@@ -23,6 +23,25 @@ than a denylist of suspicious literals. ``timeout``, ``batch_size``,
 default for any of them can never fire this check however it is written.
 Configuration defaults are not defects; measured quantities are.
 
+**But the allowlist is not the universe (E-038).** :data:`MEASURED_TOKENS` was
+also, silently, the whole set of names R10 would ever look at -- so a repo
+publishing a metric under any word outside it got a PASS over code the check
+never read. Measured on ``resilient-surge`` at ``8b71343``: four of the twelve
+public metric callables in its own ``evaluation/metrics.py`` were invisible,
+and in that same file the four visible ones had been repaired to raise on a
+0/0 denominator while ``false_alarm_ratio`` still returned ``0.0``. The repair
+had stopped exactly where the word list stopped.
+
+The universe is therefore derived from the ADOPTER now --
+:mod:`resilient_mlkit.core.metric_registry` reads the repo's own
+figure-producing callables out of the trees the repo declares -- and the
+vocabulary above keeps one specific job: it is the only leg a FAIL may rest
+on, because :func:`satisfies_a_gate` reads polarity off these words. A name
+that arrives only from the derived registry is emitted as
+:data:`UNCLASSIFIED_NAME` and rendered NA with the name quoted. Precision is
+unchanged where it was bought: no derived name can defeat a config veto, and
+no derived name can be called "the value that passes the gate".
+
 **A default alone is not a defect.** ``rmse = d.get("rmse", 0.0)`` inside a
 plotting helper harms nobody. It becomes a defect when the value reaches a
 gate, a metric or a report -- somewhere a reader will take it for a
@@ -51,6 +70,7 @@ import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 #: The two AST nodes that carry a signature. Several scanners need
 #: ``.args``/``.body``/a docstring, which ``ast.AST`` does not promise, and
@@ -346,6 +366,14 @@ def is_measured_name(name: str, *, config_context: bool = False) -> bool:
     ``config_context`` marks sites where a threshold would legitimately live
     (a parameter default, a module constant, a value read from a config
     mapping); there the threshold vocabulary vetoes as well.
+
+    This is the VOCABULARY leg only -- the list of words above. It is NOT the
+    whole universe of measured names any more, and calling it as though it
+    were is E-038: see :mod:`resilient_mlkit.core.metric_registry` and
+    :func:`measured_name_source`. Kept as-is, and kept public, because the
+    vocabulary leg is what FAIL is allowed to rest on: polarity
+    (:func:`satisfies_a_gate`) is read off these words, so a name outside them
+    cannot be adjudicated as "the value that passes the gate".
     """
     tokens = set(tokenise(name))
     if not tokens:
@@ -355,6 +383,60 @@ def is_measured_name(name: str, *, config_context: bool = False) -> bool:
     if config_context and THRESHOLD_TOKENS & tokens:
         return False
     return bool(MEASURED_TOKENS & tokens)
+
+
+#: What :func:`measured_name_source` answers with. ``VOCABULARY`` is the
+#: built-in word list; ``REGISTRY`` is a name derived from the ADOPTER's own
+#: figure-producing callables, which the vocabulary has no opinion on; ``None``
+#: is "not a measured name".
+VOCABULARY = "VOCABULARY"
+REGISTRY = "REGISTRY"
+
+#: Severity of a finding whose only measured name came from the adopter's
+#: derived registry. Structurally distinct from the two defect severities,
+#: because it carries no verdict -- see :attr:`Finding.severity`.
+UNCLASSIFIED_NAME = "UNCLASSIFIED_NAME"
+
+
+class _Registry(Protocol):
+    """The only thing this module needs from a derived metric registry.
+
+    Structural, not an import: :mod:`metric_registry` imports THIS module for
+    the walker and the vocabulary, so a hard dependency back would be a cycle.
+    """
+
+    def contains(self, name: str) -> bool: ...
+
+
+def measured_name_source(
+    name: str,
+    *,
+    config_context: bool = False,
+    registry: _Registry | None = None,
+) -> str | None:
+    """Which leg, if any, says ``name`` denotes a measured quantity.
+
+    The vocabulary leg wins when both match, so every finding that existed
+    before a registry was passed keeps the symbol and the severity it had.
+
+    The config vetoes apply to BOTH legs unchanged. A repo that computes
+    ``def seed(...) -> int`` does not thereby make ``seed`` a metric, and the
+    registry must not be a way around a veto the vocabulary leg respects.
+    """
+    if not name:
+        return None
+    if is_measured_name(name, config_context=config_context):
+        return VOCABULARY
+    if registry is None:
+        return None
+    tokens = set(tokenise(name))
+    if not tokens:
+        return None
+    if HARD_CONFIG_TOKENS & tokens:
+        return None
+    if config_context and THRESHOLD_TOKENS & tokens:
+        return None
+    return REGISTRY if registry.contains(name) else None
 
 
 def _is_extensive(name: str) -> bool:
@@ -382,6 +464,12 @@ class Finding:
     #: value would fail its gate but is still emitted as a measurement, which
     #: misreports rather than falsely reassures. Both are defects; only the
     #: first can turn a red gate green, so they are ranked apart.
+    #:
+    #: UNCLASSIFIED_NAME is neither. It means the symbol reached this check
+    #: only through the ADOPTER's derived metric registry -- the repo computes
+    #: a figure under that name, and mlkit's own vocabulary has no opinion on
+    #: it, so no polarity can be read and no verdict can be asserted. R10
+    #: renders these NA, quoting the name. Before E-038 they were SILENCE.
     severity: str = "SATISFIES_GATE"
 
     def render(self) -> str:
@@ -612,10 +700,20 @@ class _Candidate:
 
 
 class _ModuleScanner:
-    def __init__(self, path: str, source: str, tree: ast.Module) -> None:
+    def __init__(
+        self,
+        path: str,
+        source: str,
+        tree: ast.Module,
+        registry: _Registry | None = None,
+    ) -> None:
         self.path = path
         self.lines = source.splitlines()
         self.tree = tree
+        #: The ADOPTER's derived metric-name universe, or None when the caller
+        #: passed none. Every name question in this scanner goes through
+        #: :meth:`_measured`, so there is exactly one place the two legs meet.
+        self.registry = registry
         self.parents: dict[int, ast.AST] = {}
         for parent in ast.walk(tree):
             for child in ast.iter_child_nodes(parent):
@@ -623,6 +721,17 @@ class _ModuleScanner:
         self._sink_cache: dict[int, dict[str, str]] = {}
         self._findings: list[Finding] = []
         self._seen: set[tuple[int, int, str]] = set()
+
+    # -- the name question -------------------------------------------------
+
+    def _name_source(self, name: str, *, config_context: bool = False) -> str | None:
+        """VOCABULARY, REGISTRY or None for one symbol. The only asker."""
+        return measured_name_source(
+            name, config_context=config_context, registry=self.registry
+        )
+
+    def _measured(self, name: str, *, config_context: bool = False) -> bool:
+        return self._name_source(name, config_context=config_context) is not None
 
     # -- tree helpers ------------------------------------------------------
 
@@ -667,7 +776,7 @@ class _ModuleScanner:
         """
         sinks: dict[str, str] = {}
         scope_name = getattr(scope, "name", "<module>")
-        returns_figure = bool(_SINK_FUNCS.search(scope_name)) or is_measured_name(scope_name)
+        returns_figure = bool(_SINK_FUNCS.search(scope_name)) or self._measured(scope_name)
 
         def note(sym: str, why: str) -> None:
             if sym and sym not in sinks:
@@ -733,7 +842,7 @@ class _ModuleScanner:
                         for sym in names_in(arg):
                             note(sym, f"passed to {fname}()")
                 for kw in sub.keywords:
-                    if kw.arg and (is_measured_name(kw.arg) or _VERDICT_NAMES.search(kw.arg)):
+                    if kw.arg and (self._measured(kw.arg) or _VERDICT_NAMES.search(kw.arg)):
                         why = f"passed as {fname or 'result'}({kw.arg}=...)"
                         note(kw.arg, why)
                         for sym in names_in(kw.value):
@@ -767,7 +876,7 @@ class _ModuleScanner:
                     return "reported in a dict carrying a pass/fail verdict"
                 return "reported under a metric key"
             if isinstance(parent, ast.keyword) and parent.arg and (
-                is_measured_name(parent.arg) or _VERDICT_NAMES.search(parent.arg)
+                self._measured(parent.arg) or _VERDICT_NAMES.search(parent.arg)
             ):
                 return f"passed as {parent.arg}=..."
             if isinstance(parent, ast.Call):
@@ -778,7 +887,7 @@ class _ModuleScanner:
             if isinstance(parent, ast.Return):
                 scope = self.enclosing_function(parent)
                 name = getattr(scope, "name", "")
-                if name and (_SINK_FUNCS.search(name) or is_measured_name(name)):
+                if name and (_SINK_FUNCS.search(name) or self._measured(name)):
                     return f"returned from {name}()"
             if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Module)):
                 return None
@@ -843,6 +952,27 @@ class _ModuleScanner:
 
     # -- emission ----------------------------------------------------------
 
+    def _severity(self, symbol: str, literal: str, from_vocabulary: bool) -> str:
+        """Rank one finding.
+
+        A name the built-in vocabulary knows keeps the two severities it has
+        always had, decided by :func:`satisfies_a_gate`.
+
+        A name that reached this scanner ONLY through the adopter's derived
+        registry gets :data:`UNCLASSIFIED_NAME` instead, and never
+        ``SATISFIES_GATE``. ``satisfies_a_gate`` reads polarity off the
+        vocabulary and returns True for anything it does not recognise, so
+        calling a derived-name finding "the value that passes the gate" would
+        be asserting a direction nothing measured. R10 renders these NA and
+        quotes the name. See :mod:`resilient_mlkit.core.metric_registry`.
+        """
+        if not from_vocabulary:
+            return UNCLASSIFIED_NAME
+        return (
+            "SATISFIES_GATE" if satisfies_a_gate(symbol, literal)
+            else "PUBLISHES_UNMEASURED"
+        )
+
     def _emit(self, cand: _Candidate) -> None:
         """Report the candidate when it is BOTH a measurement and reaches a sink.
 
@@ -852,10 +982,21 @@ class _ModuleScanner:
         ``el = self.compute_expected_loss(ep) if ep else 0.05`` is named for
         its producer and sunk under ``el``. Both halves are still required.
         """
-        measured = [
+        # The VOCABULARY leg is consulted across the whole alias list before
+        # the registry leg is consulted at all. That ordering is what makes
+        # this change provably additive: any candidate that had a
+        # vocabulary-named alias before a registry existed still resolves to
+        # that same alias, with that same severity, at that same line.
+        vocabulary = [
             s for s in cand.symbols
             if s and is_measured_name(s, config_context=cand.config_context)
         ]
+        derived = [
+            s for s in cand.symbols
+            if s
+            and self._name_source(s, config_context=cand.config_context) == REGISTRY
+        ]
+        measured = vocabulary or derived
         if not measured:
             return
         if self._in_synthetic_context(cand.node):
@@ -889,10 +1030,7 @@ class _ModuleScanner:
                 literal=cand.literal,
                 sink=sink,
                 snippet=self.snippet(cand.node),
-                severity=(
-                    "SATISFIES_GATE" if satisfies_a_gate(symbol, cand.literal)
-                    else "PUBLISHES_UNMEASURED"
-                ),
+                severity=self._severity(symbol, cand.literal, bool(vocabulary)),
             )
         )
 
@@ -976,7 +1114,7 @@ class _ModuleScanner:
             return
         symbols = self._context_symbols(node)
         for symbol in symbols[:1]:
-            if _VERDICT_NAMES.search(symbol) or is_measured_name(symbol):
+            if _VERDICT_NAMES.search(symbol) or self._measured(symbol):
                 self._emit(_Candidate(
                     node, [symbol], "absence adjudicated as a pass", "True",
                 ))
@@ -1054,7 +1192,7 @@ class _ModuleScanner:
                 continue
             # A parameter default IS the canonical home of a threshold, so the
             # threshold vocabulary vetoes here.
-            if not is_measured_name(arg.arg, config_context=True):
+            if not self._measured(arg.arg, config_context=True):
                 continue
             if not satisfies_a_gate(arg.arg, literal):
                 continue
@@ -1071,6 +1209,10 @@ class _ModuleScanner:
             self._findings.append(Finding(
                 path=self.path, line=line, symbol=arg.arg, shape="parameter default",
                 literal=literal, sink=sink, snippet=self.snippet(arg),
+                severity=self._severity(
+                    arg.arg, literal,
+                    is_measured_name(arg.arg, config_context=True),
+                ),
             ))
 
     def _scan_metric_literal_return(self, fn: _FunctionNode) -> None:
@@ -1088,7 +1230,7 @@ class _ModuleScanner:
         only an uppercase acronym.
         """
         name = getattr(fn, "name", "")
-        if not is_measured_name(name, config_context=True) \
+        if not self._measured(name, config_context=True) \
                 and not self._docstring_names_a_metric(fn):
             return
         for sub in ast.walk(fn):
@@ -1115,6 +1257,11 @@ class _ModuleScanner:
                 path=self.path, line=line, symbol=name,
                 shape="metric function returns a literal", literal=literal,
                 sink=f"returned from {name}()", snippet=self.snippet(sub),
+                severity=self._severity(
+                    name, literal,
+                    is_measured_name(name, config_context=True)
+                    or self._docstring_names_a_metric(fn),
+                ),
             ))
 
     @staticmethod
@@ -1396,30 +1543,44 @@ def iter_python_files(
             yield path
 
 
-def scan_source(source: str, display: str) -> list[Finding]:
+def scan_source(
+    source: str, display: str, registry: _Registry | None = None
+) -> list[Finding]:
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return []
-    return _ModuleScanner(display, source, tree).scan()
+    return _ModuleScanner(display, source, tree, registry).scan()
 
 
-def scan_file(path: Path, display: str | None = None) -> list[Finding]:
+def scan_file(
+    path: Path, display: str | None = None, registry: _Registry | None = None
+) -> list[Finding]:
     """Findings for one Python file. Unreadable or unparseable files yield none."""
     try:
         source = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return []
-    return scan_source(source, display or str(path))
+    return scan_source(source, display or str(path), registry)
 
 
-def scan_tree(roots: Iterable[Path], base: Path | None = None) -> list[Finding]:
-    """Findings across every Python file under ``roots``."""
+def scan_tree(
+    roots: Iterable[Path],
+    base: Path | None = None,
+    registry: _Registry | None = None,
+) -> list[Finding]:
+    """Findings across every Python file under ``roots``.
+
+    ``registry`` is the ADOPTER's own metric-name universe, derived by
+    :func:`resilient_mlkit.core.metric_registry.derive` from the same trees.
+    Passing None keeps the pre-E-038 behaviour -- the built-in vocabulary and
+    nothing else -- which is what every caller outside R10 wants and gets.
+    """
     findings: list[Finding] = []
     for path in iter_python_files(roots):
         display = str(path)
         if base is not None and path.is_relative_to(base):
             display = str(path.relative_to(base))
-        findings.extend(scan_file(path, display))
+        findings.extend(scan_file(path, display, registry))
     findings.sort(key=lambda f: (f.path, f.line, f.symbol))
     return findings

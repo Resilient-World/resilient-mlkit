@@ -799,6 +799,15 @@ lands.
 **Status: E-038 CONFIRMED, NOT CLOSED.** Not blocked by anything in this
 branch; blocked on an R10 change being scoped as its own work.
 
+**UPDATE 2026-08-30 — that work is done, on
+`fix/r10-metric-name-blindness-e-038`. See E-M18 below.** The fifteen tokens
+were NOT adopted; `MEASURED_TOKENS` is byte-identical to this entry's version,
+so the `Conv2d(bias=True)` and crop-growth-stage over-fire measured here cannot
+occur. E-M16's own prescription — "ask of the VALUE what R11 now asks of the
+record: was this number computed from anything, or was it written down" — is
+what the repair implements, applied to the name's DECLARATION: a name enters
+R10's universe when the repo itself computes a figure under it.
+
 ---
 
 ## E-M17 — R11's `CONTRADICTED_SOURCE` is still decided by a field-NAME list
@@ -973,3 +982,118 @@ drives both report writers and fails when the line is put back.
 and `::test_residual_a_stamp_applied_in_a_helper_is_still_invisible`. Both
 assert the current, wrong silence. When one goes red, update this section
 rather than re-pinning the silence.
+
+---
+
+## E-M18 — E-038 is CLOSED: R10's metric-name universe is derived from the adopter
+
+**Raised and closed** 2026-08-30 on `fix/r10-metric-name-blindness-e-038`.
+E-M16 confirmed E-038 and refused to close it by extending `MEASURED_TOKENS`,
+because the fifteen proposed tokens put R10 onto `Conv2d(bias=True)` and crop
+growth stages. This entry records the repair that was taken instead, everything
+it moved, and the two things it does NOT close.
+
+### The blind spot, re-measured against surge's own registry
+
+`src/resilient_surge/evaluation/metrics.py` at `8b71343` declares twelve public
+metric callables. `is_measured_name` classifies eight and is blind to four:
+
+    peak_timing_error   peak_magnitude_error   false_alarm_ratio   aal_bias
+
+The consequence is in surge's source, not in the abstract. In that one file
+`f1_score`, `iou` and `hit_rate` were repaired to raise `Unmeasured` on a 0/0
+denominator; `false_alarm_ratio` still returns `0.0` on the identical
+degeneracy — a perfect no-false-alarm score reported from nothing. **The repair
+stopped exactly where the word list stopped.**
+
+Spelling defeats the list independently of vocabulary: `csi` IS in
+`MEASURED_TOKENS`, and `critical_success_index` never reaches it, because
+`tokenise` splits it into `critical`/`success`/`index`.
+
+### What the repair is
+
+`core/metric_registry.py`. A name enters R10's universe for a repo when a
+callable in the trees that repo declares under `[source]` computes a number
+from its own parameters — an arithmetic `BinOp` at a return, after unwrapping
+`float()`/`int()`/`round()`/`abs()`, both arms of a ternary, and one hop
+through a local. No list of names is involved anywhere.
+
+`MEASURED_TOKENS` is unchanged, and keeps one job: it is the only leg a FAIL
+may rest on, because `satisfies_a_gate` reads polarity off those words.
+
+### Three verdicts, and why the new one is NA rather than FAIL
+
+* vocabulary name → FAIL, unchanged;
+* registry-only name → severity `UNCLASSIFIED_NAME`, R10 renders **NA quoting
+  the name**. mlkit has no polarity for a name it does not know, and
+  `calculate_payout` returning `0.0` below its trigger is correct domain
+  behaviour, not a fabrication. The wrong answer here is silence, which is what
+  it used to be;
+* the derivation's own anchor probe failing → NA.
+
+### What moved, measured at the adopters' mains on 2026-08-30
+
+Driven with `mlkit` at `7d36930` (main) and at this branch, in separate
+interpreters, each asserting its own `resilient_mlkit.__file__` before
+answering.
+
+| repo | main | derived registry | of those, mlkit's vocabulary already knew | branch |
+|---|---|---|---|---|
+| surge `8b71343` | PASS, 0 findings | 103 | 7 | **NA**, 16 `UNCLASSIFIED_NAME`, 0 defects |
+| fray `89b7d04` | FAIL, 5 findings | 50 | 1 | FAIL, same 5 + 1 `UNCLASSIFIED_NAME` |
+| chokepoint `52ac929` | FAIL, 2 findings | 110 | 1 | FAIL, same 2 + 6 `UNCLASSIFIED_NAME` |
+
+Those middle columns are E-038 as a number: on chokepoint, **fifty-nine of the
+sixty**, and after the annotation restriction was dropped **109 of 110**, of the
+names the repo computes figures under were outside the universe R10 checked.
+
+Finding-level diff across all three: **0 lost, 0 severities changed, 23 added.**
+Accepted-set diff over a 482-name universe (mlkit's three token sets plus every
+adopter's registry), both `config_context` values: **0 names newly accepted**;
+96 / 49 / 109 newly refused.
+
+### surge's PASS did move, and it moved onto real defects
+
+Reported plainly because a control said honest PASSes should not flip. The
+sixteen sites are surge's own committed code, and at least five are the defect
+class R10 exists to catch, each with a repaired sibling in the same file:
+
+    evaluation/metrics.py:228                    false_alarm_ratio      = 0.0
+    evaluation/metrics.py:156                    peak_magnitude_error   = 0.0
+    evaluation/hindcast_suite/skill_metrics.py:70  false_alarm_ratio    = 0.0
+    evaluation/hindcast_suite/skill_metrics.py:83  critical_success_index = 0.0
+    evaluation/probabilistic/flood_event_metrics.py:89  false_alarm_rate = 0.0
+    evaluation/probabilistic/flood_event_metrics.py:103 missed_detection_rate = 0.0
+    evaluation/probabilistic/insurance_metrics.py:53    aal_bias        = 0.0
+
+Repairing them is surge's change, not mlkit's (rule 7). Others in the sixteen —
+`calculate_payout = 0.0` below a trigger, `rate_on_line = 0.0` — are plausibly
+correct domain behaviour, which is exactly why the verdict is NA and not FAIL.
+
+chokepoint's six include `_montiel_olea_effective_f = 0.0`, a weak-instrument
+F statistic defaulting to zero, and `_evalue = 1.0`.
+
+### WHAT THIS DOES NOT CLOSE
+
+1. **A metric computed entirely inside a call.**
+   `return float(np.divide(fp, fp + tp)) if (fp + tp) > 0 else 0.0` leaves no
+   arithmetic `BinOp`, so the name never enters the registry and the `0.0` is
+   not reported. Admitting any call would enrol every function in a repo.
+   Stated as a limit and pinned by
+   `tests/test_r10_metric_name_universe.py::test_residual_a_metric_computed_inside_a_call_is_still_invisible`,
+   which fails the day it closes.
+2. **`value = ... if ... else 0.0; return value`** is not attributed to the
+   enclosing function by R10's scanner. This is an OLD R10 limit, not an E-038
+   one: measured identical on `rmse`, a name the word list has always known.
+   Pinned as a pair by
+   `::test_residual_a_computed_local_returned_by_name_is_an_OLD_r10_limit`.
+3. **E-M17 residual 4** (`"_".join([...])`, `%`, `.format`, dict read-back at a
+   provenance stamp) is deliberately NOT closed here. It was examined and does
+   not share this mechanism: E-038 is an enumerated NAME UNIVERSE in R10;
+   residual 4 is the reach of R11's constant FOLDER in a different check with a
+   different registry. Making an unresolvable expression a refusal there needs
+   its own over-fire budget and its own control pair. It stays recorded under
+   E-M17.
+
+**Status: E-038 CLOSED. E-M16 superseded by this entry. E-M17 residual 4
+unchanged and still open.**
