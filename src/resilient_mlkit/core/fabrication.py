@@ -59,6 +59,16 @@ the champion's predictions, and uncertainty bands manufactured by multiplying
 a point estimate. Those are the same defect class but they leave no numeric
 literal behind, and a rule broad enough to catch them would flag ordinary
 code. They remain a matter for review.
+
+One further limit, added deliberately and recorded as E-M19: in the ``absence
+adjudicated as a pass`` shape, a verdict whose other operand is itself a
+degeneracy test on the guarded figure -- ``rmse is None or rmse <= 0.0`` -- is
+read as an absence guard and goes silent. That is the price of not firing on
+``observed_mean is None or observed_mean <= 0.0``, which is fray's honest
+"there is nothing to divide by" guard reporting ``None``. The two are the same
+structure; separating them needs a discriminator this module does not have.
+Measured: no instance of the silenced form exists in any of the ten
+``resilient-*`` checkouts.
 """
 
 from __future__ import annotations
@@ -628,6 +638,134 @@ def _is_absence_test(node: ast.AST) -> bool:
     return False
 
 
+#: Predicates that ask "is this figure missing / not-a-number". They belong to
+#: the ABSENCE test, never to the adjudication of a measured value:
+#: ``np.isnan(holdout_mae)`` asks whether the figure exists, not whether it is
+#: good enough. Held as bare attribute names because the call is what is read,
+#: not the import -- ``np.isnan``, ``pd.isna``, ``math.isnan`` and a bare
+#: ``isnan`` all reduce to the same name here.
+_NULLITY_PREDICATES = frozenset({"isnan", "isna", "isnull", "isnat", "is_nan"})
+
+#: The NEGATION of one of these is the same absence test spelled the other way
+#: round: ``not np.isfinite(mae)``, ``not pd.notna(mae)``.
+_PRESENCE_PREDICATES = frozenset({"isfinite", "notna", "notnull"})
+
+#: Single-argument casts that wrap a figure without changing what is being
+#: asked about it, so ``np.isnan(float(mae))`` still names ``mae``.
+_TRANSPARENT_CASTS = frozenset({"float", "int", "abs", "bool"})
+
+
+def _dotted_target(node: ast.AST | None) -> str:
+    """``mae`` / ``res.mae`` / ``res.metrics.mae``, or ``""`` when unnameable.
+
+    Used to ask whether two operands of an ``or`` are talking about the SAME
+    figure. A name that cannot be spelled (a subscript, a call result) yields
+    ``""``, which never matches, so an unnameable operand is never assumed to
+    be part of another operand's guard.
+    """
+    while (
+        isinstance(node, ast.Call)
+        and len(node.args) == 1
+        and not node.keywords
+        and isinstance(node.func, ast.Name)
+        and node.func.id in _TRANSPARENT_CASTS
+    ):
+        node = node.args[0]
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+        return ".".join(reversed(parts))
+    return ""
+
+
+def _has_none_arm(node: ast.AST) -> bool:
+    """``node`` is an ``is None`` test. Kept BYTE-FOR-BYTE from the pre-fix gate.
+
+    The condition that admitted an expression to the "absence adjudicated as a
+    pass" shape is reproduced here unchanged, so that the narrowing added in
+    :meth:`_ModuleScanner._scan_or` is provably a narrowing of what the shape
+    does with an admitted expression and not, by accident, a narrowing of what
+    gets admitted.
+    """
+    return (
+        isinstance(node, ast.Compare)
+        and any(isinstance(o, ast.Is) for o in node.ops)
+        and any(
+            isinstance(c, ast.Constant) and c.value is None for c in node.comparators
+        )
+    )
+
+
+def _is_none_target(node: ast.AST) -> str:
+    """The figure ``node`` tests against ``None``; ``""`` when there is no name.
+
+    ``""`` covers both "not an ``is None`` test at all" and "an ``is None``
+    test on something that cannot be named" (``d.get("mae") is None``). Either
+    way the answer is the same to every caller: this operand contributes no
+    guarded name, so nothing can be matched against it.
+    """
+    if not isinstance(node, ast.Compare):
+        return ""
+    left: ast.expr = node.left
+    for op, comparator in zip(node.ops, node.comparators):
+        if (
+            isinstance(op, ast.Is)
+            and isinstance(comparator, ast.Constant)
+            and comparator.value is None
+        ):
+            return _dotted_target(left)
+        left = comparator
+    return ""
+
+
+def _tests_absence_of(node: ast.AST, guarded: frozenset[str]) -> bool:
+    """True when ``node`` is part of an absence guard rather than an adjudication.
+
+    FOUR ways an operand can be part of the guard, and no more. The list is
+    deliberately shorter than :func:`_is_absence_test`, which this does NOT
+    delegate to wholesale: that helper ignores polarity for calls, so
+    ``BASELINE.is_file()`` reads as an absence test there when in this position
+    it is a presence test and ``mae is None or BASELINE.is_file()`` is the
+    self-passing gate choco actually shipped. Measured: delegating wholesale
+    silenced that shape; the four legs below do not.
+
+    * an ``is None`` test;
+    * a degeneracy Compare -- ``len(folds) == 0``, ``observed_mean <= 0.0``
+      (fray src/validation/error_decomposition.py:131). Compare only.
+    * ``not <name>`` -- an empty population, ``not eligible`` (fray
+      scripts/stress_readout_county_yield.py:318);
+    * a NaN/NA question about an ALREADY-GUARDED figure --
+      ``np.isnan(holdout_mae)``, ``not np.isfinite(holdout_mae)`` (chokepoint
+      scripts/fit_corridor_ensemble_weights.py:249,252).
+
+    The last leg is why ``guarded`` is passed in. ``np.isnan(x)`` is part of
+    *this* guard only when ``x`` is the figure the ``is None`` arm is about;
+    ``mae is None or np.isnan(other)`` asks about a second figure, adjudicates
+    on it, and stays reportable.
+    """
+    if _has_none_arm(node):
+        return True
+    if isinstance(node, ast.Compare):
+        return _is_absence_test(node)
+    call, negated = node, False
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+        if isinstance(node.operand, ast.Name):
+            return True
+        call, negated = node.operand, True
+    if not isinstance(call, ast.Call) or len(call.args) != 1:
+        return False
+    func = call.func
+    name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+    wanted = _PRESENCE_PREDICATES if negated else _NULLITY_PREDICATES
+    if name not in wanted:
+        return False
+    target = _dotted_target(call.args[0])
+    return bool(target) and target in guarded
+
+
 _CONFIG_SOURCES = re.compile(
     r"(?i)\b(config|cfg|conf|params?|settings?|options?|opts?|args|kwargs|"
     r"env|environ|defaults?|toml|yaml|ini)\b"
@@ -1105,12 +1243,46 @@ class _ModuleScanner:
             ))
             return
         # `x is None or x > threshold` -- absence adjudicated as a pass.
-        if not any(
-            isinstance(v, ast.Compare)
-            and any(isinstance(o, ast.Is) for o in v.ops)
-            and any(isinstance(c, ast.Constant) and c.value is None for c in v.comparators)
-            for v in node.values
-        ):
+        #
+        # BOTH halves are required, and the second half is what makes it a
+        # defect. The `is None` arm on its own says only "this figure may be
+        # missing"; it is the OTHER operand -- something that ADJUDICATES the
+        # figure -- that turns the expression into a verdict, and therefore
+        # turns a missing figure into a passing one. Where every remaining
+        # operand is itself part of the absence guard, nothing is adjudicated
+        # and there is no verdict to fake:
+        #
+        #     holdout_mae is None or np.isnan(holdout_mae)
+        #
+        # is the guard of an HONEST NA report, not a pass. That exact
+        # expression is chokepoint scripts/fit_corridor_ensemble_weights.py
+        # :249 and :252, where the true branch writes `None` into the report
+        # and the promotion decision forty lines further down (`if holdout_mae
+        # is not None and holdout_baseline_mae is not None`) REFUSES to promote
+        # unless both figures were measured and beat the margin. R10 named
+        # those two lines as "absence adjudicated as a pass" over a tree whose
+        # own committed readiness table records R10 PASS -- one tree, two
+        # verdicts, and the wrong one was ours. A check that cries wolf gets
+        # disabled, and a disabled check still looks like coverage.
+        #
+        # Measured before changing anything: this shape had SEVEN matches
+        # across the fleet's ten checkouts and every one of them was an honest
+        # NA guard of this family (chokepoint x2, fray x4, backend x1). The
+        # narrowing below drops exactly those seven and nothing else; the
+        # defect shape it exists for is pinned by the control fixtures in
+        # tests/test_fabricated_defaults.py.
+        #
+        # Deliberately NOT narrowed to "the other operand must be a threshold
+        # Compare": `ok = run is None or run.passed` adjudicates through an
+        # attribute and is the same defect, so the requirement is the weaker
+        # and more faithful one -- at least one operand that is not part of
+        # the absence guard.
+        if not any(_has_none_arm(v) for v in node.values):
+            return
+        guarded = frozenset(
+            target for target in (_is_none_target(v) for v in node.values) if target
+        )
+        if all(_tests_absence_of(v, guarded) for v in node.values):
             return
         symbols = self._context_symbols(node)
         for symbol in symbols[:1]:

@@ -27,6 +27,64 @@ true before the tag was cut. It is withdrawn here rather than quietly dropped,
 and `tests/test_version_declaration.py` now FIRES on it: the newest entry may
 not restate it, and must name at least one of the checks whose verdict moved.
 
+### R10 `absence adjudicated as a pass` fired on honest NA-reporting guards (E-M19)
+
+**R10 changes verdict on unchanged repo code in one repo**, in the direction
+that removes a finding: `chokepoint` moves FAIL → NA. It belongs to the same
+major event as the sections below, and it is the correction of a defect in one
+of them.
+
+**What was wrong.** `_scan_or` admitted any `or` expression holding an
+`is None` arm and never asked what that arm was OR'd with. The shape it exists
+for is `p_value is None or p_value > alpha` — an unmeasured p-value satisfying
+a parallel-trends gate — and the second operand is the whole defect: it is the
+adjudication, and the `is None` arm is what lets a missing figure pass it.
+Without that requirement the rule also matched
+
+```python
+"holdout_mae": None if holdout_mae is None or np.isnan(holdout_mae) else round(holdout_mae, 6)
+```
+
+where every operand is an absence test on the same figure, the taken branch
+writes `None` rather than a number, and the promotion decision forty lines
+below refuses unless both holdout figures were measured and beat the margin
+(`chokepoint scripts/fit_corridor_ensemble_weights.py:249,252,380-382`).
+Absence there REFUSES. R10 called it a pass.
+
+**Measured, not asserted.** `scan_file` over every `*.py` in the ten
+`resilient-*` checkouts, before the fix: this shape had **7 matches and all
+seven were guards of that family** — chokepoint x2, `fray` x4
+(`scripts/stress_readout_county_yield.py:318,444,447`,
+`src/validation/error_decomposition.py:131`), `backend` x1
+(`api/services/investment_case.py:350`). Not one was a fabrication. After the
+fix the same walk returns 0 of them and **nothing else in the fleet moves**.
+
+**The rule now.** An `is None` arm is required exactly as before — the
+admitting predicate is copied byte-for-byte into `_has_none_arm` so that the
+narrowing provably applies to what the shape DOES with an expression, not to
+which expressions it sees. On top of it, at least one operand must sit outside
+the absence guard, where the guard is four things and no more: an `is None`
+test; a degeneracy `Compare` (`len(folds) == 0`, `observed_mean <= 0.0`);
+`not <name>`; and a NaN/NA question about an already-guarded figure
+(`np.isnan(x)`, `pd.isna(x)`, `math.isnan(float(x))`, `not np.isfinite(x)`).
+
+Deliberately NOT "the other operand must be a threshold `Compare`":
+`ok = run is None or run.passed` adjudicates through an attribute and is the
+same defect, and `coverage is None or BASELINE.is_file()` is choco's
+fixture-presence gate in `or` form. Both still fire. An earlier draft
+delegated the guard test to `_is_absence_test`, which ignores polarity for
+calls and read `BASELINE.is_file()` as absence; that draft silenced the choco
+shape and was measured and discarded. Both halves are pinned as a control pair
+in `tests/test_fabricated_defaults.py` (8 fixtures red against the pre-fix
+scanner, 7 more that must stay green on both).
+
+Residual, disclosed and open as **E-M19**: a verdict whose other operand is
+itself a degeneracy test on the guarded figure — `rmse_gate_passed = rmse is
+None or rmse <= 0.0` — is now read as an absence guard and goes silent. That
+follows from this module's own long-standing definition of a degeneracy test
+and has no instance anywhere in the fleet, but it is a narrowing and it is
+recorded rather than left to be discovered.
+
 ### R10 `FABRICATED_DEFAULTS` checked mlkit's word list, not the adopter's metrics (E-038)
 
 **R10 changes verdict on unchanged repo code in three of the eight repos**, so
