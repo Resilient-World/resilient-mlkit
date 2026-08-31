@@ -39,6 +39,7 @@ from ..core import (
     environment,
     fabricated_targets,
     fabrication,
+    metric_registry,
     policy,
     report,
     served_reimplementation,
@@ -513,6 +514,21 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
 
     NA, not PASS, when the repo declares no source tree. A check that walks
     nothing and reports green is the same defect it was written to catch.
+
+    E-038: the set of names this walk treats as measurements is DERIVED from
+    the adopter -- :func:`metric_registry.derive` reads the repo's own
+    figure-producing callables out of the same declared trees -- and is no
+    longer mlkit's word list alone. Three verdicts, structurally distinct:
+
+    * a finding at a name mlkit's vocabulary knows -> FAIL, exactly as before;
+    * a finding whose only measured name came from the adopter's registry ->
+      NA quoting the name, because mlkit cannot read that name's polarity and
+      so cannot say the literal is the value that passes the gate. Before
+      E-038 this case was SILENCE, which is the one answer that is wrong;
+    * a registry derivation that came back empty over a tree that has Python
+      files -> NA. An empty registry is evidence the derivation did not run,
+      not evidence of a repo without metrics, and falling back to the word
+      list there is E-038 restored.
     """
     source = repo.config().get("source") or {}
     declared = [str(t).strip() for t in (source.get("trees") or []) if str(t).strip()]
@@ -538,14 +554,22 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
             f"declared source tree(s) {', '.join(declared)} do not exist under {repo.path}",
         )
 
-    findings = fabrication.scan_tree(roots, base=repo.path)
+    registry = metric_registry.derive(roots, base=repo.path)
+    findings = fabrication.scan_tree(roots, base=repo.path, registry=registry)
     files = sum(1 for _ in fabrication.iter_python_files(roots))
 
+    unclassified = [
+        f for f in findings if f.severity == fabrication.UNCLASSIFIED_NAME
+    ]
     satisfying = [f for f in findings if f.severity == "SATISFIES_GATE"]
-    publishing = [f for f in findings if f.severity != "SATISFIES_GATE"]
+    publishing = [
+        f for f in findings
+        if f.severity not in ("SATISFIES_GATE", fabrication.UNCLASSIFIED_NAME)
+    ]
+    defects = satisfying + publishing
 
     report_path = repo.path / R10_REPORT_RELPATH
-    _write_r10_report(report_path, repo, ctx, findings, files, declared)
+    _write_r10_report(report_path, repo, ctx, findings, files, declared, registry)
 
     evidence = {
         "trees": declared,
@@ -553,8 +577,13 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
         "findings": len(findings),
         "satisfies_gate": len(satisfying),
         "publishes_unmeasured": len(publishing),
+        "unclassified_name": len(unclassified),
         "report": str(report_path.relative_to(repo.path)),
-        "top": [f.to_dict() for f in (satisfying or publishing)[:R10_REASON_FINDINGS]],
+        "top": [
+            f.to_dict()
+            for f in (satisfying or publishing or unclassified)[:R10_REASON_FINDINGS]
+        ],
+        "metric_registry": registry.to_dict(),
     }
     if absent:
         evidence["declared_but_absent"] = [str(a) for a in absent]
@@ -566,16 +595,40 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
             evidence,
         )
 
-    if findings:
+    if registry.refusal:
+        return CheckResult.na("R10", PHASE, registry.refusal, evidence)
+
+    if defects:
         head = (satisfying or publishing)[:R10_REASON_FINDINGS]
         detail = "; ".join(
             f"{f.path}:{f.line} {f.symbol}={f.literal} ({f.shape} → {f.sink})" for f in head
         )
-        more = len(findings) - len(head)
+        more = len(defects) - len(head)
+        trailer = f"; +{more} more in {R10_REPORT_RELPATH}" if more > 0 else ""
+        if unclassified:
+            trailer += (
+                f"; and {len(unclassified)} further site(s) at metric name(s) this "
+                f"repo declares but mlkit cannot classify — see {R10_REPORT_RELPATH}"
+            )
         return CheckResult.failed(
             "R10", PHASE,
-            f"{len(findings)} fabricated default(s) reach a gate, metric or report "
+            f"{len(defects)} fabricated default(s) reach a gate, metric or report "
             f"({len(satisfying)} of them satisfy the gate that consumes them): {detail}"
+            + trailer,
+            evidence,
+        )
+
+    if unclassified:
+        head = unclassified[:R10_REASON_FINDINGS]
+        detail = "; ".join(
+            f"{f.path}:{f.line} {f.symbol}={f.literal} ({f.shape} → {f.sink})" for f in head
+        )
+        more = len(unclassified) - len(head)
+        return CheckResult.na(
+            "R10", PHASE,
+            f"{len(unclassified)} plausible literal(s) stand at metric name(s) THIS REPO "
+            f"declares by computing them, which mlkit's own vocabulary cannot classify, "
+            f"so no polarity can be read and neither PASS nor FAIL is earned: {detail}"
             + (f"; +{more} more in {R10_REPORT_RELPATH}" if more > 0 else ""),
             evidence,
         )
@@ -589,8 +642,10 @@ def _write_r10_report(
     findings: list[fabrication.Finding],
     files: int,
     trees: list[str],
+    registry: metric_registry.MetricRegistry | None = None,
 ) -> None:
     """Write every finding out, because a truncated reason is not evidence."""
+    registry = registry or metric_registry.MetricRegistry()
     lines = [
         f"# Fabricated defaults (R10) — resilient-{repo.name}",
         "",
@@ -602,6 +657,9 @@ def _write_r10_report(
         "`SATISFIES_GATE` marks a default that is the value which would PASS the",
         "gate consuming it. `PUBLISHES_UNMEASURED` marks one that would fail its",
         "gate but is still emitted as though it were a measurement.",
+        "`UNCLASSIFIED_NAME` marks neither: the symbol is a metric name THIS REPO",
+        "declares by computing it, mlkit's own vocabulary has no opinion on it, so",
+        "no polarity can be read and no verdict is asserted. R10 renders NA.",
         "",
         "| severity | file:line | symbol | value | shape | sink |",
         "|---|---|---|---|---|---|",
@@ -614,6 +672,26 @@ def _write_r10_report(
     if not findings:
         lines.append("| — | — | — | — | — | (none) |")
     lines.append("")
+    # The derivation is disclosed in full, because a name universe nobody can
+    # read is the same problem as a name universe nobody can extend (E-038).
+    lines += [
+        "## The metric-name universe this run checked",
+        "",
+        "Derived from this repo's OWN figure-producing callables in the trees above,",
+        "not from a word list inside mlkit. See `core/metric_registry.py`.",
+        "",
+        f"- names derived: {len(registry.names)}",
+        f"- of those, already in mlkit's vocabulary (the anchor): "
+        f"{len(registry.known)} — {', '.join(sorted(registry.known)) or '(none)'}",
+        f"- of those, unclassifiable by mlkit: {len(registry.unclassified)}",
+        f"- derivation refusal: {registry.refusal or '(none)'}",
+        "",
+    ]
+    if registry.unclassified:
+        lines += ["| derived name mlkit cannot classify | declared at |", "|---|---|"]
+        for key in sorted(registry.unclassified):
+            lines.append(f"| `{key}` | {registry.origins.get(key, '—')} |")
+        lines.append("")
     # Unguarded on purpose: this report is produced by parsing source, not by
     # importing the repo, so it is measured correctly from any interpreter.
     # See core/report.py, "WHAT IS NOT GUARDED, AND WHY".
