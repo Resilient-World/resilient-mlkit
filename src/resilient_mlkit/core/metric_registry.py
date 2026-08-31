@@ -73,6 +73,21 @@ gap to patch, and it is pinned by
 -- which fails the day it closes, so the disclosure gets updated instead of the
 silence being re-pinned.
 
+A callable whose only parameter is ``self``/``cls`` is excluded too, by
+:func:`_computes_a_figure`: a ``@property`` or a zero-argument method deriving
+a figure from instance state computes from nothing this walk can name. That
+exclusion was found in verification and is DISCLOSED with its price rather
+than left in a code comment. Measured across the eight adopter repos at their
+remote mains on 2026-08-30, admitting self-only callables would add 22/6/13/13/
+3/13/27/18 names (arabica/blackout/choco/chokepoint/fray/surge/torrent/triage)
+and make NINETEEN further sites visible -- arabica 2, blackout 1, chokepoint 3,
+torrent 12, triage 1, and none in choco, fray or surge. Every one of the
+nineteen lands in the ``UNCLASSIFIED_NAME`` lane, and every repo carrying one
+is ALREADY non-PASS, so no repo's verdict is bought by the exclusion; the
+widened universe also drags in bare ``mean`` on torrent, which is the precision
+cost that keeps it excluded. Pinned by
+``tests/test_r10_e038_verification.py::test_residual_a_self_only_callable_is_outside_the_registry``.
+
 THE ANCHOR
 ----------
 Blind flattening that silently returns nothing is the failure the tick-11
@@ -180,6 +195,10 @@ class MetricRegistry:
     unclassified: frozenset[str] = frozenset()
     #: Python files the derivation parsed.
     files: int = 0
+    #: Files under a declared tree the derivation could not READ, as
+    #: ``"path: OSErrorSubclass"``. Disclosed rather than raised -- see
+    #: :func:`derive`. Never empty silently: the count is in the evidence.
+    unreadable: tuple[str, ...] = ()
     #: Set when the derivation cannot be trusted. NA, never silence.
     refusal: str | None = None
 
@@ -195,6 +214,7 @@ class MetricRegistry:
             "vocabulary_known": sorted(self.known),
             "unclassified": sorted(self.unclassified),
             "files_parsed": self.files,
+            "unreadable": list(self.unreadable),
             "refusal": self.refusal,
         }
 
@@ -315,15 +335,35 @@ def derive(roots: Iterable[Path], base: Path | None = None) -> MetricRegistry:
     """
     roots = list(roots)
     origins: dict[str, str] = {}
+    unreadable: list[str] = []
     files = 0
     for path in fabrication.iter_python_files(roots):
         files += 1
         display = str(path)
         if base is not None and path.is_relative_to(base):
             display = str(path.relative_to(base))
-        for key, origin in _names_in(
-            path.read_text(encoding="utf-8", errors="replace"), display
-        ).items():
+        try:
+            source = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            # E-038 VERIFICATION: this read was unguarded, and R10 therefore
+            # raised on any file it could not open under a DECLARED tree.
+            # Measured on a dangling ``*.py`` symlink inside the declared
+            # tree of a fixture repo: main reported PASS (its
+            # ``fabrication.scan_file`` catches OSError and skips), this
+            # module raised ``FileNotFoundError``, and the harness turned the
+            # crash into a FAIL with four frames of traceback.
+            #
+            # Skipping, not refusing, and the reason is adversarial rather
+            # than cosmetic: ``derive``'s refusal short-circuits R10 into NA,
+            # so making an unreadable file a refusal would hand an adopter a
+            # one-symlink lever for turning a MEASURED FAIL into "could not
+            # measure". Skipping matches what the scanner itself does with
+            # the same file, so the registry and the scan cannot disagree
+            # about which files this repo has. The skip is disclosed in the
+            # evidence and in the R10 report; it is never silent.
+            unreadable.append(f"{display}: {type(exc).__name__}")
+            continue
+        for key, origin in _names_in(source, display).items():
             origins.setdefault(key, origin)
 
     names = frozenset(origins)
@@ -335,5 +375,6 @@ def derive(roots: Iterable[Path], base: Path | None = None) -> MetricRegistry:
         known=known,
         unclassified=names - known,
         files=files,
+        unreadable=tuple(unreadable),
         refusal=refusal,
     )

@@ -529,6 +529,11 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
       files -> NA. An empty registry is evidence the derivation did not run,
       not evidence of a repo without metrics, and falling back to the word
       list there is E-038 restored.
+
+    The three are ranked FAIL > NA-by-refusal > NA-by-unclassified-name: a
+    literal the built-in vocabulary already adjudicated is measured whether or
+    not the derived universe is alive, so a broken derivation downgrades the
+    reason, never the verdict. See the ORDER note below.
     """
     source = repo.config().get("source") or {}
     declared = [str(t).strip() for t in (source.get("trees") or []) if str(t).strip()]
@@ -595,16 +600,41 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
             evidence,
         )
 
-    if registry.refusal:
-        return CheckResult.na("R10", PHASE, registry.refusal, evidence)
-
+    # ORDER, corrected in verification: the DEFECT lane is adjudicated before
+    # the derivation refusal, not after it.
+    #
+    # `satisfying` and `publishing` are the vocabulary leg alone. They are
+    # fully measured by the built-in word list and by `satisfies_a_gate`, and
+    # they do not depend on the derived registry for their SEVERITY at all --
+    # so a derivation that has stopped working says nothing about whether
+    # those literals are fabricated. Refusing first reported NA on a repo
+    # where R10 had just measured a fabricated default that SATISFIES the gate
+    # consuming it, with `satisfies_gate: 1` sitting in the evidence and no
+    # mention of it in the reason. That is precisely the collapse
+    # `core.result.Status` refuses by name: "could not measure" and "measured,
+    # and it is wrong" are different distances from a productive run, and a
+    # table that renders them identically cannot answer the only question
+    # that matters.
+    #
+    # The refusal is not dropped: it is carried into the FAIL reason, and it
+    # still produces NA on its own whenever no defect was measured.
     if defects:
         head = (satisfying or publishing)[:R10_REASON_FINDINGS]
         detail = "; ".join(
             f"{f.path}:{f.line} {f.symbol}={f.literal} ({f.shape} → {f.sink})" for f in head
         )
         more = len(defects) - len(head)
-        trailer = f"; +{more} more in {R10_REPORT_RELPATH}" if more > 0 else ""
+        # The refusal note goes FIRST in the trailer. A reason is truncated at
+        # ``core.result.MAX_REASON``, and "there may be more than this" is the
+        # part a reader must not lose to a "+N more" tail.
+        trailer = (
+            "; NOTE, the derived name universe is ALSO unmeasured in this run, "
+            "so this FAIL rests on the built-in vocabulary alone and there may "
+            f"be more — see evidence.metric_registry.refusal"
+            if registry.refusal else ""
+        )
+        if more > 0:
+            trailer += f"; +{more} more in {R10_REPORT_RELPATH}"
         if unclassified:
             trailer += (
                 f"; and {len(unclassified)} further site(s) at metric name(s) this "
@@ -617,6 +647,9 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
             + trailer,
             evidence,
         )
+
+    if registry.refusal:
+        return CheckResult.na("R10", PHASE, registry.refusal, evidence)
 
     if unclassified:
         head = unclassified[:R10_REASON_FINDINGS]
@@ -684,6 +717,9 @@ def _write_r10_report(
         f"- of those, already in mlkit's vocabulary (the anchor): "
         f"{len(registry.known)} — {', '.join(sorted(registry.known)) or '(none)'}",
         f"- of those, unclassifiable by mlkit: {len(registry.unclassified)}",
+        f"- files under a declared tree the derivation could not READ: "
+        f"{len(registry.unreadable)}"
+        + (f" — {', '.join(registry.unreadable)}" if registry.unreadable else ""),
         f"- derivation refusal: {registry.refusal or '(none)'}",
         "",
     ]
