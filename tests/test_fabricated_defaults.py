@@ -398,6 +398,167 @@ def test_producer_call_names_the_quantity_when_the_local_does_not():
 
 
 # ---------------------------------------------------------------------------
+# `absence adjudicated as a pass` — the control pair
+#
+# One shape, two verdicts, and the difference is the OTHER operand of the
+# `or`. The pair is pinned here because the check shipped for two weeks
+# without it: `_scan_or` accepted any BoolOp holding an `is None` arm and
+# never asked what the arm was OR'd with, so it named chokepoint's honest
+# NA-reporting guards as fabrication (E-M18). A green R10 that a reader
+# has learned to overrule is worth less than no R10.
+# ---------------------------------------------------------------------------
+
+
+def test_absence_ored_with_a_threshold_is_the_defect():
+    """CONTROL A. `p is None or p > alpha` -- the shape the check exists for.
+
+    The `is None` arm makes an UNMEASURED p-value satisfy the parallel-trends
+    gate: no panel, no estimate, and `parallel_trends_ok` is True. This is the
+    canonical form named in the commit that introduced the shape (7a97863).
+    """
+    findings = scan(
+        """
+        def check_parallel_trends(panel, alpha=0.05):
+            p_value = pretrend_p(panel) if panel is not None else None
+            parallel_trends_ok = p_value is None or p_value > alpha
+            return {"p_value": p_value, "parallel_trends_ok": parallel_trends_ok}
+        """
+    )
+    absence = [f for f in findings if f.shape == "absence adjudicated as a pass"]
+    assert [f.symbol for f in absence] == ["parallel_trends_ok"]
+    assert absence[0].literal == "True"
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        pytest.param("coverage is None or coverage >= 0.90", id="literal-threshold"),
+        pytest.param("coverage is None or coverage >= floor", id="named-threshold"),
+        pytest.param("coverage is None or coverage != 0.0", id="not-equal-threshold"),
+        pytest.param("coverage is None or run.coverage_ok", id="adjudicated-elsewhere"),
+        pytest.param(
+            "coverage is None or np.isnan(other_metric)",
+            id="nan-test-on-a-different-figure",
+        ),
+        # resilient-choco src/registry/promotion_gate.py:57 in `or` form. The
+        # fixture EXISTING is what passes the gate, and an absent coverage is
+        # waved through beside it. This one nearly went silent: an earlier
+        # draft of the narrowing delegated to `_is_absence_test`, which reads
+        # `BASELINE.is_file()` as an absence test because it ignores polarity
+        # for calls. `not BASELINE.is_file()` is the absence test; the bare
+        # call is a presence test and adjudicates.
+        pytest.param(
+            "coverage is None or BASELINE.is_file()", id="fixture-presence-as-a-verdict"
+        ),
+    ],
+)
+def test_control_a_every_adjudicating_operand_still_fires(expression):
+    """CONTROL A, widened. The narrowing must cost the shape nothing else.
+
+    `run.coverage_ok` is deliberately in the list: adjudication through an
+    attribute is the same defect as adjudication through a threshold, so the
+    rule is "an operand outside the absence guard", not "a Compare".
+    """
+    findings = scan(
+        f"""
+        def gate(run, floor):
+            coverage = measure_coverage(run)
+            other_metric = measure_other(run)
+            coverage_gate_passed = {expression}
+            return coverage_gate_passed
+        """
+    )
+    assert any(
+        f.shape == "absence adjudicated as a pass" for f in findings
+    ), f"{expression} adjudicates a figure and must still be reported"
+
+
+def test_control_b_an_absence_guard_that_reports_na_is_not_a_pass():
+    """CONTROL B. resilient-chokepoint scripts/fit_corridor_ensemble_weights.py:249,252.
+
+    Verbatim shape, including the `promoted` decision that consumes it. Every
+    operand of the `or` is an absence test on the SAME figure, the true branch
+    writes `None` rather than a number, and promotion refuses unless both
+    figures were measured. Absence here REFUSES; it is not adjudicated as a
+    pass, and R10 naming it made chokepoint's readiness table red for a wrong
+    reason while its own committed evidence at 52ac929 recorded R10 PASS.
+    """
+    findings = scan(
+        """
+        def write_report(holdout_mae, holdout_baseline_mae, margin, out_path):
+            promoted = False
+            if holdout_mae is not None and holdout_baseline_mae is not None:
+                promoted = bool(holdout_baseline_mae - holdout_mae >= margin)
+            doc = {
+                "holdout_mae": (
+                    None if holdout_mae is None or np.isnan(holdout_mae)
+                    else round(holdout_mae, 6)
+                ),
+                "holdout_baseline_mae": (
+                    None
+                    if holdout_baseline_mae is None or np.isnan(holdout_baseline_mae)
+                    else round(holdout_baseline_mae, 6)
+                ),
+                "promoted": promoted,
+            }
+            out_path.write_text(yaml.safe_dump(doc))
+        """
+    )
+    assert [f for f in findings if f.shape == "absence adjudicated as a pass"] == []
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        # resilient-chokepoint scripts/fit_corridor_ensemble_weights.py:249.
+        pytest.param(
+            "holdout_mae is None or np.isnan(holdout_mae)", id="chokepoint-249-isnan"
+        ),
+        pytest.param(
+            "holdout_mae is None or math.isnan(float(holdout_mae))",
+            id="isnan-through-a-cast",
+        ),
+        pytest.param(
+            "holdout_mae is None or pd.isna(holdout_mae)", id="pandas-isna"
+        ),
+        pytest.param(
+            "holdout_mae is None or not np.isfinite(holdout_mae)",
+            id="negated-finiteness",
+        ),
+        # resilient-fray scripts/stress_readout_county_yield.py:444.
+        pytest.param(
+            "holdout_mae is None or baseline_mae is None", id="fray-444-two-is-nones"
+        ),
+        # resilient-fray scripts/stress_readout_county_yield.py:318.
+        pytest.param(
+            "holdout_mae is None or not eligible", id="fray-318-empty-population"
+        ),
+        # resilient-fray src/validation/error_decomposition.py:131.
+        pytest.param(
+            "holdout_mae is None or holdout_mae <= 0.0", id="fray-131-degeneracy"
+        ),
+    ],
+)
+def test_control_b_the_whole_measured_false_positive_family_is_silent(expression):
+    """CONTROL B, widened to the seven fleet sites this shape actually matched.
+
+    Measured before the fix with `scan_file` over every ``*.py`` in the ten
+    ``resilient-*`` checkouts: seven matches, all of this family, none of them
+    a fabrication. Each is reduced here to the operand pair that decided it,
+    and reported the way the originals report -- `None`, never a number.
+    """
+    findings = scan(
+        f"""
+        def report(holdout_mae, baseline_mae, eligible):
+            return {{
+                "holdout_mae": None if {expression} else round(holdout_mae, 6),
+            }}
+        """
+    )
+    assert [f for f in findings if f.shape == "absence adjudicated as a pass"] == []
+
+
+# ---------------------------------------------------------------------------
 # Negative set — legitimate configuration and correct repairs
 # ---------------------------------------------------------------------------
 

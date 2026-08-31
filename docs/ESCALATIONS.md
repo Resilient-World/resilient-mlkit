@@ -1127,3 +1127,131 @@ F statistic defaulting to zero, and `_evalue = 1.0`.
 
 **Status: E-038 CLOSED. E-M16 superseded by this entry. E-M17 residual 4
 unchanged and still open.**
+
+---
+
+## E-M19 — R10's `absence adjudicated as a pass` fired on honest NA guards; the fix's residual
+
+**Raised and repaired** 2026-08-31 on `fix/r10-scan-or-absence-guard-false-positive`.
+The false positive is CLOSED. The residual named at the bottom is OPEN.
+
+### The false positive
+
+`_scan_or` admitted any `or` expression containing an `is None` compare and
+emitted `absence adjudicated as a pass` without ever reading the other
+operand. The shape the check exists for is
+
+```python
+parallel_trends_ok = p_value is None or p_value > alpha
+```
+
+where the SECOND operand is the whole defect: it is the adjudication, and the
+`is None` arm is what lets an unmeasured p-value satisfy it. Reading only the
+first arm made the rule match its own opposite:
+
+```python
+# resilient-chokepoint scripts/fit_corridor_ensemble_weights.py:249
+"holdout_mae": None if holdout_mae is None or np.isnan(holdout_mae) else round(holdout_mae, 6),
+```
+
+Every operand there is an absence test on the same figure, the taken branch
+writes `None` rather than a number, and lines 380-382 of the same script
+refuse to promote unless BOTH holdout figures were measured and beat the
+margin. Absence refuses; it is not adjudicated as a pass.
+
+### What it cost, before the repair
+
+One tree, two verdicts. `reports/readiness.md` committed at chokepoint
+`52ac929` records `R10 | PASS`; a fresh `mlkit check --phase readiness` at
+mlkit `c65b2e7` over that same tree returned R10 FAIL naming
+`fit_corridor_ensemble_weights.py:249` and `:252` and nothing else
+(nonce `mlkit-20260831T042310Z-9843aed63cb2`). A green readiness table was
+unreachable for chokepoint without editing chokepoint — which would have been
+editing honest code to satisfy a broken instrument. mlkit is the fleet's only
+source of numbers; a scanner that fires on honest NA guards makes every table
+it touches red for a wrong reason, and that is how a reader learns to overrule
+a red gate.
+
+*Caveat recorded so it is not read as more than it is:* the committed
+`readiness.md` at `52ac929` was itself produced on an earlier branch
+(`feat/observed-trade-and-fabrication-gates`, SHA `11a06e57`, nonce
+`mlkit-20260822T082253Z-7a18f55fd943`), not at `52ac929` with mlkit 0.5.0. It
+is evidence that this shape once passed, not a same-run tie.
+
+### Measured population, before touching anything
+
+`fabrication.scan_file` over every `*.py` in the ten `resilient-*` checkouts,
+mlkit at `c65b2e7`: 177 findings, of which **7 carried this shape and all 7
+were guards of this family** —
+
+| repo | site | other operand |
+|---|---|---|
+| chokepoint | `scripts/fit_corridor_ensemble_weights.py:249` | `np.isnan(holdout_mae)` |
+| chokepoint | `scripts/fit_corridor_ensemble_weights.py:252` | `np.isnan(holdout_baseline_mae)` |
+| fray | `scripts/stress_readout_county_yield.py:318` | `not eligible` |
+| fray | `scripts/stress_readout_county_yield.py:444` | `best_precision is None` |
+| fray | `scripts/stress_readout_county_yield.py:447` | `best_recall is None` |
+| fray | `src/validation/error_decomposition.py:131` | `observed_mean <= 0.0` |
+| backend | `api/services/investment_case.py:350` | `cumulative_expected_loss_usd is None` |
+
+Not one is a fabrication; every one reports `None` where the figure is absent.
+After the repair the identical walk returns 170 findings: those 7 gone, **0
+added, 0 severities changed, every other finding at the same file, line,
+symbol and shape**.
+
+### The rule now
+
+The admitting predicate — "does this `or` contain an `is None` arm" — is
+copied byte-for-byte into `_has_none_arm`, so the narrowing provably applies
+to what the shape does with an admitted expression and not to which
+expressions are admitted. On top of it, at least one operand must sit OUTSIDE
+the absence guard. The guard is four things and no more:
+
+1. an `is None` test;
+2. a degeneracy `Compare` — `len(folds) == 0`, `observed_mean <= 0.0`;
+3. `not <name>` — an empty population;
+4. a NaN/NA question about an ALREADY-GUARDED figure — `np.isnan(x)`,
+   `pd.isna(x)`, `math.isnan(float(x))`, `not np.isfinite(x)`.
+
+Leg 4 is name-scoped on purpose: `mae is None or np.isnan(other)` asks about a
+second figure, adjudicates on it, and stays reportable.
+
+### One draft was measured and discarded
+
+The first draft delegated the guard test to `_is_absence_test`. That helper
+ignores polarity for calls, so it reads `BASELINE.is_file()` as an absence
+test — and `coverage is None or BASELINE.is_file()` is choco's
+fixture-presence gate written as an `or`, a real self-passing gate. The draft
+silenced it. Measured, discarded, and pinned:
+`tests/test_fabricated_defaults.py::test_control_a_every_adjudicating_operand_still_fires[fixture-presence-as-a-verdict]`.
+
+The rule was also deliberately NOT narrowed to "the other operand must be a
+threshold `Compare`", which the work item proposed: `ok = run is None or
+run.passed` adjudicates through an attribute and is the same defect. The
+weaker and more faithful requirement — an operand outside the guard — keeps it.
+
+### RESIDUAL, OPEN
+
+A verdict whose other operand is itself a degeneracy test on the guarded
+figure now goes silent:
+
+```python
+rmse_gate_passed = rmse is None or rmse <= 0.0   # silent since this change
+rmse_gate_passed = rmse is None or rmse <  1e-9  # silent since this change
+rmse_gate_passed = rmse is None or rmse == 0.0   # silent since this change
+rmse_gate_passed = rmse is None or not rows      # silent since this change
+```
+
+All four fired before. They follow from this module's own long-standing
+definition of a degeneracy test (`_is_absence_test`), which fray's
+`error_decomposition.py:131` legitimately relies on, so the two cannot be
+separated by structure alone. **There is no instance of any of the four
+anywhere in the ten checkouts** — the fleet walk above is the measurement —
+so nothing is lost today. Closing it needs a discriminator this repair does
+not have: whether the `or` expression is the VALUE of the verdict or merely
+the CONDITION selecting between two values. In all 7 false positives it was a
+condition (an `IfExp` test or a comprehension filter); in the defect shape it
+is the value. That is a second, independent narrowing with its own over-fire
+budget and its own control pair, and it is not taken here.
+
+**Status: the false positive CLOSED. The residual OPEN and unassigned.**
