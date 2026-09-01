@@ -716,12 +716,20 @@ def d6_resampling_unit(repo: Repo, ctx: RunContext) -> CheckResult:
     try:
         fn = repo.resolve(RESAMPLING_BINDING)
     except BindingError as exc:
+        # LEFT EXACTLY AS IT WAS, deliberately. `redact` bounds every reason at
+        # MAX_REASON = 400 characters and this one already spends 397 of them,
+        # so naming the optional `track` and the sequence shape here would
+        # TRUNCATE the sentence that tells an adopter what to declare -- a
+        # message that stops mid-word is worse guidance than one that is merely
+        # incomplete. The new shape is documented where there is room for it:
+        # `spine/mlkit/repo.toml` (which this very sentence points the reader
+        # at), :data:`DECLARATION_SHAPE`, and this function's docstring.
         return CheckResult.na(
             "D6", PHASE,
             f"{exc}; an interval or a promotion that rests on a resampling procedure "
             "must declare the unit that procedure drew. Declare "
             f"`{RESAMPLING_BINDING}` returning "
-            f"{DECLARATION_SHAPE}, where `assignment` is "
+            f"{{{', '.join(DECLARED_FIELDS)}, assignment}}, where `assignment` is "
             f"one mapping per panel row naming {list(ROW_FIELDS)}.",
         )
     try:
@@ -826,6 +834,10 @@ def d6_resampling_unit(repo: Repo, ctx: RunContext) -> CheckResult:
             t for t in in_splits if t not in {str(n) for n in names}
         ]
 
+    # The joined reason is bounded by MAX_REASON like every other reason, so a
+    # repo with several failing tracks can lose the tail of the sentence. Each
+    # per-declaration reason is kept WHOLE in evidence["declarations"] above --
+    # the summary is what truncates, never the record.
     fails = [(n, r) for n, r in zip(names, results, strict=True) if r.status is Status.FAIL]
     if fails:
         return CheckResult.failed(
