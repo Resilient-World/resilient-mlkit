@@ -524,3 +524,49 @@ def test_a_non_finite_measurement_is_not_a_measurement():
 def test_a_recorded_bar_must_name_a_metric():
     with pytest.raises(ArtifactIntegrityError, match="names no decision metric"):
         RecordedBar(name="persistence", metrics=())
+
+
+# ---------------------------------------------------------------------------
+# M-01 — metric polarity and domain (HOLE 1), DEFECT PINS
+#
+# These three tests record, executably, the behaviour the contract has TODAY
+# at 8517341, before the M-01 fix. No test in this suite recorded it; that is
+# the E-M17-residual discipline (pin the silence before repairing it). The fix
+# commit REWRITES each of these into the refusal it earns — a pin that
+# survives the fix unchanged means the fix did not land.
+# ---------------------------------------------------------------------------
+def test_m01_defect_pin_a_negative_mape_candidate_promotes():
+    """DEFECT (fray E-035 residual 3). mape is nonnegative by definition; a
+    candidate of -0.05 is an impossible reading. Today skill() folds it into
+    1 - (-0.05/0.20) = 1.25 and the decision PASSES on it."""
+    decision = challenger_decision(
+        [Comparison(BAR, "mape", -0.05, 0.20, 100, arm="val")],
+        recorded_bar=BAR,
+        metrics=("mape",),
+    )
+    assert decision.status is Status.PASS
+    assert decision.promotable is True
+    assert decision.skill["mape"] == pytest.approx(1.25)
+
+
+def test_m01_defect_pin_a_worse_higher_is_better_candidate_promotes():
+    """DEFECT. r2 is higher-is-better; a candidate at 0.10 against a champion
+    at 0.90 is a much worse model. Today the contract silently assumes every
+    metric is lower-is-better, computes 1 - 0.10/0.90 = +0.8889, and PROMOTES
+    the worse model."""
+    decision = challenger_decision(
+        [Comparison(BAR, "r2", 0.10, 0.90, 100, arm="val")],
+        recorded_bar=BAR,
+        metrics=("r2",),
+    )
+    assert decision.status is Status.PASS
+    assert decision.promotable is True
+    assert decision.skill["r2"] == pytest.approx(1.0 - 0.10 / 0.90, rel=1e-12)
+
+
+def test_m01_defect_pin_polarity_is_nowhere_declarable():
+    """DEFECT. Neither Comparison nor challenger_decision accepts a polarity
+    or domain declaration, so no caller CAN say which direction is better."""
+    fields = {f.name for f in Comparison.__dataclass_fields__.values()}
+    assert "polarity" not in fields
+    assert "domain" not in fields
