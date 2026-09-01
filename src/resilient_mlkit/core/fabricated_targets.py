@@ -249,10 +249,42 @@ module-dict hop is the ONE fold that follows a name across the tree rather
 than down it, so it carries a cycle guard -- ``A = {"x": A["x"]}`` is legal
 Python, and a scanner that raises reports nothing at all.
 
-Over-fire budget, MEASURED read-only before this shipped (2026-08-31, dual
-interpreter, each side asserting its own ``resilient_mlkit.__file__``): ten
-checkouts at their remote mains, 3394 Python files per side, R11 findings
-0 -> 0, NEW 0, GONE 0. Harness controls in ``reports/M04_FLEET_SWEEP.md``.
+AND THE RESIDUE GETS A THIRD VERDICT: ``UNREADABLE_STAMP``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What is left once every CONSTANT spelling folds is an expression that is
+genuinely dynamic: ``source=f"era5_{region}"``, ``source=FEEDS[which]``.
+Staying silent there reports the record as CLEAN. It is not clean. It is
+unadjudicated, and the honest verdict for something not measured is NA.
+
+So a record gets an ``UNREADABLE_STAMP`` finding -- severity and rule both,
+because there is no fabrication to grade -- and R11 returns **NA rather than
+PASS**, when ALL of the following hold. Each conjunct has a silent control
+beside it in ``tests/test_fabricated_targets.py``:
+
+* ``_wholly_manufactured`` proves the record (the unchanged
+  ``CONTRADICTED_SOURCE`` precondition -- a record arriving as a parameter,
+  or carrying one value read off a file, is not adjudicated);
+* the field the RNG reached is a TARGET field. An input-only manufactured row
+  stays in the ordinary conservative under-report; widening the NA to it would
+  turn any unresolvable f-string into a fleet-wide verdict change;
+* the unresolved field is in :data:`SOURCE_NAMING_FIELDS`, not merely in
+  :data:`PROVENANCE_FIELDS`. This is the one place the module leans on a
+  field-NAME list again after moving the source rule off one, and it can only
+  do so because the verdict is NA. A computed ``split``, licence class or
+  ``kind`` names a partition, a permission or a shape, not an unread origin;
+* and the record carries NO readable string at all -- so a resolvable
+  ``"provenance": "synthetic"`` beside the dynamic value still ends the
+  adjudication in the honesty rule, exactly as before.
+
+The finding QUOTES the expression. "Unreadable" without saying what could not
+be read is not something a reader can act on.
+
+Over-fire budget, MEASURED read-only before either stage shipped (2026-08-31,
+dual interpreter, each side asserting its own ``resilient_mlkit.__file__``):
+ten checkouts at their remote mains, 3394 Python files per side, R11 findings
+0 -> 0, NEW 0, GONE 0, with the NA lane enabled. Harness controls -- same rev
+on both sides, and a planted-fabricator positive on a copy of a real repo
+tree -- in ``reports/M04_FLEET_SWEEP.md``.
 
 The honesty rule is UNCHANGED and still runs first: a simulation token in any
 provenance field of the record ends the adjudication before either source rule
@@ -656,9 +688,15 @@ INPUT_FABRICATED = "INPUT_FABRICATED"
 #: ``CONTRADICTED_SOURCE`` a source label naming an external dataset sits on a
 #:                         record whose every value was manufactured in this
 #:                         process.
+#: ``UNREADABLE_STAMP``    (M-04 Stage 2, MEASUREMENT BUILD) the record is
+#:                         wholly manufactured with a drawn TARGET, and the
+#:                         only provenance value it carries is an expression
+#:                         this module cannot resolve. Not a fabrication and
+#:                         not a clean record: an unadjudicated one.
 OBSERVED_STAMP = "OBSERVED_STAMP"
 CONTRADICTED_STAMP = "CONTRADICTED_STAMP"
 CONTRADICTED_SOURCE = "CONTRADICTED_SOURCE"
+UNREADABLE_STAMP = "UNREADABLE_STAMP"
 
 #: Callables that carry no information from outside this process: they compute
 #: over what they are given. Used by :meth:`_ModuleScanner.manufactured_of` to
@@ -942,6 +980,12 @@ class _Record:
     #: Names whose taint reaches this record without a nameable field, used by
     #: the frame shape where columns are assigned separately.
     carried: list[str] = field(default_factory=list)
+    #: Declared provenance fields whose VALUE this module could not resolve to
+    #: any string: ``source=f"era5_{region}"``, ``feed=FEEDS[which]``. The
+    #: field name says a provenance claim is being made; the value says
+    #: nothing this module can read. Carried as the expression source so a
+    #: finding can quote it.
+    unreadable: list[tuple[str, str]] = field(default_factory=list)
 
 
 class _ModuleScanner:
@@ -1732,9 +1776,37 @@ class _ModuleScanner:
                 record.stamps.extend(stamps)
                 continue
             if name in PROVENANCE_FIELDS:
+                record.unreadable.extend(self._unreadable_of(name, value))
                 continue
             record.data.append((name, value))
         return record
+
+    def _unreadable_of(self, name: str, value: ast.AST) -> list[tuple[str, str]]:
+        """A declared SOURCE-NAMING field whose value resolved to no string.
+
+        Scoped to :data:`SOURCE_NAMING_FIELDS`, not to all of
+        :data:`PROVENANCE_FIELDS`, and for the same reason that set exists:
+        ``kind``, ``*_type``, ``method`` and the licence and split fields name
+        a shape, a permission or a partition rather than an origin, and a
+        computed value under one of them is not an unread source claim. A
+        record whose only unresolved provenance field is ``split=chosen``
+        would otherwise take its repo's R11 row to NA over a partition name.
+
+        This is the one place the module leans on a field-NAME list again
+        after moving the source rule off one, and it can only do so because
+        the verdict it produces is NA: under-reporting here costs a record
+        nobody was told to open, which is the same conservative direction
+        every other conjunct in this module leans.
+        """
+        if name not in SOURCE_NAMING_FIELDS:
+            return []
+        if isinstance(value, (ast.Tuple, ast.List, ast.Set)) and not value.elts:
+            return []
+        try:
+            expression = ast.unparse(value)
+        except Exception:  # pragma: no cover - unparse is total on real trees
+            return []
+        return [(name, expression[:200])]
 
     def _record_from_call(self, node: ast.Call) -> _Record | None:
         if not node.keywords:
@@ -1756,6 +1828,9 @@ class _ModuleScanner:
                 record.stamps.extend(stamps)
                 continue
             if keyword.arg in PROVENANCE_FIELDS:
+                record.unreadable.extend(
+                    self._unreadable_of(keyword.arg, keyword.value)
+                )
                 continue
             record.data.append((keyword.arg, keyword.value))
         return record
@@ -1913,6 +1988,17 @@ class _ModuleScanner:
         if value_side is not None:
             stamp, matched_on = value_side
             return CONTRADICTED_SOURCE, stamp, matched_on
+
+        # Nothing on this record resolved to a string at all, and yet it
+        # DECLARES a provenance field. The record is not clean and it is not
+        # a fabrication: it is unadjudicated, and saying so is the honest
+        # third verdict. Reported only when the record carries no readable
+        # stamp of any kind -- one resolvable declaration beside the dynamic
+        # value ends the adjudication in the honesty rule above, and one
+        # resolvable source value would have fired the rule above this.
+        if record.unreadable and not record.stamps and not record.literals:
+            name, expression = record.unreadable[0]
+            return UNREADABLE_STAMP, Stamp(name, expression, OPAQUE), ""
         return None
 
     def _wholly_manufactured(self, record: _Record, scope: ast.AST) -> bool:
@@ -1947,7 +2033,8 @@ class _ModuleScanner:
         if decision is None:
             return
         rule, claim, matched_on = decision
-        if rule is CONTRADICTED_SOURCE and not self._wholly_manufactured(record, scope):
+        if rule in (CONTRADICTED_SOURCE, UNREADABLE_STAMP) \
+                and not self._wholly_manufactured(record, scope):
             return
 
         split = next((s.value for s in record.stamps if s.field in SPLIT_FIELDS), "")
@@ -1981,9 +2068,27 @@ class _ModuleScanner:
         # aggravated form and the one a reader must see first; otherwise the
         # first tainted input field.
         hits.sort(key=lambda h: (not is_target_field(h[0]), h[0]))
+        if rule is UNREADABLE_STAMP and not is_target_field(hits[0][0]):
+            # The NA lane is scoped to a drawn TARGET, and only to that. A
+            # record whose INPUT columns are drawn under a dynamic source
+            # stamp is the ordinary conservative under-report this module has
+            # always taken; widening the NA to it would turn an unresolvable
+            # f-string on any manufactured row into a fleet-wide verdict
+            # change, which is what the over-fire budget exists to stop.
+            return
         data_fields = sum(1 for name, _ in record.data if not is_config_field(name)) \
             + len(record.carried)
         construction = ""
+        if rule is UNREADABLE_STAMP:
+            construction = (
+                f"unadjudicated: the record is wholly manufactured in this "
+                f"process and its target field carries an RNG draw, and the "
+                f"only provenance value it declares is "
+                f"{claim.field}={claim.value} -- an expression this module "
+                f"cannot resolve to a string. Neither a fabrication nor a "
+                f"clean record: NOT MEASURED. Resolve the value or declare "
+                f"the record's provenance beside it."
+            )
         if rule is CONTRADICTED_SOURCE:
             drawn = ", ".join(sorted({n for n, _ in hits}))
             construction = (
@@ -2013,7 +2118,11 @@ class _ModuleScanner:
                     corroborating=corroborating,
                     split=split,
                     snippet=self.snippet(record.node),
-                    severity=TARGET_FABRICATED if is_target_field(name) else INPUT_FABRICATED,
+                    severity=(
+                        UNREADABLE_STAMP if rule is UNREADABLE_STAMP
+                        else TARGET_FABRICATED if is_target_field(name)
+                        else INPUT_FABRICATED
+                    ),
                     rule=rule,
                     matched_on=matched_on,
                     construction=construction,

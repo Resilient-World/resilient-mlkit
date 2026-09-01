@@ -1369,7 +1369,111 @@ the five spellings planted in one file: BEFORE **1** finding, AFTER **5** —
 so the fleet's `0 → 0` is a measured zero, not a harness that scans nothing.
 Full method, per-repo table and SHAs: `reports/M04_FLEET_SWEEP.md`.
 
-### Stage 2 — UNREADABLE_STAMP: status recorded below
+### Stage 2 — `UNREADABLE_STAMP`: SHIPPED, budget measured clean first
 
-**Status: E-M17 residual 4 CLOSED for every constant spelling. Stage 2 status
-in the section appended below.**
+Once every CONSTANT spelling folds, what is left is an expression that is
+genuinely dynamic — `source=f"era5_{region}"`, `source=FEEDS[which]`. Staying
+silent there reports the record as CLEAN. It is not clean; it is
+unadjudicated, and the honest verdict for something not measured is NA.
+
+R11 now serves three verdicts, and all three are driven end to end over one
+fixture tree with one file's stamp the only thing that changes
+(`::test_stage_2_r11_serves_three_verdicts_and_all_three_are_DRIVEN`):
+
+| stamp on a record whose `yield_tonnes` is `rng.normal` | R11 |
+|---|---|
+| none | **PASS** (`unreadable_stamp` 0, `findings` 0) |
+| `"source": f"era5_{region}"` | **NA** (`unreadable_stamp` 1, `findings` **0**) |
+| `"source": "era5_land"` | **FAIL** (`findings` 1, `unreadable_stamp` 0) |
+
+`findings` staying 0 on the NA row is asserted, not incidental: counting an
+unadjudicated record as a defect would make NA a quieter FAIL.
+
+**Scope — four conjuncts, each with its own silent control.** The record must
+be `_wholly_manufactured` (unchanged precondition: a record arriving as a
+parameter, or carrying one value read off a file, is not adjudicated); the
+field the RNG reached must be a TARGET field (an input-only manufactured row
+stays in the ordinary conservative under-report — widening the NA to it would
+turn any unresolvable f-string into a fleet-wide verdict change); the
+unresolved field must be in `SOURCE_NAMING_FIELDS` and not merely in
+`PROVENANCE_FIELDS` (a computed `split`, licence class or `kind` names a
+partition, a permission or a shape, not an unread origin); and the record must
+carry no readable string at all, so a resolvable `"provenance": "synthetic"`
+beside the dynamic value still ends the adjudication in the honesty rule.
+
+That third conjunct is the one to argue with, and it is stated plainly: it is
+the one place this module leans on a field-NAME list again after moving the
+source rule off one. It can only do so because the verdict it produces is NA
+— under-reporting costs a record nobody was told to open, which is the
+direction every other conjunct here already leans. If the next dynamic stamp
+is called `feed=`, this lane will be silent on it, exactly as
+`CONTRADICTED_SOURCE` was before T8-4. **That residue is OPEN**, it is the
+same shape as E-M17's original defeat, and closing it needs a value-side
+discriminator that does not exist for an expression with no value.
+
+**The finding QUOTES the expression.** "Unreadable" without saying what could
+not be read is not something a reader can act on.
+
+**Over-fire budget, measured read-only with the NA lane ENABLED, before it
+shipped:** the same ten-checkout sweep — 3394 Python files per side — **0 new
+findings, 0 gone, no repo's R11 verdict moved in either direction.** The
+harness-not-dead control was extended with the two Stage-2 shapes and reports
+them: BEFORE 1 finding, AFTER 7 (five `CONTRADICTED_SOURCE`, two
+`UNREADABLE_STAMP` quoting `f'era5_{region}'` and `FEEDS[which]`). Under the
+M-04 plan row an ugly budget means shipping Stage 1 alone; this budget is 0,
+so Stage 2 ships.
+
+**Control C for Stage 2** — four separate mutations, each run over the whole
+suite:
+
+| mutation | result |
+|---|---|
+| the `UNREADABLE_STAMP` decision removed from `_decide` | 5 failed, 784 passed |
+| the `SOURCE_NAMING_FIELDS` narrowing removed | 3 failed, 786 passed — exactly the computed `split` / licence-class / `kind` rows |
+| the drawn-TARGET guard removed | 1 failed, 788 passed |
+| R11's NA branch disabled in `checks/readiness.py` | 1 failed, 788 passed |
+
+Each mutation fails only the control that exists for it, so no control here is
+carrying another one's weight.
+
+**What a zero budget does NOT prove**, stated because a clean sweep is easy to
+over-read: it says nothing moved on ten trees as they stand today. It does not
+say nothing will move when a repo next writes one of these shapes — an adopter
+that writes `source=f"era5_{region}"` over a drawn target will see its R11 row
+go NA, which is the intended behaviour. The three adopters pinned to
+`branch = "main"` (choco, triage, blackout) inherit this on their next re-lock
+with no review step; that belongs to M-08's enumeration and M-09's tag
+annotation, and it is repeated here so it is not discovered by a re-lock.
+
+### RESIDUALS OF THIS ENTRY, pinned as tests that assert the current silence
+
+Both are driven, both are stated rather than papered over, and both are held
+by `::test_residual_stage_2_two_shapes_the_na_lane_does_not_reach`, which
+fails the day either closes:
+
+1. **A dynamic stamp under a field name outside `SOURCE_NAMING_FIELDS.`**
+   `{"yield_tonnes": float(4500.0 + rng.normal(0, 90.0)), "zq7lk":
+   f"era5_{region}"}` — measured **0 findings**. This is E-M17's original
+   defeat one level down: the value-side rule was moved off the field-name
+   list precisely because the next stamp gets called something else, and this
+   lane cannot follow it there, because an expression with no value has no
+   value side to read. It is the price of the NA and it is not hidden by it.
+2. **A dynamic stamp bolted on as a FRAME COLUMN.**
+   `frame["source"] = f"era5_{region}"` over a drawn `yield_tonnes` column —
+   measured **0 findings**. `_frame_records` collects string-LITERAL columns;
+   an unresolvable column value is not collected at all. The literal frame
+   column does fire
+   (`::test_control_a_fires_on_the_pandas_column_shape_under_a_renamed_column`),
+   so this is a gap in the NA lane specifically, not in the frame shape.
+
+The keyword-constructor record shape DOES reach the lane and is driven
+separately (`::test_stage_2_the_constructor_call_shape_reaches_the_na_lane`),
+because a rule that read the dict spelling and not the constructor one would
+be reading the layout again.
+
+**Status: E-M17 residual 4 CLOSED — every constant spelling folds, and the
+dynamic residue on a source-naming field is adjudicated NA instead of silently
+PASSed. The two residuals above are OPEN and pinned.**
+
+**mlkit `pytest`: 757 at `8517341` (re-measured on branch start) → 792 on this
+branch.**

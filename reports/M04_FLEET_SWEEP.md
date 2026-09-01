@@ -17,7 +17,11 @@ is what rules that out rather than the invocation looking right.
   `8517341dbd11731d10be20cd4b186b4be32f609b`, bound as
   `.../m04-fleet/resilient-mlkit/src/resilient_mlkit`.
 - **AFTER side** — this branch's worktree, bound as
-  `.../mlkit-m04/src/resilient_mlkit`.
+  `.../mlkit-m04/src/resilient_mlkit`. The table below was produced with
+  **both Stage 1 (the folds) and Stage 2 (the `UNREADABLE_STAMP` NA lane)
+  enabled** — the budget that gates Stage 2 is a budget for the thing that
+  actually ships, so it was measured with it turned on. Stage 1 alone was
+  measured separately at the Stage-1 commit and gave the same `0 → 0`.
 - **Repos** — every checkout freshly cloned at its **remote `main`**
   (`git clone --depth 1 --single-branch --branch main`), because local
   checkouts in this workspace are stale: the local `resilient-blackout`
@@ -43,7 +47,11 @@ is what rules that out rather than the invocation looking right.
 | `resilient-triage` | `806d4e067e` | 418 | 22 | 0 | 0 | 0 | 0 |
 | **total** | | **3394** | | **0** | **0** | **0** | **0** |
 
-**Stage 1 over-fire budget: 0 new findings over 3394 Python files.**
+**Over-fire budget, Stage 1 + Stage 2: 0 new findings over 3394 Python files.**
+No repo's R11 verdict moves in either direction — none gains a
+`CONTRADICTED_SOURCE` FAIL from a folded spelling, and none is taken to NA by
+the `UNREADABLE_STAMP` lane. Under the M-04 plan row this is the budget that
+decides whether Stage 2 ships; it is not ugly, so it does.
 
 ### What this sweep does NOT cover, stated rather than implied
 
@@ -77,28 +85,56 @@ TOTAL GONE: 0
 ### Control — the harness is NOT dead (planted fabricators, real repo tree)
 
 A **copy** of the `resilient-fray` clone (the fray checkout itself untouched)
-with one file added, `src/m04_planted_control.py`, holding five records that
-are each 100% `rng.normal` plus literals and each stamped `zq7lk=` with the
-same claim written five ways: the plain literal, `"_".join(["era5",
-"land"])`, `"era5_%s" % "land"`, `"era5_{}".format("land")`, and
-`FEEDS["primary"]`. fray's own signed `docs/allowlist.yaml` was the registry,
-unmodified.
+with one file added, `src/m04_planted_control.py`, holding seven records that
+are each 100% `rng.normal` plus literals: five stamped `zq7lk=` with the same
+claim written five ways (the plain literal, `"_".join(["era5", "land"])`,
+`"era5_%s" % "land"`, `"era5_{}".format("land")`, `FEEDS["primary"]`) and two
+with a drawn `yield_tonnes` target under an unresolvable `source=`
+(`f"era5_{region}"` and `FEEDS[which]`). fray's own signed
+`docs/allowlist.yaml` was the registry, unmodified.
 
 | side | mlkit bound | .py files | findings |
 |---|---|---|---|
 | BEFORE (`8517341`) | `m04-fleet/resilient-mlkit/src/resilient_mlkit` | 229 | **1** |
-| AFTER (this branch) | `mlkit-m04/src/resilient_mlkit` | 229 | **5** |
+| AFTER (this branch) | `mlkit-m04/src/resilient_mlkit` | 229 | **7** |
 
-The BEFORE side finds the plain literal and misses the other four — which is
-E-M17 residual 4, driven at fleet scale on a real repo tree rather than on a
-fixture string. The AFTER side finds all five. So the `0 -> 0` on the actual
-fleet is a measured zero, not a harness that scans nothing.
+The AFTER side's seven, as reported:
+
+```
+line  9  CONTRADICTED_SOURCE  INPUT_FABRICATED  zq7lk = era5_land
+line 17  CONTRADICTED_SOURCE  INPUT_FABRICATED  zq7lk = era5_land
+line 26  CONTRADICTED_SOURCE  INPUT_FABRICATED  zq7lk = era5_land
+line 34  CONTRADICTED_SOURCE  INPUT_FABRICATED  zq7lk = era5_land
+line 43  CONTRADICTED_SOURCE  INPUT_FABRICATED  zq7lk = era5_land
+line 51  UNREADABLE_STAMP     UNREADABLE_STAMP  source = f'era5_{region}'
+line 60  UNREADABLE_STAMP     UNREADABLE_STAMP  source = FEEDS[which]
+```
+
+The BEFORE side finds the plain literal and misses the other six — which is
+E-M17 residual 4 and its residue, driven at fleet scale on a real repo tree
+rather than on a fixture string. So the `0 → 0` on the actual fleet is a
+measured zero, not a harness that scans nothing, and **both** new lanes are
+demonstrably live inside this harness.
 
 ## Reading of the budget
 
 Stage 1 changes what R11 can READ, not what it is willing to adjudicate: the
 preconditions (`manufactured_of`, the honesty rule, branch (a)/(b)) are
-untouched. The fleet result is consistent with that — no honest record in
-3394 files carries a folded-constant provenance stamp that reaches the
-registry, so nothing moved — and the planted control shows the new reach is
-real where the shape exists.
+untouched. Stage 2 adds a verdict that did not exist, and it is scoped by
+four conjuncts each of which has its own silent control in the suite.
+
+The fleet result is consistent with both — no honest record in 3394 files
+carries a folded-constant provenance stamp that reaches the registry, and no
+wholly-manufactured record with a drawn target carries an unresolvable
+source-naming field — and the planted control shows the new reach is real
+where each shape exists.
+
+**What a zero budget does not prove.** It says nothing moved on ten trees as
+they stand today; it does not say nothing will move when a repo next writes
+one of these shapes. That is the intended behaviour, not a side effect: an
+adopter that writes `source=f"era5_{region}"` over a drawn target will see R11
+go NA, and the fix is to resolve the value or declare the record's provenance
+beside it. The three adopters pinned to `branch = "main"` (choco, triage,
+blackout) inherit this on their next re-lock with no review step — that is
+M-08/M-09's enumeration to carry, and it is repeated here so it is not
+discovered by a re-lock.

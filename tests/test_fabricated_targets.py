@@ -2259,3 +2259,361 @@ def test_control_c_the_registry_disclosure_is_r11s_and_r12_still_runs(tmp_path):
     )
     assert r11.evidence["source_registry"]["present"] is True
     assert "source_registry" not in r12.evidence
+
+
+# ---------------------------------------------------------------------------
+# M-04 STAGE 2 — UNREADABLE_STAMP, the NA lane
+#
+# The residue E-M17 residual 4 leaves behind once every CONSTANT spelling
+# folds: an expression that is genuinely dynamic. Silence there says the
+# record is clean. It is not clean; it is unadjudicated, and the honest
+# verdict for something not measured is NA, not PASS.
+#
+# The lane is scoped hard, and each conjunct below has a silent control:
+#   * the record must be WHOLLY MANUFACTURED (the CONTRADICTED_SOURCE
+#     precondition, unchanged);
+#   * its TARGET field must carry the draw -- an input-only record stays in
+#     the ordinary conservative under-report;
+#   * the unresolved field must be in SOURCE_NAMING_FIELDS, not merely in
+#     PROVENANCE_FIELDS, so a computed `split` or licence class is not an
+#     unread source claim;
+#   * and the record must carry NO readable string at all, so one resolvable
+#     declaration beside the dynamic value ends the adjudication in the
+#     honesty rule exactly as before.
+#
+# Over-fire budget, measured read-only BEFORE this shipped: ten resilient-*
+# checkouts at their remote mains, 3394 Python files per side, 0 new findings.
+# See reports/M04_FLEET_SWEEP.md.
+# ---------------------------------------------------------------------------
+
+STAGE2_TARGET_RECORD = """
+    import numpy as np
+
+    FEEDS = {{"primary": "era5_land"}}
+
+    def build(days=365, seed=0, region="civ", which="primary"):
+        rng = np.random.default_rng(seed)
+        return [
+            {{"yield_tonnes": float(4500.0 + rng.normal(0, 90.0)), {stamp}}}
+            for d in range(days)
+        ]
+"""
+
+STAGE2_CASES = [
+    # (label, stamp entry, expected rule or None for silence)
+    ("dynamic f-string source", '"source": f"era5_{region}"', ft.UNREADABLE_STAMP),
+    ("dynamic dict key source", '"source": FEEDS[which]', ft.UNREADABLE_STAMP),
+    ("dynamic join source", '"source": "_".join(["era5", region])',
+     ft.UNREADABLE_STAMP),
+    ("dynamic percent source", '"data_source": "era5_%s" % region',
+     ft.UNREADABLE_STAMP),
+    # --- and everything the lane must NOT reach ---------------------------
+    ("resolvable source still fires the source rule", '"source": "era5_land"',
+     ft.CONTRADICTED_SOURCE),
+    ("declares itself beside the dynamic value",
+     '"source": f"era5_{region}", "provenance": "synthetic"', None),
+    ("a readable string elsewhere on the record",
+     '"source": f"era5_{region}", "station": "abidjan"', None),
+    ("computed split is not an unread source claim", '"split": region, "note": 1',
+     None),
+    ("computed licence class is not an unread source claim",
+     '"licence_class": region, "note": 1', None),
+    ("computed kind names a shape, not an origin", '"kind": region, "note": 1',
+     None),
+]
+
+
+@pytest.mark.parametrize(
+    ("label", "stamp", "rule"),
+    [pytest.param(*case, id=case[0].replace(" ", "-")) for case in STAGE2_CASES],
+)
+def test_stage_2_the_na_lane_and_everything_it_must_not_reach(
+    label, stamp, rule, registry
+):
+    """CONTROL A and CONTROL B for ``UNREADABLE_STAMP``, in one table.
+
+    The four firing rows are the same record with the same drawn target and
+    the same unreadable source expression written four ways. The six silent
+    rows each remove exactly one conjunct.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(STAGE2_TARGET_RECORD.format(stamp=stamp)),
+        "src/loaders/grid.py",
+        registry,
+    )
+    if rule is None:
+        assert findings == [], (label, [f.render() for f in findings])
+        return
+    assert len(findings) == 1, (label, [f.render() for f in findings])
+    finding = findings[0]
+    assert finding.rule == rule, (label, finding.render())
+    if rule is ft.UNREADABLE_STAMP:
+        assert finding.severity == ft.UNREADABLE_STAMP, finding.render()
+        # The expression is QUOTED. A finding that says "unreadable" without
+        # saying what it could not read is not something a reader can act on.
+        assert "region" in finding.claim_value or "which" in finding.claim_value, (
+            label, finding.claim_value
+        )
+        assert "NOT MEASURED" in finding.construction, finding.construction
+    else:
+        assert finding.severity == ft.TARGET_FABRICATED, finding.render()
+
+
+def test_stage_2_the_lane_needs_the_record_to_be_manufactured_and_targeted(registry):
+    """CONTROL B, the conjuncts a table row cannot express.
+
+    (a) The record arrives as a PARAMETER (residual 3's territory), so
+    ``manufactured_of`` cannot prove it was built in-process.
+    (b) The record carries a value read off a file, so the dynamic source
+    label may well describe where that value came from -- which is the whole
+    reason ``_wholly_manufactured`` exists.
+    (c) Only an INPUT column is drawn; there is no fabricated target, so this
+    stays in the ordinary conservative under-report rather than taking a
+    repo's R11 row to NA.
+    (d) Nothing is drawn at all.
+    """
+    assert_bound_to_this_worktree()
+    parameter_arriving = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def _stamp(row, region="civ"):
+                row["source"] = f"era5_{region}"
+                return row
+
+            def build(days=365, seed=0):
+                rng = np.random.default_rng(seed)
+                return [
+                    _stamp({"yield_tonnes": float(4500.0 + rng.normal(0, 90.0))})
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert parameter_arriving == [], [f.render() for f in parameter_arriving]
+
+    reads_a_file = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+            import pandas as pd
+
+            def build(path, days=365, seed=0, region="civ"):
+                rng = np.random.default_rng(seed)
+                observed = pd.read_csv(path)
+                return [
+                    {"yield_tonnes": float(4500.0 + rng.normal(0, 90.0)),
+                     "station_reading": observed.iloc[d]["v"],
+                     "source": f"era5_{region}"}
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert reads_a_file == [], [f.render() for f in reads_a_file]
+
+    input_only = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def build(days=365, seed=0, region="civ"):
+                rng = np.random.default_rng(seed)
+                return [
+                    {"t2m": float(22.0 + rng.normal(0, 1.2)),
+                     "source": f"era5_{region}"}
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert input_only == [], [f.render() for f in input_only]
+
+    no_draw = ft.scan_source(
+        textwrap.dedent(
+            """
+            def build(days=365, region="civ"):
+                return [
+                    {"yield_tonnes": 4500.0 + d, "source": f"era5_{region}"}
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert no_draw == [], [f.render() for f in no_draw]
+
+
+def test_stage_2_r11_serves_three_verdicts_and_all_three_are_DRIVEN(tmp_path):
+    """The NA lane is only real if the CHECK returns NA, not just the scanner.
+
+    A severity nothing reads is a comment. R11's verdict logic is driven end
+    to end three times over the SAME fixture repo, with one file's stamp the
+    only thing that changes:
+
+        PASS  -- no stamp at all;
+        NA    -- an unresolvable source expression on a drawn target;
+        FAIL  -- the same expression resolved to ``era5_land``.
+
+    Three verdicts from one instrument over one tree, each obtained by running
+    it. NA sitting between PASS and FAIL is the point: it must not collapse
+    into either, and the evidence keys must not let an unadjudicated record be
+    counted as a defect.
+    """
+    assert_bound_to_this_worktree()
+    from resilient_mlkit.checks import RunContext
+    from resilient_mlkit.checks.readiness import r11_fabricated_targets
+    from resilient_mlkit.core.repo import Repo
+    from resilient_mlkit.core.result import Status
+
+    loader = """
+        import numpy as np
+
+        def build(days=365, seed=0, region="civ"):
+            rng = np.random.default_rng(seed)
+            return [
+                {{"yield_tonnes": float(4500.0 + rng.normal(0, 90.0)){stamp}}}
+                for d in range(days)
+            ]
+    """
+
+    def run(name: str, stamp: str):
+        root = tmp_path / name
+        (root / "src").mkdir(parents=True, exist_ok=True)
+        (root / "docs").mkdir(parents=True, exist_ok=True)
+        (root / "docs" / "allowlist.yaml").write_text(ALLOWLIST_FIXTURE)
+        (root / "src" / "loader.py").write_text(
+            textwrap.dedent(loader.format(stamp=stamp))
+        )
+        repo = Repo(name="fixture", path=root)
+        ctx = RunContext(nonce="test-nonce", root=root)
+        result = r11_fabricated_targets(repo, ctx)
+        report = (root / "reports" / "fabricated_targets.md").read_text()
+        return result, report
+
+    clean, _ = run("clean", "")
+    assert clean.status is Status.PASS, clean.reason
+    assert clean.evidence["unreadable_stamp"] == 0, clean.evidence
+
+    unread, unread_report = run("unread", ', "source": f"era5_{region}"')
+    assert unread.status is Status.NA, (unread.status, unread.reason)
+    assert unread.evidence["unreadable_stamp"] == 1, unread.evidence
+    assert unread.evidence["findings"] == 0, (
+        "an unadjudicated record is not a defect count; counting it as one "
+        "would make NA a quieter FAIL.\n" + str(unread.evidence)
+    )
+    assert "UNADJUDICATED" in unread.reason, unread.reason
+    assert "region" in unread.reason, unread.reason
+    assert "UNREADABLE_STAMP" in unread_report, unread_report
+
+    fabricated, _ = run("fabricated", ', "source": "era5_land"')
+    assert fabricated.status is Status.FAIL, (fabricated.status, fabricated.reason)
+    assert fabricated.evidence["findings"] == 1, fabricated.evidence
+    assert fabricated.evidence["unreadable_stamp"] == 0, fabricated.evidence
+
+
+def test_stage_2_the_constructor_call_shape_reaches_the_na_lane(registry):
+    """The record shapes are not one shape, so the lane is driven on each.
+
+    ``_record_from_dict`` is not the only way a record is written. This is the
+    keyword-constructor shape, and it must reach the NA lane too -- a rule that
+    read the dict spelling and not the constructor one would be reading the
+    layout, which is what E-M17 is an instance of.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def build(days=365, seed=0, region="civ"):
+                rng = np.random.default_rng(seed)
+                return [
+                    Row(yield_tonnes=float(4500.0 + rng.normal(0, 90.0)),
+                        source=f"era5_{region}")
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert len(findings) == 1, [f.render() for f in findings]
+    assert findings[0].rule == ft.UNREADABLE_STAMP, findings[0].render()
+    assert "region" in findings[0].claim_value, findings[0].claim_value
+
+
+RESIDUAL_STAGE2 = [
+    (
+        "a dynamic stamp under a field name outside SOURCE_NAMING_FIELDS",
+        """
+    import numpy as np
+
+    def build(days=365, seed=0, region="civ"):
+        rng = np.random.default_rng(seed)
+        return [
+            {"yield_tonnes": float(4500.0 + rng.normal(0, 90.0)),
+             "zq7lk": f"era5_{region}"}
+            for d in range(days)
+        ]
+""",
+    ),
+    (
+        "a dynamic stamp bolted on as a FRAME COLUMN",
+        """
+    import numpy as np
+    import pandas as pd
+
+    def build(days=365, seed=0, region="civ"):
+        rng = np.random.default_rng(seed)
+        frame = pd.DataFrame({"yield_tonnes": rng.normal(4500.0, 90.0, days)})
+        frame["source"] = f"era5_{region}"
+        return frame
+""",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("label", "source"),
+    [pytest.param(*case, id=case[0][:40].replace(" ", "-")) for case in RESIDUAL_STAGE2],
+)
+def test_residual_stage_2_two_shapes_the_na_lane_does_not_reach(
+    label, source, registry
+):
+    """RESIDUAL, pinned so the day either closes is visible.
+
+    (a) The NA lane is scoped to `SOURCE_NAMING_FIELDS`, so the SAME dynamic
+    value under an invented field name is silent. This is E-M17's original
+    defeat one level down: the value-side rule was moved off the field-name
+    list precisely because the next stamp gets called something else, and this
+    lane cannot follow it there because an expression with no value has no
+    value side to read. Recorded as the price of the NA, not hidden by it.
+
+    (b) `_frame_records` collects string-literal columns; an unresolvable
+    column value is not collected at all, so the pandas spelling of the same
+    record is silent.
+    `test_control_a_fires_on_the_pandas_column_shape_under_a_renamed_column`
+    shows the LITERAL frame column does fire, so this is a gap in the NA lane
+    specifically.
+
+    Both assert the CURRENT, WRONG silence. When one goes red, update E-M20
+    rather than re-pinning it.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(source), "src/loaders/grid.py", registry
+    )
+    assert findings == [], (
+        f"{label}: an E-M20 residual has closed. Update the escalation rather "
+        f"than re-pinning the silence: {[f.render() for f in findings]}"
+    )
