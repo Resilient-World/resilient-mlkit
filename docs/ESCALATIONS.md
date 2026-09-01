@@ -2332,3 +2332,47 @@ that the copy exists.
 
 **Can be done from here** (unlike E-M30/E-M31): it is a change inside mlkit.
 Left open deliberately, not blocked.
+
+### CLOSED 2026-09-01 by adversarial verification — the copy was not one copy, and the update missed it
+
+The entry above says "Updated to `28` in the same commit". **It was not.**
+Measured at `24f23b8`, the branch head as pushed: `README.md` contains the count
+**twice**, and only one was updated.
+
+| where | at `24f23b8` | measured truth |
+|---|---|---|
+| `README.md:114` "`READY-TO-TRAIN` requires all N gating checks" | `28` | `len(gating_ids())` = **28** |
+| `README.md:12` "the package. N gating checks across 4 phases" | `27` | **28** |
+| `README.md:13` "5 diagnostic triage checks: N in the registry" | `32` | `len(all_check_ids())` = **33** |
+
+So the file shipped contradicting itself nine lines apart, and the half that
+went stale is the half that **claims to be measured** — "Counted, not
+remembered — `len(gating_ids())` and `len(all_check_ids())` on 2026-08-29".
+A remembered number wearing a measurement's clothes is worse than one that
+admits it is prose, and it is CLAUDE.md rule 2's exact shape: a plausible
+number that does not get checked.
+
+Both literals are corrected here (28 / 33, counted on 2026-09-01), and the
+"nothing compares it" half is closed rather than restated:
+`tests/test_promotion_state.py::test_the_readme_states_no_check_count_the_registry_contradicts`
+holds both README figures against `len(gating_ids())` and `len(all_check_ids())`.
+
+Controls driven, each independently:
+
+- **A** — README as it ships at `24f23b8`: FAILS,
+  `README.md states a gating-check count the registry contradicts (checks.PHASE_ORDER gates 28): [('27', 27)]`.
+- **B** — gating count correct, registry size reverted to `32`: FAILS on the
+  second leg, `states a registry size the registry contradicts (33 checks are registered): [('32', 32)]`.
+  Neither leg is carried by the other.
+- **C, not dead** — a README stating neither count: FAILS
+  `README states no gating-check count`. A scanner that finds nothing is
+  otherwise indistinguishable from a file with nothing wrong in it.
+- **negative control** — `README.md:88`'s "Three of the readiness checks" is a
+  SUBSET count, is correct, and stays legal. The two parsers require the literal
+  words `gating checks` / `in the registry` rather than reusing
+  `stated_check_counts`, whose regex matches any count of checks at all.
+
+Scope kept deliberately narrow: the rule is "any TOTAL stated in README.md
+equals the registry's", not "README.md contains no numbers". `CHANGELOG.md`'s
+`26` and `25` are history and are correctly left alone — a changelog that
+rewrote its own past counts would be worse than one that goes stale.
