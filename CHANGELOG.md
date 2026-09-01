@@ -27,6 +27,50 @@ true before the tag was cut. It is withdrawn here rather than quietly dropped,
 and `tests/test_version_declaration.py` now FIRES on it: the newest entry may
 not restate it, and must name at least one of the checks whose verdict moved.
 
+### D6's crosscut carve-out is proportional and fail-closed, not existential
+
+**A verdict change inside a check that has not shipped yet, and the reason it is
+recorded here rather than folded into the entry below.** The dependence-unit
+contract as first written asked `if crosscutting:` — *does any unit key appear
+in more than one arm* — and one key answering yes silenced
+`DEPENDENCE_UNIT_TOO_FINE` for every other key in the arm. Its own adversarial
+verifier drove `resilient-fray`'s panel with COUNTY unit keys and recorded **D6
+PASS**, the wrong answer in the repo the finding came from, and then turned a
+FAIL into a PASS for 1,364 rows by editing the `unit_key` of **one**. Both
+drives are in `reports/D6_CROSSCUT_BASE.json`, taken at the base sha before a
+source file was edited.
+
+Each unit key is now classified on its own. A block of the holdout policy that
+is split with at least one **arm-local** piece refuses; `UNIT_CROSSCUTS_ARMS` is
+reported only when the arm-local mass is empty. Four counts join the record —
+`n_units_crosscutting_arms`, `n_units_local_to_arm`,
+`n_blocks_split_by_local_units`, `n_blocks_split_by_crosscutting_units` — so the
+carve-out is a proportion a reader can see rather than an existence claim.
+
+**chokepoint's convention is unchanged and that was the falsification
+condition**: 28 of 28 corridors cross every arm, so the carve-out covers the
+whole arm, relation `UNIT_CROSSCUTS_ARMS`, no refusal, `28` units still printed
+beside `20` blocks.
+
+**Measured, not asserted.** 209,952 assignments enumerated at the base sha and
+at the head and diffed by content: **0 cases that refuse at the base are silent
+at the head**, 6,912 silent cases now refuse, and 6,912 refuse on both sides
+under an earlier, more specific constant
+(`UNIT_LABEL_CONTRADICTS_CONTENT → DEPENDENCE_UNIT_TOO_FINE`). The
+preregistered claim that the constant would also be preserved is **falsified,
+and said so** in `reports/D6_CROSSCUT_RESULTS.md` §4.1. Suite 977 → 991 with no
+existing test edited.
+
+**One regression was found in this fix by attacking it, not by shipping it.**
+Making the relation proportional would on its own have loosened
+`UNIT_LABEL_CONTRADICTS_CONTENT`: with that half removed, 2,160 of the 209,952
+cases go from refusing to silent (`reports/D6_CROSSCUT_CONTAINMENT_NOT_DEAD.json`).
+
+**What is still not closed, named rather than left to be found**: a unit that
+crosscuts *every* arm remains refusal-free even when it is finer than the
+policy's blocks inside the arm. chokepoint's endorsed bootstrap has that exact
+shape, and nothing measured in this round tells the two apart.
+
 ### D6 `RESAMPLING_UNIT`, and the dependence unit inside `core.served`
 
 **New check, new gating check, and one contract surface widened.** Nothing here
