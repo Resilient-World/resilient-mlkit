@@ -46,6 +46,7 @@ from resilient_mlkit.core.result import (
     ALLOW_DIRTY_KEY,
     CheckResult,
     FabricationError,
+    GateAggregate,
     Status,
     VerdictSealed,
 )
@@ -302,3 +303,131 @@ def test_residual_a_nested_evidence_value_is_still_mutable_in_place():
     r.evidence["curve"]["0.25"] = 9.9
     assert r.evidence["curve"]["0.25"] == 9.9
     assert r.status is Status.PASS
+
+
+# ---------------------------------------------------------------------------
+# E-M21 — the seal flag was itself unsealed (verifier finding, 2026-08-31)
+# ---------------------------------------------------------------------------
+# M-02(b) shipped with this disclosure, in `_is_sealed.__doc__` and pinned by
+# `test_residual_e_dict_surgery_defeats_the_seal_as_it_defeats_frozen` above:
+#
+#     "Both are `__dict__` surgery, which defeats this exactly as it defeats
+#      every frozen dataclass in this package. ... it is a LOUD limit: nothing
+#      edits a verdict that way by accident, and accident is what the seal
+#      exists to stop (`result.status = Status.PASS`, one ordinary assignment,
+#      in a check module -- which now refuses)."
+#
+# The disclosure was incomplete, and measured so with the module's own
+# `__file__` asserted at 943c0fd:
+#
+#     r = CheckResult.failed("R99", "phase-1", "a real failure")
+#     r._sealed = False        # ORDINARY assignment. Not __dict__ surgery.
+#     r.status = Status.PASS   # ORDINARY assignment.
+#     r.to_dict()["status"]    -> 'PASS'
+#
+# `__setattr__` refused `_VERDICT_FIELDS` and rate-limited `_STAMP_FIELDS`, and
+# passed everything else — including the one attribute whose value decides
+# whether either of those clauses runs at all. The guard read a flag the caller
+# it was guarding against could set.
+#
+# The same hole, one layer down: `SealedEvidence` declared `__slots__ =
+# ("_sealed",)` and never overrode `__setattr__`, so `r.evidence._sealed =
+# False` re-opened the mapping and `r.evidence["forged"] = True` landed.
+#
+# This is NOT the disclosed residual. `object.__setattr__` and `__dict__[...]`
+# name the machinery they are subverting; `obj._sealed = False` is the same
+# syntax as the accident the seal exists to stop, and it is strictly cheaper
+# than either disclosed defeat. It is closed below; the three disclosed
+# `__dict__` paths stay open and stay pinned, unchanged, above.
+
+
+def test_em21_the_seal_flag_cannot_be_cleared_by_ordinary_assignment():
+    """CONTROL A. The flag that decides whether the guard runs is guarded."""
+    r = failing()
+    with pytest.raises(VerdictSealed, match="_sealed"):
+        r._sealed = False
+    assert r._is_sealed() is True
+    with pytest.raises(VerdictSealed):
+        r.status = Status.PASS
+    assert r.to_dict()["status"] == "FAIL"
+
+
+def test_em21_the_evidence_seal_flag_cannot_be_cleared_by_ordinary_assignment():
+    """CONTROL A. Same hole one layer down, in the evidence mapping."""
+    r = failing()
+    with pytest.raises(VerdictSealed, match="_sealed"):
+        r.evidence._sealed = False
+    with pytest.raises(VerdictSealed):
+        r.evidence["forged"] = True
+    assert dict(r.evidence) == {"rows": 3, "overlaps": 1}
+
+
+def test_em21_a_flipped_verdict_cannot_flip_a_gate_aggregate():
+    """CONTROL A. Why it matters: M-03 derives its verdict from these objects.
+
+    ``GateAggregate.passed`` is a property over the results, precisely so that
+    nobody can make the aggregate disagree with the checks it holds. That
+    guarantee is only as strong as the checks' own seal: with the seal flag
+    writable, two ordinary assignments to a member FAIL flipped
+    ``passed`` False -> True and emptied ``blocking``.
+    """
+    ok = CheckResult.passed("R1", "p", {"n": 1})
+    lost = CheckResult.failed("R2", "p", "the check measured a real failure")
+    agg = GateAggregate("promotion", (ok, lost))
+    assert agg.passed is False and agg.blocking == ("R2",)
+
+    with pytest.raises(VerdictSealed):
+        lost._sealed = False
+    with pytest.raises(VerdictSealed):
+        lost.status = Status.PASS
+
+    assert agg.passed is False
+    assert agg.blocking == ("R2",)
+
+
+def test_em21_control_b_construction_and_the_runner_s_stamps_are_unmoved():
+    """CONTROL B (must stay silent). The repair touches one attribute name.
+
+    Every legitimate path still constructs, the runner's write-once stamps
+    still apply, and the serialisation is byte-identical to what the same
+    inputs produced before the repair.
+    """
+    built = [
+        CheckResult.passed("R1", "p", {"n": 1}),
+        CheckResult.failed("R2", "p", "why"),
+        CheckResult.na("R3", "p", "why"),
+        CheckResult.deferred("R4", "p", "KEY", "detail"),
+        CheckResult.escalated("R5", "p", "why"),
+    ]
+    for r in built:
+        assert r._is_sealed() is True
+        payload = r.to_dict()
+        assert CheckResult.from_dict(payload).to_dict() == payload
+        assert json.loads(json.dumps(payload)) == payload
+
+    r = built[1]
+    r.repo = "resilient-mlkit"
+    r.git_sha = "8517341"
+    r.nonce = "n1"
+    assert (r.repo, r.git_sha, r.nonce) == ("resilient-mlkit", "8517341", "n1")
+    with pytest.raises(VerdictSealed, match="re-stamp"):
+        r.git_sha = "943c0fd"
+
+    # The R2/T2 delegation shape: a new result built from ANOTHER result's
+    # already-sealed evidence mapping. This is what broke the two-signal seal
+    # M-02 measured and reverted; the repair here must not resurrect it.
+    inherited = CheckResult("R9", "p", Status.PASS, "", built[0].evidence)
+    assert inherited.status is Status.PASS
+    assert dict(inherited.evidence) == {"n": 1}
+    assert inherited._is_sealed() is True
+
+
+def test_em21_control_b_copies_still_round_trip_and_stay_sealed():
+    """CONTROL B. ``copy``/``deepcopy`` of a formed verdict keep working."""
+    r = failing()
+    for clone in (copy.copy(r), copy.deepcopy(r)):
+        assert clone.to_dict() == r.to_dict()
+        with pytest.raises(VerdictSealed):
+            clone.status = Status.PASS
+        with pytest.raises(VerdictSealed):
+            clone._sealed = False
