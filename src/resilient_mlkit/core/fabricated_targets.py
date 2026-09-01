@@ -1031,6 +1031,14 @@ class _ModuleScanner:
             "source": "era5" + "_land"      # BinOp
             SOURCE = "era5_land"; "source": SOURCE
 
+        And three more, driven silent on 2026-08-31 and folded since
+        (M-04 / E-M17 residual 4), all constant arithmetic exactly like
+        the ``Add`` case:
+
+            "source": "_".join(["era5", "land"])
+            "source": "era5_%s" % "land"
+            "source": "{}_land".format("era5")
+
         A placeholder whose value this cannot resolve makes the whole
         expression unreadable and the rule silent, which is the quiet
         direction.
@@ -1066,6 +1074,71 @@ class _ModuleScanner:
             if left is None or right is None:
                 return None
             return left + right
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
+            # ``"era5_%s" % "land"`` -- %-interpolation over constants the
+            # parser already has, the same three tokens as the ``Add`` case
+            # one operator over (M-04 Stage 1; driven silent 2026-08-31).
+            # STRING operands only, and the interpolation itself is guarded:
+            # a placeholder the resolved operands cannot satisfy makes the
+            # value unreadable, never a guess.
+            left = self._string_of(node.left)
+            if left is None:
+                return None
+            if isinstance(node.right, ast.Tuple):
+                parts = [self._string_of(e) for e in node.right.elts]
+                if any(p is None for p in parts):
+                    return None
+                args: str | tuple[str, ...] = tuple(p for p in parts if p is not None)
+            else:
+                single = self._string_of(node.right)
+                if single is None:
+                    return None
+                args = single
+            try:
+                return left % args
+            except (TypeError, ValueError, KeyError):
+                return None
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            # ``"{}_land".format("era5")`` and ``"_".join(["era5", "land"])``
+            # (M-04 Stage 1). FOLDING, never evaluation: the method is run
+            # only when the receiver and every argument resolve to string
+            # constants, so this computes exactly what a reader computes in
+            # their head. Any starred argument, ``**kwargs``, comprehension
+            # or unresolvable element makes the whole value unreadable.
+            base = self._string_of(node.func.value)
+            if base is None:
+                return None
+            if node.func.attr == "format":
+                folded_args: list[str] = []
+                for arg in node.args:
+                    if isinstance(arg, ast.Starred):
+                        return None
+                    text = self._string_of(arg)
+                    if text is None:
+                        return None
+                    folded_args.append(text)
+                folded_kwargs: dict[str, str] = {}
+                for kw in node.keywords:
+                    if kw.arg is None:  # **kwargs
+                        return None
+                    text = self._string_of(kw.value)
+                    if text is None:
+                        return None
+                    folded_kwargs[kw.arg] = text
+                try:
+                    return base.format(*folded_args, **folded_kwargs)
+                except (IndexError, KeyError, ValueError, AttributeError):
+                    return None
+            if node.func.attr == "join" and len(node.args) == 1 \
+                    and not node.keywords:
+                elements = node.args[0]
+                if not isinstance(elements, (ast.List, ast.Tuple)):
+                    return None
+                parts = [self._string_of(e) for e in elements.elts]
+                if any(p is None for p in parts):
+                    return None
+                return base.join(p for p in parts if p is not None)
+            return None
         return None
 
     def _strings_of(self, node: ast.AST | None) -> list[str]:

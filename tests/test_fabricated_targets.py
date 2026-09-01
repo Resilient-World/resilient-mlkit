@@ -1984,23 +1984,67 @@ def test_m04_the_literal_twin_of_the_dynamic_spellings_fires(registry):
     ],
     ids=["str-join", "percent-format", "str-format"],
 )
-def test_m04_pin_a_constant_foldable_spelling_is_still_silent(stamp_expr, registry):
-    """PIN, asserting the CURRENT, WRONG silence (M-04 Stage 0).
+def test_m04_control_a_a_constant_foldable_spelling_fires_like_the_literal(
+        stamp_expr, registry):
+    """CONTROL A (M-04 Stage 1). Was the Stage-0 pin of the same spellings.
 
     ``"_".join(["era5", "land"])``, ``"era5_%s" % "land"`` and
     ``"{}_land".format("era5")`` are the literal ``"era5_land"`` written as
     constant arithmetic the parser already has -- the same three tokens as
-    the ``BinOp(Add)`` spelling `_string_of` folds today, one operator over.
-    Driven silent against 8517341 on 2026-08-31. When Stage 1 folds them this
-    test goes red, and the red is the signal to flip it into the Control A
-    firing assertion, not to re-pin the silence.
+    the ``BinOp(Add)`` spelling `_string_of` already folded, one operator
+    over. Driven silent against 8517341 on 2026-08-31 and pinned so; folded
+    since, and the firing must be THE SAME finding the literal twin
+    produces: same rule, same severity, same field, same resolved value.
+    """
+    assert_bound_to_this_worktree()
+    findings = scan_dynamic_stamp(stamp_expr, registry)
+    twin = scan_dynamic_stamp('"era5_land"', registry)
+    assert len(findings) == 1, (
+        f"R11 is SILENT on {stamp_expr}, which folds to the literal "
+        f'"era5_land" the twin control fires on: '
+        f"{[f.render() for f in findings]}"
+    )
+    assert len(twin) == 1
+    got, expected = findings[0], twin[0]
+    assert got.rule == expected.rule == ft.CONTRADICTED_SOURCE
+    assert got.severity == expected.severity == ft.TARGET_FABRICATED
+    assert got.field == expected.field == "tonnes"
+    assert got.claim_field == expected.claim_field == "source"
+    assert got.claim_value == expected.claim_value == "era5_land"
+    assert got.matched_on == expected.matched_on
+    assert got.construction == expected.construction
+
+
+@pytest.mark.parametrize(
+    "stamp_expr",
+    [
+        '"_".join(["era5", parts])',        # unresolvable element
+        '"era5_%s" % suffix',               # unresolvable operand
+        '"{}_land".format(prefix)',         # unresolvable argument
+        '"era5_%d" % "land"',               # interpolation itself fails
+        '"{missing}_land".format(era="x")', # placeholder unsatisfied
+        '"_".join(p for p in FEEDS)',       # comprehension, not constants
+        '"{}_land".format(*FEED_PARTS)',    # starred argument
+    ],
+    ids=["join-dynamic", "percent-dynamic", "format-dynamic",
+         "percent-raises", "format-raises", "join-genexp", "format-starred"],
+)
+def test_m04_control_b_a_spelling_that_does_not_fold_stays_unresolved(
+        stamp_expr, registry):
+    """CONTROL B (M-04 Stage 1). Folding, never evaluation.
+
+    Every variant here carries a name or shape `_string_of` cannot resolve,
+    or an interpolation the resolved constants cannot satisfy. None of them
+    IS a readable string, so none may become a stamp: a fold that guessed
+    would be adjudicating a value the source does not state. (`suffix`,
+    `parts`, `prefix` and `FEED_PARTS` are deliberately unbound at module
+    level -- exactly the unreadable case.)
     """
     assert_bound_to_this_worktree()
     findings = scan_dynamic_stamp(stamp_expr, registry)
     assert findings == [], (
-        "the constant-foldable spelling now resolves (M-04 Stage 1 landed): "
-        "flip this pin into the firing assertion beside the literal twin: "
-        f"{[f.render() for f in findings]}"
+        f"{stamp_expr} cannot be folded from constants, but R11 fired on it "
+        f"anyway -- the fold is EVALUATING: {[f.render() for f in findings]}"
     )
 
 
