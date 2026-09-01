@@ -1507,3 +1507,125 @@ PASSed. The two residuals above are OPEN and pinned.**
 
 **mlkit `pytest`: 757 at `8517341` (re-measured on branch start) → 794 on this
 branch.**
+
+---
+
+## E-M22 ADVERSARIAL VERIFICATION (2026-08-31) — the NA lane called "unreadable" a value it had read
+
+Driven against a fresh clone at `origin/main` = `8517341` with the branch at
+`70b21df`, dual interpreter, each side asserting its own
+`resilient_mlkit.core.fabricated_targets.__file__` before scanning anything.
+
+### The M-04 branch, re-measured rather than re-read
+
+Reproduced and CONFIRMED, independently of the branch's own harness:
+
+- baseline `757` at `8517341` (754 passed + 3 skipped) → `794` on the branch
+  (791 + 3). Test diff `+781 / −0`: **no main test deleted, edited or
+  weakened**;
+- Stage-0 fire-then-fix: Stage-1 code + the Stage-0 pin table gives **4 failed
+  / 755 passed / 3 skipped** — exactly the four pinned rows and nothing else;
+- all four residual-4 spellings fold and reach `CONTRADICTED_SOURCE`, and the
+  module-dict read-back `FEEDS["primary"]` FIRES rather than going NA. The
+  branch's deviation from the plan row on that spelling is strictly stronger
+  than the row and is upheld;
+- `UNREADABLE_STAMP` never displaces a defect: a repo carrying both a real
+  fabrication and an unreadable stamp still returns **FAIL**, a repo with only
+  unreadable stamps returns **NA**, a clean repo still **PASS**es (driven
+  through `readiness.r11_fabricated_targets`, not through the scanner);
+- six of the branch's guards mutated out one at a time over the whole suite —
+  the fold dispatch, the module-dict cycle guard, the `UNREADABLE_STAMP`
+  decision, the `SOURCE_NAMING_FIELDS` narrowing, the drawn-TARGET guard and
+  R11's NA branch — each fails at least one control and none is dead;
+- the width guard's own control is honest: with
+  `_template_is_safe_to_apply` forced to `True` the SUITE DOES NOT FINISH, and
+  the boundary predicate test is what fails politely instead;
+- over-fire budget re-measured on a DIFFERENT population from the branch's
+  (this workspace's ten `resilient-*` checkouts as they stand, **3297** `.py`
+  files): **0 new, 0 gone**. That sweep is demonstrably alive rather than
+  silently dead — it reports the same **4** pre-existing `CONTRADICTED_SOURCE`
+  findings (arabica ×1, surge ×3) on both sides.
+
+### DEFECT FOUND AND REPAIRED — an empty value is not an unreadable one
+
+On the branch, a wholly-manufactured record whose target carries an
+`rng.normal` draw:
+
+```
+{"yield_tonnes": <draw>, "source": None}   ->  UNREADABLE_STAMP, R11 NA
+{"yield_tonnes": <draw>}                   ->  silent,           R11 PASS
+```
+
+Two spellings of the same **absent** source claim, adjudicated differently on
+the presence of a key whose value is nothing. That is the layout-reading
+defect this module exists to close, one lane down — and the finding's own
+wording, "an expression this module cannot resolve to a string", is a FALSE
+claim about the instrument's reach: `None` resolved, it is simply not a
+string. Same for `0`, `1.5`, `True`, `...`, `b"..."` and `"data_source": None`.
+`source={}` went NA while `source=()`, `[]` and `set()` were silent — the
+empty-container arm stopped at `ast.Dict` for no reason a reader could give.
+
+The lane is a **NA** lane, so this over-reports "not measured" rather than
+"fabricated"; it fires **0 times** across 3297 fleet `.py` files today. It is
+still a claim the check cannot support, and R11 NA is not R11 PASS for a repo
+whose readiness depends on it.
+
+REPAIRED in `_unreadable_of` (root cause in `src/`, no gate edited, no
+threshold moved, no test weakened): a non-string `ast.Constant` and an empty
+container of ANY kind under a source-naming field declare no origin and are
+silent. A NON-empty container is still unread and still takes the lane
+(`source={"primary": region}` → `UNREADABLE_STAMP`), and one readable element
+inside an otherwise-dynamic container still FIRES the source rule
+(`source=["era5_land", region]` → `CONTRADICTED_SOURCE`, identical at
+`8517341`).
+
+Controls: `test_stage_2_an_empty_source_value_is_not_an_unreadable_one`
+(10 silent rows + 7 firing rows) and
+`test_stage_2_an_absent_source_key_and_a_null_one_agree`, which asserts the
+two scans EQUAL rather than asserting two separate silences — the defect was
+not that it fired, it was that the two spellings of one claim disagreed.
+Check-not-dead: reverting the two arms fails **9** of them, and no
+pre-existing test. Suite `794` → **`812`** (809 + 3 skipped). Fleet sweep
+re-run WITH the repair: still **0 new, 0 gone** over the same 3297 files.
+
+### OPEN, measured, not repaired here
+
+1. **The honesty rule's REACH widened with the folds, and that turns a firing
+   record silent.** Measured both sides on one record:
+   `{"yield_t_ha": <draw>, "source": "era5_land", "provenance": "_".join(["synth","etic"])}`
+   FIRES `CONTRADICTED_SOURCE`/`TARGET_FABRICATED` at `8517341` and is
+   **SILENT** on the branch. It is not a new evasion — the same record with a
+   literal `"provenance": "synthetic"` is already silent at `8517341`, so the
+   fold only makes the pre-existing exemption reachable in four more spellings,
+   symmetrically with the firing side — and the fleet sweep measures **0 gone**.
+   Recorded because the branch's Control B covers a folded NAME beside a
+   literal `synthetic`, and not a literal name beside a FOLDED `synthetic`,
+   and because "the honesty rule is UNCHANGED" is true of the rule and not of
+   its reach.
+2. **`_module_dict_entry` adds a new instance of an existing crash surface.**
+   A module-dict chain about 500 links deep (`G0 = {"x": G1["x"]}` …) raises
+   `RecursionError` out of `scan_source`, which catches only `SyntaxError`, so
+   it escapes `scan_repo` and `r11_fabricated_targets` and the check reports
+   nothing at all. The cycle guard handles cycles, not depth. NOT a new class:
+   a 3000-term `+` chain already raises `RecursionError` at `8517341`
+   identically, and no fleet file is anywhere near either bound (3297 `.py`
+   scanned, no exception on either side). Left open rather than patched here
+   because the honest fix is a depth/`RecursionError` boundary for the whole
+   folder, which is a separate change with its own control pair.
+3. The branch's own two pinned residuals (a dynamic stamp under a field name
+   outside `SOURCE_NAMING_FIELDS`; a dynamic stamp bolted on as a frame
+   column) were re-driven and are unchanged: both silent, both still pinned.
+
+### Process note, disclosed rather than fixed
+
+The round-8 collision table marks mlkit `docs/ESCALATIONS.md` **append-only,
+coordinated** (G-ESC). The branch makes one IN-PLACE edit there — E-M17's
+residual 4 struck through and pointed at this entry (13 lines rewritten at
+`:945`). It is the bookkeeping STATE asks for when a pinned residual closes,
+it does not textually collide with #23/#24 (both append at EOF), and it is
+disclosed in the PR body — but it is not an append, and the human merging the
+three siblings should know that before resolving the tail conflict. This
+verification entry is an append.
+
+**Status: M-04 STANDS on its substance. One NA-lane over-fire found by driving
+and REPAIRED on this branch; two measured behaviours recorded OPEN above.**
