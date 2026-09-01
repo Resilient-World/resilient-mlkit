@@ -2418,3 +2418,106 @@ Suite `912` → **`952`**. No test that exists on `main` was changed.
 
 **Status: REPAIRED for every report written from here on. The four residuals
 above are recorded, not closed.**
+
+---
+
+## E-M25 — the two builds E-M24 could still fail to tell apart
+
+**Raised:** 2026-09-01, by adversarial verification of E-M24 (PR #31), driving
+its own control construction against the branch it verified.
+**Status: BOTH REPAIRED on `verify/e-m24-residuals-sourceless-digest-and-unstamped-results-store`.**
+No gate file edited, no threshold moved, no range widened, no holdout narrowed,
+no test that exists on `main` or on PR #31 changed. No ledgered test read was
+spent and no code path that could spend one was added.
+
+### 1. The digest could cover none of the running code (REPAIRED)
+
+`digest_tree` excludes `__pycache__` and `*.pyc`, correctly: bytecode moves for
+reasons that are not gate semantics. The boundary of that exclusion was open.
+In a **sourceless install** — every `.py` compiled to a `.pyc` in place and the
+source removed, which CPython still imports — the excluded set is the executing
+set, and the digest falls through to whatever non-Python data the package
+ships. `resilient_mlkit` ships exactly one such file, `py.typed`.
+
+Driven 2026-09-01, two copies of `src/resilient_mlkit` differing only by one
+byte in `checks/readiness.py`, each compiled sourceless, each imported in its
+own interpreter with `resilient_mlkit.__file__` asserted:
+
+```
+D4  loaded_from=__init__.pyc  files=1  stamp=0.5.0+src.5b9327f66528
+D5  loaded_from=__init__.pyc  files=1  stamp=0.5.0+src.5b9327f66528   (readiness.py DIFFERS)
+```
+
+A real R10 report written through `_write_r10_report` by D4 verified **MATCH**
+against D5. That is the E-M24 defect itself — two builds whose gate source
+differs reporting one identity — reappearing inside the fix for it, and it
+contradicts `core/identity.py`'s own stated invariant that the digest "never
+degrades into a plausible-looking string, because a plausible identity is worse
+than a missing one".
+
+**Repair.** `running_code_is_covered_or_reason()`: the file `core/identity.py`
+was *actually loaded from* must be one of the files the digest covers. Under
+any install form that ships source it is; under a sourceless install it is not,
+and then the build declines — `+src.unknown`, every comparison
+`INDETERMINATE`. Re-driven after the repair: `files=0`, `known False`, on both
+trees. The negative controls are driven too: a source-shipping copy at another
+path still digests to the same value, and stray bytecode beside real source
+still does not move the digest.
+
+### 2. `mlkit check --portfolio` — the readiness table nothing stamped (REPAIRED)
+
+E-M24 stamped every report mlkit *writes*. `.mlkit/results/*.json` holds the
+verdicts mlkit *keeps*, and `_cmd_portfolio` renders a full R1–R12 readiness
+table out of them with the exit code `README.md` says CI gates on. The store
+recorded the repo's git SHA and nothing about mlkit; `store.load` staled only
+on the SHA.
+
+Driven 2026-09-01, same two trees, two interpreters, bindings asserted both
+sides: 27 PASSes written by `0.5.0+src.b1686b22efc6` were read back at an
+**unchanged repo SHA** by `0.5.0+src.48480b572359` and rendered
+
+```
+fray   771b874  PPPPP  PPPPP  PPPPPPPPPPPP  PPPPP  PPPPP  READY-TO-TRAIN
+```
+
+at exit 0, with nothing in the table, the store, or the exit code naming either
+build. This is the finding E-M24 records — "readiness under whichever mlkit
+happened to be installed, and nothing says which" — in the one readiness table
+the stamping pass did not reach, and it is the table with the CI exit code.
+
+**Repair.** `save()` records `mlkit_build`; `load()` stales a PASS whose stored
+build is absent, unknown, or different, by the same rule and the same
+PASS/ESCALATED-only scope as the existing git-SHA rule — so a FAIL measured by
+another build is still reported rather than hidden. `render_portfolio` emits
+the E-M24 header lines, so the table names the build that rendered it.
+Re-driven after the repair: 27 `S`, `IN-PROGRESS`, exit 3; the same store read
+by the build that wrote it still resolves `READY-TO-TRAIN`.
+
+**This one moves verdicts and the CHANGELOG says so.** Every results file
+written before this records no `mlkit_build`, so its PASSes read STALE until
+the phase is re-run — the same treatment a result with no git SHA has always
+had, for the same reason.
+
+### What is still NOT closed (recorded, not repaired)
+
+* **E-M24's four recorded residuals stand**, in particular that the stamp is
+  forward-looking: the committed fleet of readiness tables stays unattributable
+  until each repo re-runs under a stamping mlkit, and repinning fray
+  (`c65b2e7`) and chokepoint (`8517341`) is not done here.
+* **The stamp is a provenance label, not a signature.** A line hand-typed into
+  a report verifies `MATCH`, because the equality is over text a writer emitted
+  and nothing signs it. Nothing gates on the stamp today (E-M24 deliberately
+  adds no readiness row), so this buys an attacker only a false answer from an
+  advisory command — but it must not become a gate without a tie a hand cannot
+  reproduce.
+* **`stamps_in` accepts a stamp-shaped line anywhere at line start**, including
+  inside a fenced code block. `mlkit identity --verify docs/BUILD_IDENTITY.md`
+  reports MISMATCH against that document's illustrative
+  `0.5.0+src.4f2a91c0be3d`. Docs are not reports, and this branch does not edit
+  E-M24's design note (it is that branch's pre-registration slot), so it is
+  recorded here rather than papered over.
+* **`docs/BUILD_IDENTITY.md` names the adopter API `verify_report_identity`**;
+  what shipped is `verify_report` / `verify_report_text`, and `README.md`
+  documents only the CLI surface. Same reason for not editing the design note.
+  The name to import is `resilient_mlkit.verify_report`, and this is the line
+  recording it.
