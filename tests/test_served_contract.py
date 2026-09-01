@@ -222,6 +222,16 @@ METRICS = ("mae", "rmse")
 
 
 def comparisons(candidate, reference, **kw):
+    """MAE and RMSE, declared for what they are.
+
+    ``polarity``/``domain`` are declarations this helper makes on the caller's
+    behalf because MAE and RMSE genuinely are lower-is-better and genuinely
+    cannot be negative. Every assertion in the tests below is unchanged by
+    them; what changed on 2026-08-31 (M-01) is that the contract now requires
+    the fact to be stated rather than assuming it. The undeclared case has its
+    own pin —
+    ``test_m01_control_a_an_undeclared_polarity_is_na_not_lower_is_better``.
+    """
     return [
         Comparison(
             reference=BAR,
@@ -230,6 +240,8 @@ def comparisons(candidate, reference, **kw):
             reference_value=reference,
             n_rows=kw.pop("n_rows", 500),
             arm=kw.pop("arm", "val"),
+            polarity=kw.pop("polarity", LOWER_IS_BETTER),
+            domain=kw.pop("domain", NONNEGATIVE),
             **kw,
         )
         for metric in METRICS
@@ -275,6 +287,8 @@ def test_challenger_positive_control_unmeasurable_comparison_is_na_not_fail():
                 reference_value=None,
                 n_rows=500,
                 arm="val",
+                polarity=LOWER_IS_BETTER,
+                domain=NONNEGATIVE,
                 unmeasured_reason="the bar could not be scored on these rows",
             )
             for metric in METRICS
@@ -299,7 +313,7 @@ def test_a_zero_reference_is_na_not_a_promotion():
     ``chokepoint/.../champion_challenger.py:209-218`` returns NA on the same
     condition. The contract takes chokepoint's answer.
     """
-    assert skill(0.0, 0.0) is None
+    assert skill(0.0, 0.0, polarity=LOWER_IS_BETTER) is None
     decision = challenger_decision(
         comparisons(0.0, 0.0), recorded_bar=BAR, metrics=METRICS
     )
@@ -317,6 +331,8 @@ def test_not_being_compared_is_a_fail_not_an_na():
                 candidate_value=80.0,
                 reference_value=100.0,
                 n_rows=500,
+                polarity=LOWER_IS_BETTER,
+                domain=NONNEGATIVE,
             )
         ],
         recorded_bar=BAR,
@@ -361,8 +377,14 @@ def test_evidence_from_the_wrong_arm_is_na_not_a_pass():
 def test_a_win_on_one_metric_and_a_loss_on_the_other_fails():
     decision = challenger_decision(
         [
-            Comparison(BAR, "mae", 80.0, 100.0, 500, arm="val"),
-            Comparison(BAR, "rmse", 120.0, 100.0, 500, arm="val"),
+            Comparison(
+                BAR, "mae", 80.0, 100.0, 500, arm="val",
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+            ),
+            Comparison(
+                BAR, "rmse", 120.0, 100.0, 500, arm="val",
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+            ),
         ],
         recorded_bar=BAR,
         metrics=METRICS,

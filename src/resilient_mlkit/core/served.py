@@ -60,6 +60,15 @@ WHAT IS DELIBERATELY *NOT* IN HERE
 * **A metric.** RMSE, MAE, AAL, CSI and BSS all appear as *the* decision metric
   in one repo or another. The contract takes the metric NAMES a caller declares
   and decides on measured skill; it does not compute anyone's loss function.
+
+  It does, since 2026-08-31, require the caller to declare which DIRECTION each
+  of those names runs in and what values it can take — see
+  :data:`LOWER_IS_BETTER` / :data:`HIGHER_IS_BETTER` and :data:`NONNEGATIVE`.
+  That is not a metric; it is the one property of a metric without which
+  "beating the bar" has no meaning. Declared, never inferred from the name: a
+  name→polarity table is the E-038 defect (``core.metric_registry``), where a
+  guard keyed on a word list was blind to every name outside it and ``csi``
+  in the list did not catch ``critical_success_index``.
 * **A router.** ``ShadowRouter`` exists twice with the same name and opposite
   production semantics (see the divergence note below), and no third repo has
   one at all. Forcing five repos to grow a router two of them need would be the
@@ -114,7 +123,15 @@ from typing import Any
 from .result import Status
 
 __all__ = [
+    "DOMAINS",
     "HASH_KEY",
+    "HIGHER_IS_BETTER",
+    "IMPOSSIBLE_MEASUREMENT",
+    "LOWER_IS_BETTER",
+    "NONNEGATIVE",
+    "POLARITIES",
+    "POLARITY_UNDECLARED",
+    "REAL",
     "UNMEASURED",
     "ArtifactIntegrityError",
     "ChallengerDecision",
@@ -129,6 +146,7 @@ __all__ = [
     "ServedModel",
     "canonical_payload_sha256",
     "challenger_decision",
+    "out_of_domain",
     "seal",
     "sha256_file",
     "skill",
@@ -151,6 +169,43 @@ UNMEASURED = "NA"
 #: measured-and-won, measured-and-lost, or not measured. There is no DEFERRED
 #: promotion.
 DECISION_STATUSES = (Status.PASS, Status.FAIL, Status.NA)
+
+
+# ---------------------------------------------------------------------------
+# What a metric IS, declared rather than assumed
+# ---------------------------------------------------------------------------
+#: The two directions a decision metric can run in. Which one applies is a
+#: property of the metric, not of the gate, and the gate cannot derive it: MAE,
+#: RMSE, MAPE, CRPS and pinball loss run one way; R², CSI, BSS, hit rate and
+#: coverage run the other, and every one of those appears as *the* decision
+#: metric somewhere in this fleet.
+LOWER_IS_BETTER = "lower_is_better"
+HIGHER_IS_BETTER = "higher_is_better"
+POLARITIES = (LOWER_IS_BETTER, HIGHER_IS_BETTER)
+
+#: What values the metric can take at all. ``REAL`` claims nothing. A metric
+#: declared ``NONNEGATIVE`` cannot be negative in any arithmetic that produced
+#: it, so a negative figure under that declaration is not a bad score — it is
+#: evidence that whatever emitted it was not computing the metric it labelled.
+REAL = "real"
+NONNEGATIVE = "nonnegative"
+DOMAINS = (REAL, NONNEGATIVE)
+
+
+def out_of_domain(value: float | None, domain: str) -> bool:
+    """True when ``value`` is a figure the declared ``domain`` cannot contain.
+
+    ``None`` is not out of domain — it is unmeasured, which is a different
+    verdict with a different refusal class, and collapsing the two would hide
+    an impossible number inside the ordinary NA lane. Non-finite is likewise
+    left to :func:`skill`, which already refuses it.
+    """
+    if value is None:
+        return False
+    value = float(value)
+    if not math.isfinite(value):
+        return False
+    return domain == NONNEGATIVE and value < 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -534,16 +589,45 @@ def verify_at_load(
 # ---------------------------------------------------------------------------
 # The challenger decision
 # ---------------------------------------------------------------------------
-def skill(candidate: float | None, reference: float | None) -> float | None:
-    """``1 - candidate/reference`` for a lower-is-better metric, or ``None``.
+def skill(
+    candidate: float | None,
+    reference: float | None,
+    *,
+    polarity: str | None = None,
+    domain: str = REAL,
+) -> float | None:
+    """Positive when the candidate beat the reference, in the DECLARED direction.
+
+    ``1 - candidate/reference`` for a lower-is-better metric;
+    ``candidate/reference - 1`` for a higher-is-better one. Both are positive
+    exactly when the candidate won, and neither can be derived from the other
+    without knowing which way the metric runs — which is why ``polarity`` is a
+    parameter and not a default.
 
     ``None`` — not zero, not a raised exception — whenever the quotient is not
-    a number about accuracy: either side missing, either side non-finite, or a
-    reference of zero or below. That last case is
-    ``torrent/.../champion_challenger.py:128`` inverted: there, a zero baseline
-    silently produced a deviation of ``0.0``, which cleared the tolerance and
-    PROMOTED. Here it is unmeasured, which is what chokepoint's counterpart
-    already concluded from the identical condition.
+    a number about accuracy:
+
+    * either side missing, or either side non-finite;
+    * a reference of zero or below. That case is
+      ``torrent/.../champion_challenger.py:128`` inverted: there, a zero
+      baseline silently produced a deviation of ``0.0``, which cleared the
+      tolerance and PROMOTED. Here it is unmeasured, which is what chokepoint's
+      counterpart already concluded from the identical condition. It stays a
+      refusal under ``HIGHER_IS_BETTER`` too: a bar at or below zero makes the
+      ratio say more about the divisor than about either model, and a gate that
+      guessed which side that favoured would be guessing;
+    * **a polarity that was not declared.** Until this parameter existed, this
+      function applied the lower-is-better formula to every metric name a
+      caller passed, so an r² of 0.10 against a bar of 0.90 returned ``0.8889``
+      and PROMOTED (measured at 8517341). Defaulting the other way would be the
+      same defect with the opposite sign, so the undeclared case is unmeasured;
+    * **a value the declared domain cannot contain** — see :func:`out_of_domain`.
+      A negative MAPE against a bar of 0.20 returned ``1.25`` and promoted
+      hardest of all, because the impossibility pushed the quotient furthest.
+      Impossible is not "unmeasured" in any interesting sense, but it is
+      certainly not a skill number, and the caller that needs to tell the two
+      apart gets a named refusal class from :func:`challenger_decision` rather
+      than from here.
     """
     if candidate is None or reference is None:
         return None
@@ -551,8 +635,16 @@ def skill(candidate: float | None, reference: float | None) -> float | None:
     reference = float(reference)
     if not math.isfinite(candidate) or not math.isfinite(reference):
         return None
+    if polarity not in POLARITIES:
+        return None
+    if domain not in DOMAINS:
+        return None
+    if out_of_domain(candidate, domain) or out_of_domain(reference, domain):
+        return None
     if reference <= 0.0:
         return None
+    if polarity == HIGHER_IS_BETTER:
+        return candidate / reference - 1.0
     return 1.0 - candidate / reference
 
 
@@ -576,6 +668,13 @@ class Comparison:
     arm: str = ""
     row_matched: bool = True
     unmeasured_reason: str = ""
+    #: Which direction this metric runs in, and what values it can take. Both
+    #: are DATA the caller declares, in the same shape :class:`ServeArms` makes
+    #: the arm policy data, and for the same reason: the fleet does not agree
+    #: on one answer and both answers are correct in their own repo. A
+    #: comparison that declares no polarity is not decided against a guess.
+    polarity: str = ""
+    domain: str = REAL
 
     def __post_init__(self) -> None:
         if not self.reference or not self.metric:
@@ -585,10 +684,42 @@ class Comparison:
                 f"comparison against {self.reference!r} reports {self.n_rows} rows; a "
                 "negative row count is not a row count"
             )
+        if self.polarity and self.polarity not in POLARITIES:
+            raise ServedContractError(
+                f"comparison on {self.metric!r} declares polarity {self.polarity!r}; "
+                f"the declared polarities are {list(POLARITIES)}. A spelling this "
+                "contract does not recognise is not a declaration, and treating it as "
+                "one would restore the assumption this field exists to remove."
+            )
+        if self.domain not in DOMAINS:
+            raise ServedContractError(
+                f"comparison on {self.metric!r} declares domain {self.domain!r}; the "
+                f"declared domains are {list(DOMAINS)}"
+            )
+
+    @property
+    def declared(self) -> bool:
+        """True when this comparison says which direction its metric runs in."""
+        return self.polarity in POLARITIES
+
+    @property
+    def impossible(self) -> tuple[str, ...]:
+        """Which operands hold a figure the declared domain cannot contain."""
+        offending: list[str] = []
+        if out_of_domain(self.candidate_value, self.domain):
+            offending.append("candidate")
+        if out_of_domain(self.reference_value, self.domain):
+            offending.append("reference")
+        return tuple(offending)
 
     @property
     def skill(self) -> float | None:
-        return skill(self.candidate_value, self.reference_value)
+        return skill(
+            self.candidate_value,
+            self.reference_value,
+            polarity=self.polarity or None,
+            domain=self.domain,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         measured = self.skill
@@ -598,6 +729,8 @@ class Comparison:
             "arm": self.arm,
             "candidate_value": self.candidate_value,
             "reference_value": self.reference_value,
+            "polarity": self.polarity or UNMEASURED,
+            "domain": self.domain,
             "skill": UNMEASURED if measured is None else measured,
             "n_rows": self.n_rows,
             "row_matched": self.row_matched,
@@ -615,6 +748,13 @@ ARM_MISMATCH = "ARM_MISMATCH"
 UNMEASURED_SKILL = "UNMEASURED_SKILL"
 NO_SKILL = "NO_SKILL"
 CLEARS_BAR = "CLEARS_BAR"
+#: The figure cannot be the metric it is labelled as. Distinct from
+#: ``UNMEASURED_SKILL`` on purpose: "we could not measure it" sends someone to
+#: look at the harness, "this number is impossible" sends someone to look at
+#: the scorer, and a table that renders them identically answers neither.
+IMPOSSIBLE_MEASUREMENT = "IMPOSSIBLE_MEASUREMENT"
+#: Nobody said which direction the metric runs in, so nobody can say who won.
+POLARITY_UNDECLARED = "POLARITY_UNDECLARED"
 
 
 @dataclass(frozen=True)
@@ -791,6 +931,59 @@ def challenger_decision(
             metrics=metrics,
             skill=none_skill,
             refusal_class=NOT_COMPARED,
+        )
+
+    # Before asking how much was compared, ask whether the figures can be the
+    # metric they are labelled as, and whether anyone said which way that
+    # metric runs. Both questions are about the numbers themselves, and until
+    # they are settled every later lane is reasoning about arithmetic that may
+    # not mean anything. Measured at 8517341, with neither question asked: a
+    # MAPE of -0.05 against a bar of 0.20 PROMOTED on skill 1.25, and an r2 of
+    # 0.10 against a bar of 0.90 PROMOTED on skill 0.8889.
+    impossible = {
+        m: by_metric[m].impossible for m in metrics if by_metric[m].impossible
+    }
+    if impossible:
+        detail = "; ".join(
+            f"{m} {by_metric[m].domain} but "
+            + ", ".join(
+                f"{side} {getattr(by_metric[m], side + '_value')!r}"
+                for side in sides
+            )
+            for m, sides in impossible.items()
+        )
+        return ChallengerDecision(
+            status=Status.NA,
+            reason=(
+                f"the comparison against {recorded_bar!r} carries a figure its own "
+                f"declared domain cannot contain: {detail}. A number outside the "
+                "metric's domain is not a bad score; it is evidence that whatever "
+                "produced it was not computing the metric it labelled, and dividing "
+                "two of them yields a skill figure about nothing."
+            ),
+            recorded_bar=recorded_bar,
+            metrics=metrics,
+            skill=none_skill,
+            n_rows=min(by_metric[m].n_rows for m in metrics),
+            refusal_class=IMPOSSIBLE_MEASUREMENT,
+        )
+
+    undeclared = [m for m in metrics if not by_metric[m].declared]
+    if undeclared:
+        return ChallengerDecision(
+            status=Status.NA,
+            reason=(
+                f"the comparison against {recorded_bar!r} declares no polarity on "
+                f"{undeclared}, so which of the two values is the better one is "
+                f"unstated. Declare {LOWER_IS_BETTER!r} or {HIGHER_IS_BETTER!r} on the "
+                "comparison. This gate assumed lower-is-better until 2026-08-31 and "
+                "promoted a model that was worse on r2 by eight tenths."
+            ),
+            recorded_bar=recorded_bar,
+            metrics=metrics,
+            skill=none_skill,
+            n_rows=min(by_metric[m].n_rows for m in metrics),
+            refusal_class=POLARITY_UNDECLARED,
         )
 
     n_rows = min(by_metric[m].n_rows for m in metrics)
