@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import math
 
+from ..core import artifact
 from ..core.repo import BindingError, Repo
-from ..core.result import CheckResult, CredentialRequired
+from ..core.result import ALLOW_DIRTY_KEY, CheckResult, CredentialRequired
 from . import RunContext, check
 
 PHASE = "decision"
@@ -30,6 +31,12 @@ MIN_COVERAGE_N = 100
 #: DATA -- ``[coverage]`` / ``nominal = 0.90`` -- beside the ``coverage``
 #: binding it adjudicates. See :func:`d3_uncertainty_coverage`.
 COVERAGE_SECTION = "coverage"
+
+#: Where that section lives, as a repo-relative path for ``core.artifact``.
+#: D3 reads it FROM COMMITTED STATE. ``repo.config()`` would read the working
+#: tree, and the level is a pass mark rather than a scope declaration: see
+#: :func:`d3_uncertainty_coverage` and docs/ESCALATIONS.md E-M12/E-M23.
+REPO_CONFIG_RELPATH = ".mlkit/repo.toml"
 
 #: How far the coverage binding's self-reported ``nominal`` may sit from the
 #: declared level and still be the same number.
@@ -196,6 +203,15 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
       behaviour wearing a conditional.
     * they agree -> the ordinary coverage verdict, measured against the
       DECLARED level.
+
+    And the declaration is read FROM COMMITTED STATE, through
+    ``core.artifact.load``. E-M21 shipped this level read with
+    ``repo.config()`` -- the working tree -- while asserting that its whole
+    protection was that the level is "committed, reviewable and static". An
+    uncommitted one-line edit put the tick-13 exploit straight back (E-M23), so
+    the level now comes from ``HEAD:.mlkit/repo.toml`` or the row is NA
+    ``NOMINAL_UNCOMMITTED``; ``--allow-dirty`` reads the working tree for
+    diagnosis and structurally cannot reach a PASS.
     """
     try:
         fn = repo.resolve("coverage")
@@ -260,7 +276,45 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
     #
     # Below this point the declared level enters, and the subject's `nominal`
     # stops being the standard.
-    section = repo.config().get(COVERAGE_SECTION)
+    # ... and it enters FROM COMMITTED STATE, through `core.artifact`.
+    #
+    # `repo.config()` reads the working tree. That is right for the things it
+    # was already asked for -- which binding to import, which trees to walk,
+    # which region is declared -- because those say WHAT TO LOOK AT and mlkit
+    # is about to look at the working tree anyway. The nominal level is not
+    # that. It is the PASS MARK the verdict is measured against, which is the
+    # role `docs/selection.yaml` plays for S1-S4, and E-M12 is what reading
+    # that role off the working tree bought: a verdict quoting bytes that are
+    # in nobody's git history, unfetchable by the reader it is quoted to.
+    #
+    # Driven at `a48c975`, before this read moved: `[coverage] nominal = 0.90`
+    # committed, an UNCOMMITTED one-line edit to 0.8879423328964613, and a
+    # binding reporting that same figure as both its nominal and its empirical
+    # -> PASS, evidence `declared_nominal: 0.8879423328964613`, no marker, and
+    # `git status` showing ` M .mlkit/repo.toml` that no check read. The
+    # tick-13 exploit, restored by moving it one file across. A binding writing
+    # `.mlkit/repo.toml` from its own module body did the same without leaving
+    # the edit for a person to find in a diff they had reviewed.
+    ref = artifact.load(repo, REPO_CONFIG_RELPATH, allow_dirty=ctx.allow_dirty)
+    if ref.error:
+        return CheckResult.na(
+            "D3", PHASE,
+            f"NOMINAL_UNCOMMITTED: the declared level could not be read from "
+            f"committed state -- {ref.error}. The level these intervals promise is "
+            "the standard D3 measures against, so it is read from the blob at HEAD "
+            "and not from the working tree; otherwise the standard is whatever the "
+            "file said at the instant the check looked, which is what the binding's "
+            "own `nominal` already was",
+            evidence,
+        )
+    # One assignment rather than one per exit, so the marker cannot be dropped
+    # on three paths out of nine. A PASS carrying it is refused by
+    # `CheckResult.__post_init__`; every later result here is built from this
+    # dict, so every later result inherits it.
+    if ref.allow_dirty_read:
+        evidence = {**evidence, ALLOW_DIRTY_KEY: True}
+    document = ref.document if isinstance(ref.document, dict) else {}
+    section = document.get(COVERAGE_SECTION)
     raw = section.get("nominal") if isinstance(section, dict) else None
     if raw is None:
         return CheckResult.na(

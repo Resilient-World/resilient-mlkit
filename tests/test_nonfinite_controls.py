@@ -37,6 +37,7 @@ the negative controls here are the ordinary finite cases that must stay silent.
 
 from __future__ import annotations
 
+import subprocess
 import textwrap
 
 from resilient_mlkit.checks import RunContext
@@ -59,6 +60,12 @@ def _run(tmp_path, check, binding: str, body: str, extra_toml: str = ""):
     `extra_toml` carries the declarations a check reads as DATA rather than
     through a binding -- D3's nominal coverage level is the first of them
     (E-M21). It is appended verbatim so a fixture can also declare nothing.
+
+    The fixture is a git repo with that config COMMITTED, because D3 reads the
+    declared level from ``HEAD:.mlkit/repo.toml`` through ``core.artifact``
+    (E-M23). An uncommitted declaration is an NA before any finiteness guard
+    below could be reached, and this file exists to prove those guards fire.
+    Nothing about what these controls assert changed; the fixture became a repo.
     """
     module = f"nf_bindings_{next(_SERIAL)}"
     (tmp_path / f"{module}.py").write_text(textwrap.dedent(body))
@@ -67,6 +74,16 @@ def _run(tmp_path, check, binding: str, body: str, extra_toml: str = ""):
         f'[repo]\nname = "fixturerepo"\n\n[bindings]\n{binding} = "{module}:{binding}"\n'
         + extra_toml
     )
+    for args in (
+        ("init", "-q"),
+        ("config", "user.email", "t@example.invalid"),
+        ("config", "user.name", "t"),
+        ("add", "-A"),
+        ("commit", "-qm", "fixture"),
+    ):
+        subprocess.run(
+            ["git", "-C", str(tmp_path), *args], check=True, capture_output=True
+        )
     repo = Repo(name="fixturerepo", path=tmp_path)
     try:
         return check(repo, RunContext(nonce="test-nonce", root=tmp_path, offline=True))
