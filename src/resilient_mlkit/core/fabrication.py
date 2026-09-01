@@ -1257,11 +1257,9 @@ class _ModuleScanner:
                 and parent.body.value is None
                 and not isinstance(parent.orelse, ast.Constant)
             )
-        if isinstance(parent, ast.comprehension) and any(
+        return isinstance(parent, ast.comprehension) and any(
             clause is node for clause in parent.ifs
-        ):
-            return True
-        return False
+        )
 
     def _scan_or(self, node: ast.BoolOp) -> None:
         literal = _numeric_literal(node.values[-1])

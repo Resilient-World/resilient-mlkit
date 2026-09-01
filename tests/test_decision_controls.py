@@ -814,21 +814,17 @@ def test_negative_control_the_non_finite_refusals_outrank_the_declaration(tmp_pa
     assert "NOMINAL_SELF_DECLARED" not in result.reason
 
 
-def test_the_declared_level_range_holds_at_both_of_its_edges(tmp_path):
-    """FIRES at 0 and is SILENT at 1, so the range is a range and not a slogan.
-
-    `nominal = 0` promises nothing and would make every coverage a pass;
-    `nominal = 1` is an odd but coherent promise -- every point inside the
-    interval -- and refusing it would fail an honest repo on a bound nobody
-    argued for. Both edges are driven because a bound with only one side tested
-    can be moved to either.
-    """
+def test_a_declared_level_of_zero_is_refused(tmp_path):
+    """FIRES at 0 so the range is a range and not a slogan."""
     zero = _run_d3(
         tmp_path, _coverage('"nominal": 0, "empirical": 0.90, "n": 5000'), nominal=0
     )
     assert zero.status is Status.FAIL
     assert "not a coverage level" in zero.reason
 
+
+def test_a_declared_level_of_one_is_allowed(tmp_path):
+    """SILENT at 1: an odd but coherent promise on the upper edge."""
     one = _run_d3(
         tmp_path, _coverage('"nominal": 1.0, "empirical": 0.99, "n": 5000'), nominal=1
     )
