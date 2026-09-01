@@ -681,8 +681,10 @@ def _write_r10_report(
         "not from a word list inside mlkit. See `core/metric_registry.py`.",
         "",
         f"- names derived: {len(registry.names)}",
-        f"- of those, already in mlkit's vocabulary (the anchor): "
-        f"{len(registry.known)} — {', '.join(sorted(registry.known)) or '(none)'}",
+        (
+            f"- of those, already in mlkit's vocabulary (the anchor): "
+            f"{len(registry.known)} — {', '.join(sorted(registry.known)) or '(none)'}"
+        ),
         f"- of those, unclassifiable by mlkit: {len(registry.unclassified)}",
         f"- derivation refusal: {registry.refusal or '(none)'}",
         "",

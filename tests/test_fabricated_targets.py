@@ -194,6 +194,27 @@ def test_stamp_lifted_into_a_module_constant_and_spread_is_followed():
     assert findings[0].claim_field == "label_origin"
 
 
+def test_dynamic_stamp_lifted_into_a_module_constant_and_spread_is_followed():
+    """POSITIVE. ``{**PROVENANCE, "tonnes": t}`` must not hide a dynamic source."""
+    findings = scan(
+        """
+        import numpy as np
+
+        PROVENANCE = {"source": f"era5_{region}"}
+
+        def build(region, years):
+            rng = np.random.default_rng(1)
+            return [
+                {**PROVENANCE, "tonnes": float(rng.normal(4500.0, 90.0))}
+                for y in years
+            ]
+        """
+    )
+    assert len(findings) == 1, [f.render() for f in findings]
+    assert findings[0].severity == ft.UNREADABLE_STAMP
+    assert "region" in findings[0].claim_value
+
+
 def test_dataframe_column_stamp_is_followed():
     """POSITIVE. The pandas shape: data in at construction, stamp bolted on after."""
     findings = scan(
