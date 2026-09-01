@@ -1255,3 +1255,171 @@ is the value. That is a second, independent narrowing with its own over-fire
 budget and its own control pair, and it is not taken here.
 
 **Status: the false positive CLOSED. The residual OPEN and unassigned.**
+
+## E-M20 — the served contract decided promotions on three things nobody had to state, and a verdict nobody could not edit
+
+**Raised:** 2026-08-31, round 8, G-SERVED train (M-01 → M-02 → M-03 → M-06), one branch.
+**Status: the four holes CLOSED. Four residuals OPEN and disclosed below, each pinned by a test that fails the day it closes.**
+
+### The four defects, driven at `8517341` before any repair
+
+Every drive below asserted `resilient_mlkit.core.served.__file__` /
+`resilient_mlkit.core.result.__file__` under the branch tree, so the numbers
+belong to this checkout and not to an installed wheel.
+
+| # | Drive | Result at `8517341` |
+|---|---|---|
+| 1 | `challenger_decision([Comparison(bar, "mape", -0.05, 0.20, 500, arm="val")], ...)` | **PASS**, `promotable=True`, `skill {'mape': 1.25}` |
+| 2 | `challenger_decision([Comparison(bar, "r2", 0.10, 0.90, 500, arm="val")], ...)` | **PASS**, `promotable=True`, `skill {'r2': 0.8888888888888888}` |
+| 3 | `ChallengerDecision(status=PASS, reason=..., recorded_bar=bar, metrics=(), skill={})` | constructed, `promotable=True` |
+| 4 | `r = CheckResult.failed(...); r.status = Status.PASS; r.evidence = {}` | both assignments succeeded; `to_dict()["status"] == 'PASS'` |
+| 5 | `Comparison(bar, "mae", 80.0, 100.0, 500, arm="val").row_matched` | `True`, with no row evidence of any kind; the decision **PASSed** |
+| 6 | `hasattr(core.result, "GateAggregate")` | `False` |
+
+Rows 1 and 2 are one root cause: `skill()` hard-coded `1 - candidate/reference`
+— the lower-is-better formula — and applied it to whatever metric name the
+caller passed, without asking which direction that metric runs in or what
+values it can take. A model worse on r² by eight tenths promoted. A MAPE that
+cannot exist promoted hardest of all, because the impossibility pushed the
+quotient furthest.
+
+Rows 3 and 4 are one shape: a guard placed at one point on the timeline, or on
+one path into an object, and absent everywhere else. `challenger_decision()`
+refused an empty metric set; the public verdict TYPE did not, and the function
+could simply be stepped around. `CheckResult.__post_init__` holds this
+package's most load-bearing invariants and held them exactly once, at
+construction, after which every field it guards was an ordinary mutable
+attribute. Neither guard was weak. Both were in the wrong place.
+
+Row 5 is the same shape once more, spelled as a field default:
+`row_matched: bool = True`. The gate's row-set clause was real and fired
+correctly — on a value the CALLER supplied. So it protected exactly the
+comparisons whose authors had already thought about row sets, and every
+comparison that had never thought about them made the strongest possible claim
+about them for free.
+
+Row 6 is an absence: mlkit had no aggregate verdict type, so the adopter that
+needed one wrote it. `resilient-fray/src/registry/promotion_gate.py` — mutable
+`GateResult` at `:401`, `GateResult(passed=True)` at `:851`, narrowed with
+`&=`. It starts at TRUE and is argued down; `passed` is a stored field and can
+be assigned; and `&=` collapses three statuses into two, so NA has to become
+one of them. That is rule 7's failure mode arriving one layer up.
+
+### What closed them
+
+* **M-01** — `LOWER_IS_BETTER` / `HIGHER_IS_BETTER`, `REAL` / `NONNEGATIVE`,
+  declared as DATA on the `Comparison` in the shape `ServeArms` already makes
+  the arm policy data. `skill()` takes a keyword-only `polarity` with **no
+  default** and computes `candidate/reference - 1` for higher-is-better. New
+  refusal classes `IMPOSSIBLE_MEASUREMENT` and `POLARITY_UNDECLARED`, kept
+  apart because one sends a reader to the scorer and the other to the binding.
+  **No name→polarity table**: that is E-038 (`core.metric_registry`)
+  re-introduced at the point that decides promotions.
+* **M-02** — `ChallengerDecision` refuses `metrics=()` as its FIRST clause, since
+  every later clause is a comprehension over it and an empty tuple satisfies
+  them all vacuously. `CheckResult` gains `VerdictSealed` and a `__setattr__`
+  that refuses every verdict field after construction, plus `SealedEvidence`,
+  a dict subclass refusing all seven mutating methods (a seal that refused only
+  `r.evidence = {}` is defeated by `r.evidence.clear()`). The three runner
+  stamps (`repo`, `git_sha`, `nonce`) stay writable once and refuse
+  re-stamping onto a different value. A SEAL, not a re-validation: re-validation
+  refuses only structurally illegal states, and a FAIL carrying evidence flipped
+  to a PASS carrying the same evidence re-validates cleanly.
+* **M-03** — `GateAggregate`, frozen, `passed` a property equal to
+  `all(status is PASS)`. No field to assign, no initial value to leave standing,
+  no accumulation step to skip. **NA is not PASS**, and neither are DEFERRED,
+  STALE or ESCALATED. Refuses an empty check set, a repeated check id, and a
+  bare bool posted in as a check.
+* **M-06** — `row_set_digest()` as the one definition of the tie;
+  `candidate_row_digest` / `reference_row_digest` refused unless empty or
+  64 hex; `row_matched` becomes `field(init=False)`, derived, with a third
+  state the old field could not hold — `None`, UNTIED, which is NA at the gate
+  under the new class `ROW_SET_UNTIED`. `Comparison(..., row_matched=True)` is
+  now a TypeError: the assertion cannot be spelled by anyone.
+
+Each of the four was committed fire-then-fix where the pin could be made to
+fail first, and every guard was mutated back out afterwards to prove the pins
+are alive (twelve mutations, all killing at least one pin). Gate: mlkit full
+pytest, **757 at `8517341` (re-measured on branch start) → 830**, nothing
+pre-existing lost or weakened.
+
+### Three further holes found by attacking the repairs, and closed in the same branch
+
+Driven against the branch *after* M-01/M-02/M-03/M-06 landed:
+
+* `ChallengerDecision(status=PASS, ..., skill={"m": float("nan")})` constructed
+  and reported `promotable=True` — `float('nan') <= 0.0` is `False`, so a NaN
+  skill satisfied the non-positive-skill clause. Non-finite skill is now
+  refused on every status.
+* a `skill` map WIDER than the declared metrics constructed cleanly, and
+  `skill_vs_recorded_bar` then carried a figure for a metric the decision never
+  examined, indistinguishable downstream from the ones it did. Refused.
+* `decision.to_dict()["evidence"]["comparisons"][0]["skill"] = 99` edited the
+  decision's own record: `dict(self.evidence)` is shallow and the comparisons
+  live one level down. The boundary now deep-copies.
+
+### RESIDUALS, OPEN
+
+1. **An undeclared domain buys no domain check.** `domain` defaults to `REAL`,
+   which claims nothing, so the negative-MAPE drive still reaches PASS when the
+   caller declares polarity and leaves the domain alone. This is deliberately
+   not `row_matched=True` in new clothes, and the difference is the direction of
+   the default: `row_matched=True` asserted the STRONGEST claim on the caller's
+   behalf, `domain=REAL` asserts the WEAKEST — the failure mode is an absent
+   check, not a fabricated pass. There is no safe default (NONNEGATIVE is wrong
+   for r², which legitimately goes negative). Making the domain mandatory as
+   polarity is, is a second contract break with its own adopter cost and is not
+   taken inside M-01. Pinned:
+   `test_residual_b_an_undeclared_domain_buys_no_domain_check`.
+2. **A declared polarity can be declared wrongly.** The contract checks that a
+   direction was stated and cannot check that it is the right one for that
+   metric; `mae` declared `higher_is_better` promotes a worse model. Closing it
+   needs the name table that is E-038. What changed is auditability: the
+   declaration travels in the decision's evidence, so a reader can see
+   `mae / higher_is_better` and object. Nobody could audit the assumption it
+   replaced, because it was never written down. Pinned:
+   `test_residual_c_a_declared_polarity_can_be_declared_wrongly`.
+3. **`n_rows` is still a caller assertion, untied to the digests.** M-06 tied the
+   row SETS, not the row COUNT: a digest over two rows alongside `n_rows=500`
+   passes, because the digest is opaque and carries no count. Closing it means
+   carrying a signed count beside the digest, a further design step with its own
+   adopter cost. Related and unclosable by any digest scheme: a caller who
+   computes ONE digest and puts it on both sides has tied the declared row sets
+   together without having scored the reference on them. The tie proves the two
+   sides name the same rows; it cannot prove the scoring happened. Pinned:
+   `test_residual_d_n_rows_is_still_a_caller_assertion_untied_to_the_digests`.
+4. **`__dict__` surgery defeats the seal, as it defeats every frozen dataclass
+   here.** `object.__setattr__(r, "status", PASS)`, `r.__dict__["status"] = PASS`
+   and `del r.__dict__["_sealed"]` followed by an ordinary assignment all land.
+   A two-signal seal that survived the `del` was written and MEASURED, and is
+   not here: it also read "the evidence mapping is sealed" as proof of
+   construction, and it broke the R2/T2 delegation at `checks/readiness.py:195`,
+   which builds a CheckResult from another result's evidence — the dataclass
+   `__init__` assigns `evidence` before `measured_at`, so the inherited seal was
+   live while the new object was still being built. Six tests red. Subtle
+   correctness inside a guard is its own defect class, so the single robust
+   signal stands and the limit is stated. It is a LOUD limit: nothing reaches
+   into `__dict__` by accident, and accident is what the seal exists to stop —
+   one ordinary assignment in a check module, which now refuses. Pinned:
+   `test_residual_e_dict_surgery_defeats_the_seal_as_it_defeats_frozen`.
+   Also open at one level down: nested evidence values stay mutable
+   (`r.evidence["curve"]["a"] = 9.9`). Deep-freezing arbitrary evidence changes
+   the type of every nested structure the eight repos store, a blast radius
+   this repair did not measure. No nested edit can change `status`, add or
+   remove a top-level evidence key, or turn an empty-evidence result into a
+   passing one. Pinned:
+   `test_residual_a_nested_evidence_value_is_still_mutable_in_place`.
+
+### FOR THE FLEET — this is a BREAKING contract change, and the break is the point
+
+M-01 and M-06 will move adopter rows. A comparison that declares no polarity is
+now NA; a comparison with no row-set tie is now NA. Those rows were passing on
+assertions nobody made deliberately, so the flip is the repair showing its work.
+
+**No number is written here.** How many rows move, at which of the ten adopters,
+is M-08's measurement — a dual-interpreter drive at each adopter's remote main,
+before-tag versus candidate-tag. Predicting it numerically would be exactly the
+fabrication M-08 exists to prevent (rule 2). The adopter-side repairs in our own
+two repos are M-07; colleague repins remain their owners' calls, and the three
+floating adopters (choco, triage, blackout, pinned on `branch=main`) inherit
+this on their next re-lock with no review step — flagged in M-09.
