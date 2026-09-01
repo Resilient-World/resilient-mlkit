@@ -744,12 +744,22 @@ def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
     by_rule: dict[str, int] = {}
     for f in findings:
         by_rule[f.rule] = by_rule.get(f.rule, 0) + 1
+    # The NA lane. An UNREADABLE_STAMP finding is not a fabrication and not a
+    # clean record: it is a record this instrument could not adjudicate. It
+    # must not be counted as a defect and it must not be counted as a pass.
+    scanned = findings
+    unreadable = [
+        f for f in scanned if f.severity == fabricated_targets.UNREADABLE_STAMP
+    ]
+    findings = [
+        f for f in scanned if f.severity != fabricated_targets.UNREADABLE_STAMP
+    ]
     targets = [f for f in findings if f.severity == fabricated_targets.TARGET_FABRICATED]
     inputs = [f for f in findings if f.severity != fabricated_targets.TARGET_FABRICATED]
     in_holdout = [f for f in findings if f.split.lower() in {"val", "test", "valid", "validation"}]
 
     report_path = repo.path / R11_REPORT_RELPATH
-    _write_r11_report(report_path, repo, ctx, findings, files, registry)
+    _write_r11_report(report_path, repo, ctx, scanned, files, registry)
 
     evidence = {
         "files_walked": files,
@@ -766,6 +776,7 @@ def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
             "parse_error": registry.parse_error,
         },
         "findings": len(findings),
+        "unreadable_stamp": len(unreadable),
         "target_fabricated": len(targets),
         "input_fabricated": len(inputs),
         "stamped_into_holdout": len(in_holdout),
@@ -806,6 +817,21 @@ def r11_fabricated_targets(repo: Repo, ctx: RunContext) -> CheckResult:
             + (f"; +{more} more in {R11_REPORT_RELPATH}" if more > 0 else ""),
             evidence,
         )
+    if unreadable:
+        detail = "; ".join(
+            f'{f.path}:{f.line} {f.field} <- {f.origin_call} declares '
+            f'{f.claim_field}={f.claim_value}'
+            for f in unreadable[:R11_REASON_FINDINGS]
+        )
+        more = len(unreadable) - min(len(unreadable), R11_REASON_FINDINGS)
+        return CheckResult.na(
+            "R11", PHASE,
+            f"{len(unreadable)} wholly-manufactured record(s) with a drawn target "
+            "declare a provenance value this check cannot resolve to a string, so "
+            "their provenance is UNADJUDICATED rather than clean: " + detail
+            + (f"; +{more} more in {R11_REPORT_RELPATH}" if more > 0 else ""),
+            evidence,
+        )
     return CheckResult.passed("R11", PHASE, evidence)
 
 
@@ -825,7 +851,14 @@ def _write_r11_report(
         f"- git SHA: `{repo.git_sha}`",
         (f"- files walked: {files} (every `.py` in the repo, excluding vendored "
          "directories and `tests/`)"),
-        f"- findings: {len(findings)}",
+        # Broken out, because the two numbers mean different things and a
+        # single total would let an NA row be read as a defect (or a defect
+        # be diluted by NA rows). These match the check's own `findings` and
+        # `unreadable_stamp` evidence keys exactly.
+        (f"- findings: {sum(1 for f in findings if f.severity != fabricated_targets.UNREADABLE_STAMP)}"
+         f" (defects) + {sum(1 for f in findings if f.severity == fabricated_targets.UNREADABLE_STAMP)}"
+         " unadjudicated (`UNREADABLE_STAMP`, see below — these do not fail"
+         " this check, they take it to NA)"),
         (f"- real-source registry: `{registry.path}` — "
          + (f"{len(registry.entries)} signed entries"
             if registry.present else "ABSENT")
@@ -838,7 +871,7 @@ def _write_r11_report(
         "field that makes it a fabrication rather than an honestly-labelled",
         "simulation.",
         "",
-        "The `rule` column says WHY the stamp is false, and the three answers are",
+        "The `rule` column says WHY the stamp is false, and the answers are",
         "not interchangeable:",
         "",
         "- `OBSERVED_STAMP` — the value claims observation outright (`\"observed_ccc\"`).",
@@ -861,6 +894,16 @@ def _write_r11_report(
         "`TARGET_FABRICATED` marks a draw reaching the field a model is trained to",
         "predict. `INPUT_FABRICATED` marks one reaching another data field of the",
         "same stamped record.",
+        "",
+        "`UNREADABLE_STAMP` is NOT a defect row and does not fail this check. It",
+        "marks a record that is wholly manufactured with a drawn TARGET, whose only",
+        "source-naming field holds an expression this check cannot resolve to a",
+        "string (`source=f\"era5_{region}\"`, `source=FEEDS[which]`). Its provenance",
+        "is UNADJUDICATED, not clean — so R11 reports NA rather than PASS, and the",
+        "`claim` column quotes the expression verbatim. Resolving the value, or",
+        "declaring the record's provenance beside it, returns this check to a",
+        "verdict. A repo with only these rows has not failed; it has not been",
+        "measured.",
         "",
         "| rule | severity | record | field | drawn at | claim | matched on | split | drawn fields | corroborating |",
         "|---|---|---|---|---|---|---|---|---|---|",

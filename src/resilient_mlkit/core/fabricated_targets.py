@@ -227,6 +227,65 @@ control with its honest twin beside it. Folding, never evaluation: an
 f-string whose placeholder cannot be resolved makes the value unreadable and
 the check silent.
 
+E-M17 RESIDUAL 4 IS CLOSED (M-04, 2026-08-31)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Four more spellings of that same value were measured SILENT at 8517341 while
+the plain literal fired: ``"_".join(["era5", "land"])``, ``"era5_%s" %
+"land"``, ``"era5_{}".format("land")``, and a module-level ``FEEDS =
+{"primary": "era5_land"}`` read back as ``FEEDS["primary"]``. All four now
+fold and reach the same adjudication, reported under the FOLDED value so a
+reader sees the claim rather than the spelling.
+
+The read-back is the ``SOURCE = "era5_land"`` hoist this module already
+closed, written with a subscript instead of a name; the same module dict was
+already resolved one level deep for ``**FEEDS`` spreads, so reading it through
+a spread and not through a subscript was reading the layout.
+
+The folds stay total functions of already-resolved STRINGS. ``"%d" % 5`` does
+not fold, because a numeric conversion is not something this module should be
+the place to invent; ``"_".join(parts)`` over an unresolved name does not
+fold; a dict that is not a module-level binding is not resolved at all. The
+module-dict hop is the ONE fold that follows a name across the tree rather
+than down it, so it carries a cycle guard -- ``A = {"x": A["x"]}`` is legal
+Python, and a scanner that raises reports nothing at all.
+
+AND THE RESIDUE GETS A THIRD VERDICT: ``UNREADABLE_STAMP``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What is left once every CONSTANT spelling folds is an expression that is
+genuinely dynamic: ``source=f"era5_{region}"``, ``source=FEEDS[which]``.
+Staying silent there reports the record as CLEAN. It is not clean. It is
+unadjudicated, and the honest verdict for something not measured is NA.
+
+So a record gets an ``UNREADABLE_STAMP`` finding -- severity and rule both,
+because there is no fabrication to grade -- and R11 returns **NA rather than
+PASS**, when ALL of the following hold. Each conjunct has a silent control
+beside it in ``tests/test_fabricated_targets.py``:
+
+* ``_wholly_manufactured`` proves the record (the unchanged
+  ``CONTRADICTED_SOURCE`` precondition -- a record arriving as a parameter,
+  or carrying one value read off a file, is not adjudicated);
+* the field the RNG reached is a TARGET field. An input-only manufactured row
+  stays in the ordinary conservative under-report; widening the NA to it would
+  turn any unresolvable f-string into a fleet-wide verdict change;
+* the unresolved field is in :data:`SOURCE_NAMING_FIELDS`, not merely in
+  :data:`PROVENANCE_FIELDS`. This is the one place the module leans on a
+  field-NAME list again after moving the source rule off one, and it can only
+  do so because the verdict is NA. A computed ``split``, licence class or
+  ``kind`` names a partition, a permission or a shape, not an unread origin;
+* and the record carries NO readable string at all -- so a resolvable
+  ``"provenance": "synthetic"`` beside the dynamic value still ends the
+  adjudication in the honesty rule, exactly as before.
+
+The finding QUOTES the expression. "Unreadable" without saying what could not
+be read is not something a reader can act on.
+
+Over-fire budget, MEASURED read-only before either stage shipped (2026-08-31,
+dual interpreter, each side asserting its own ``resilient_mlkit.__file__``):
+ten checkouts at their remote mains, 3394 Python files per side, R11 findings
+0 -> 0, NEW 0, GONE 0, with the NA lane enabled. Harness controls -- same rev
+on both sides, and a planted-fabricator positive on a copy of a real repo
+tree -- in ``reports/M04_FLEET_SWEEP.md``.
+
 The honesty rule is UNCHANGED and still runs first: a simulation token in any
 provenance field of the record ends the adjudication before either source rule
 is reached. That is what keeps torrent's ``v4_orchestrator`` note ("these
@@ -630,9 +689,15 @@ INPUT_FABRICATED = "INPUT_FABRICATED"
 #: ``CONTRADICTED_SOURCE`` a source label naming an external dataset sits on a
 #:                         record whose every value was manufactured in this
 #:                         process.
+#: ``UNREADABLE_STAMP``    (M-04 Stage 2, MEASUREMENT BUILD) the record is
+#:                         wholly manufactured with a drawn TARGET, and the
+#:                         only provenance value it carries is an expression
+#:                         this module cannot resolve. Not a fabrication and
+#:                         not a clean record: an unadjudicated one.
 OBSERVED_STAMP = "OBSERVED_STAMP"
 CONTRADICTED_STAMP = "CONTRADICTED_STAMP"
 CONTRADICTED_SOURCE = "CONTRADICTED_SOURCE"
+UNREADABLE_STAMP = "UNREADABLE_STAMP"
 
 #: Callables that carry no information from outside this process: they compute
 #: over what they are given. Used by :meth:`_ModuleScanner.manufactured_of` to
@@ -916,6 +981,12 @@ class _Record:
     #: Names whose taint reaches this record without a nameable field, used by
     #: the frame shape where columns are assigned separately.
     carried: list[str] = field(default_factory=list)
+    #: Declared provenance fields whose VALUE this module could not resolve to
+    #: any string: ``source=f"era5_{region}"``, ``feed=FEEDS[which]``. The
+    #: field name says a provenance claim is being made; the value says
+    #: nothing this module can read. Carried as the expression source so a
+    #: finding can quote it.
+    unreadable: list[tuple[str, str]] = field(default_factory=list)
 
 
 class _ModuleScanner:
@@ -940,6 +1011,12 @@ class _ModuleScanner:
         self._seen: set[tuple[int, str, str]] = set()
         self._module_dicts = self._collect_module_dicts()
         self._module_strings = self._collect_module_strings()
+        #: Cycle guard for the ONE fold that jumps across the tree instead of
+        #: down it. ``A = {"x": A["x"]}`` is legal Python and would otherwise
+        #: recurse until the interpreter gave out -- on a scanner that reads
+        #: whatever source a repo happens to contain, that is a crash, and a
+        #: crashed check reports nothing.
+        self._dict_resolving: set[tuple[str, str]] = set()
         self._class_string_cache: dict[int, dict[str, str]] = {}
         self._tainted_functions: dict[str, Origin] = {}
 
@@ -1032,6 +1109,28 @@ class _ModuleScanner:
             "source": "era5" + "_land"      # BinOp
             SOURCE = "era5_land"; "source": SOURCE
 
+        E-M17 residual 4 (M-04 Stage 1) added the four spellings that were
+        still readable to the parser and not to this method. Each is the same
+        constant-folding argument one syntax over:
+
+            "source": "_".join(["era5", "land"])
+            "source": "era5_%s" % "land"
+            "source": "era5_{}".format("land")
+            FEEDS = {"primary": "era5_land"}; "source": FEEDS["primary"]
+
+        All four were driven SILENT at 8517341 against a record whose only
+        data field is an ``rng.normal`` draw, while the plain literal fired.
+        The last one is the ``SOURCE = "era5_land"`` hoist already closed
+        above, written with a subscript instead of a name: the value is a
+        string constant in the module body either way, and reading one and
+        not the other is reading the layout.
+
+        FOLDING, NEVER EVALUATION, and the folds are total functions of
+        already-resolved STRINGS. ``%`` and ``.format`` are applied only when
+        the template and every operand have themselves been folded to strings,
+        and only inside a guard that returns ``None`` on any failure -- a
+        template this cannot apply is unreadable, not an error to report.
+
         A placeholder whose value this cannot resolve makes the whole
         expression unreadable and the rule silent, which is the quiet
         direction.
@@ -1067,6 +1166,153 @@ class _ModuleScanner:
             if left is None or right is None:
                 return None
             return left + right
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
+            return self._fold_percent(node)
+        if isinstance(node, ast.Subscript):
+            return self._module_dict_entry(node)
+        if isinstance(node, ast.Call):
+            return self._fold_string_method(node)
+        return None
+
+    #: Nothing this module reads is a real source label past this length, and
+    #: a fold is not a place to build a megabyte. ``"x" * n`` is not folded at
+    #: all; this bounds the ``%``/``.format`` width specifiers, which can.
+    _FOLD_LIMIT = 4096
+
+    def _bounded(self, text: str | None) -> str | None:
+        if text is None or len(text) > self._FOLD_LIMIT:
+            return None
+        return text
+
+    @staticmethod
+    def _template_is_safe_to_apply(template: str) -> bool:
+        """Refuse a template whose padding would build the string first.
+
+        ``_bounded`` throws the result away, but ``"{:>999999999}".format("a")``
+        has already allocated a gigabyte by the time it can. A scanner reads
+        whatever source a repo happens to contain, so "the result is discarded"
+        is not a defence against a template written to exhaust it -- the same
+        argument as the cycle guard below: a scanner that dies reports nothing
+        at all, which is strictly worse than the silence it replaced.
+
+        A width or precision of five digits or more is not a source label.
+        Refusing it makes the expression unreadable, which is the quiet
+        direction.
+        """
+        if len(template) > _ModuleScanner._FOLD_LIMIT:
+            return False
+        run = 0
+        for character in template:
+            if character.isdigit():
+                run += 1
+                if run >= 5:
+                    return False
+            else:
+                run = 0
+        return True
+
+    def _fold_percent(self, node: ast.BinOp) -> str | None:
+        """``"era5_%s" % "land"`` and ``"%s_%s" % ("era5", "land")``.
+
+        Only when the template AND every operand fold to strings. An int on
+        the right (``"%d" % 5``) leaves ``_string_of`` returning ``None`` for
+        that operand and the whole expression unreadable -- deliberately, so
+        this fold cannot be the place a numeric conversion gets invented.
+        """
+        template = self._string_of(node.left)
+        if template is None or not self._template_is_safe_to_apply(template):
+            return None
+        if isinstance(node.right, (ast.Tuple, ast.List)):
+            operands = [self._string_of(e) for e in node.right.elts]
+            if any(o is None for o in operands):
+                return None
+            args: object = tuple(operands)
+        else:
+            single = self._string_of(node.right)
+            if single is None:
+                return None
+            args = (single,)
+        try:
+            return self._bounded(template % args)
+        except (TypeError, ValueError, KeyError, IndexError):
+            # A template these operands do not satisfy is unreadable, not a
+            # defect to report. Quiet direction.
+            return None
+
+    def _fold_string_method(self, node: ast.Call) -> str | None:
+        """``"_".join([...])`` and ``"era5_{}".format(...)``, constants only."""
+        func = node.func
+        if not isinstance(func, ast.Attribute):
+            return None
+        receiver = self._string_of(func.value)
+        if receiver is None:
+            return None
+        if func.attr == "join":
+            if len(node.args) != 1 or node.keywords:
+                return None
+            argument = node.args[0]
+            if not isinstance(argument, (ast.List, ast.Tuple, ast.Set)):
+                # ``sep.join(parts)`` over a name this cannot resolve is the
+                # unreadable case, not a fold.
+                return None
+            parts = [self._string_of(e) for e in argument.elts]
+            if any(p is None for p in parts):
+                return None
+            return self._bounded(receiver.join([p for p in parts if p is not None]))
+        if func.attr == "format":
+            if not self._template_is_safe_to_apply(receiver):
+                return None
+            positional = [self._string_of(a) for a in node.args]
+            if any(p is None for p in positional):
+                return None
+            if any(k.arg is None for k in node.keywords):
+                return None
+            keyword: dict[str, str] = {}
+            for k in node.keywords:
+                value = self._string_of(k.value)
+                if value is None or k.arg is None:
+                    return None
+                keyword[k.arg] = value
+            try:
+                return self._bounded(
+                    receiver.format(
+                        *[p for p in positional if p is not None], **keyword
+                    )
+                )
+            except (TypeError, ValueError, KeyError, IndexError, AttributeError):
+                return None
+        return None
+
+    def _module_dict_entry(self, node: ast.Subscript) -> str | None:
+        """``FEEDS["primary"]`` where the module body holds the dict literal.
+
+        The same hoist ``_collect_module_strings`` already closes for
+        ``SOURCE = "era5_land"``, and the same dict ``_record_from_dict``
+        already resolves one level deep for ``**FEEDS`` spreads. Reading it
+        through a spread and not through a subscript was reading the layout.
+
+        Module-level bindings only, and a CONSTANT STRING key only. A dynamic
+        key (``FEEDS[which]``) resolves to nothing and stays quiet.
+        """
+        holder = node.value
+        if not isinstance(holder, ast.Name):
+            return None
+        table = self._module_dicts.get(holder.id)
+        if table is None:
+            return None
+        slot = node.slice
+        if not (isinstance(slot, ast.Constant) and isinstance(slot.value, str)):
+            return None
+        marker = (holder.id, slot.value)
+        if marker in self._dict_resolving:
+            return None
+        self._dict_resolving.add(marker)
+        try:
+            for key, value in zip(table.keys, table.values):
+                if isinstance(key, ast.Constant) and key.value == slot.value:
+                    return self._string_of(value)
+        finally:
+            self._dict_resolving.discard(marker)
         return None
 
     def _strings_of(self, node: ast.AST | None) -> list[str]:
@@ -1551,6 +1797,7 @@ class _ModuleScanner:
                     spread = self._record_from_dict(self._module_dicts[value.id])
                     record.stamps.extend(spread.stamps)
                     record.literals.extend(spread.literals)
+                    record.unreadable.extend(spread.unreadable)
                 else:
                     record.carried.extend(self._target_names(value) or [])
                 continue
@@ -1563,9 +1810,60 @@ class _ModuleScanner:
                 record.stamps.extend(stamps)
                 continue
             if name in PROVENANCE_FIELDS:
+                record.unreadable.extend(self._unreadable_of(name, value))
                 continue
             record.data.append((name, value))
         return record
+
+    def _unreadable_of(self, name: str, value: ast.AST) -> list[tuple[str, str]]:
+        """A declared SOURCE-NAMING field whose value resolved to no string.
+
+        Scoped to :data:`SOURCE_NAMING_FIELDS`, not to all of
+        :data:`PROVENANCE_FIELDS`, and for the same reason that set exists:
+        ``kind``, ``*_type``, ``method`` and the licence and split fields name
+        a shape, a permission or a partition rather than an origin, and a
+        computed value under one of them is not an unread source claim. A
+        record whose only unresolved provenance field is ``split=chosen``
+        would otherwise take its repo's R11 row to NA over a partition name.
+
+        This is the one place the module leans on a field-NAME list again
+        after moving the source rule off one, and it can only do so because
+        the verdict it produces is NA: under-reporting here costs a record
+        nobody was told to open, which is the same conservative direction
+        every other conjunct in this module leans.
+
+        UNREADABLE IS NOT THE SAME AS EMPTY (adversarial verification of M-04,
+        2026-08-31). ``"source": None`` was driven to ``UNREADABLE_STAMP`` and
+        took R11 to NA, while the SAME record with the key left out stayed
+        PASS -- two spellings of the same (absent) claim adjudicated
+        differently, which is the layout-reading defect this whole module
+        exists to stop, one lane down. ``None``, a number, a bool, ``...``,
+        ``b"..."`` and an EMPTY container of any kind are values this module
+        reads perfectly well; they are simply not strings and they assert no
+        origin. Saying "an expression this check cannot resolve" about them is
+        a false claim about the instrument's own reach, and the finding's
+        wording says exactly that. The empty-container arm was already here
+        for tuple/list/set and stopped at ``ast.Dict`` for no reason a reader
+        could give; both halves are closed together.
+
+        A NON-empty container is still unread: ``source=["era5", region]``
+        carries a claim this module resolved no string out of.
+        """
+        if name not in SOURCE_NAMING_FIELDS:
+            return []
+        if isinstance(value, (ast.Tuple, ast.List, ast.Set)) and not value.elts:
+            return []
+        if isinstance(value, ast.Dict) and not value.values:
+            return []
+        if isinstance(value, ast.Constant):
+            # A non-string constant under a source-naming field declares no
+            # origin. It resolved; it is not a string. Silence, not NA.
+            return []
+        try:
+            expression = ast.unparse(value)
+        except (TypeError, ValueError, AttributeError):
+            return []
+        return [(name, expression[:200])]
 
     def _record_from_call(self, node: ast.Call) -> _Record | None:
         if not node.keywords:
@@ -1578,6 +1876,7 @@ class _ModuleScanner:
                     spread = self._record_from_dict(self._module_dicts[keyword.value.id])
                     record.stamps.extend(spread.stamps)
                     record.literals.extend(spread.literals)
+                    record.unreadable.extend(spread.unreadable)
                 continue
             record.literals.extend(
                 (keyword.arg, t) for t in self._strings_of(keyword.value)
@@ -1587,6 +1886,9 @@ class _ModuleScanner:
                 record.stamps.extend(stamps)
                 continue
             if keyword.arg in PROVENANCE_FIELDS:
+                record.unreadable.extend(
+                    self._unreadable_of(keyword.arg, keyword.value)
+                )
                 continue
             record.data.append((keyword.arg, keyword.value))
         return record
@@ -1743,6 +2045,17 @@ class _ModuleScanner:
         if value_side is not None:
             stamp, matched_on = value_side
             return CONTRADICTED_SOURCE, stamp, matched_on
+
+        # Nothing on this record resolved to a string at all, and yet it
+        # DECLARES a provenance field. The record is not clean and it is not
+        # a fabrication: it is unadjudicated, and saying so is the honest
+        # third verdict. Reported only when the record carries no readable
+        # stamp of any kind -- one resolvable declaration beside the dynamic
+        # value ends the adjudication in the honesty rule above, and one
+        # resolvable source value would have fired the rule above this.
+        if record.unreadable and not record.stamps and not record.literals:
+            name, expression = record.unreadable[0]
+            return UNREADABLE_STAMP, Stamp(name, expression, OPAQUE), ""
         return None
 
     def _wholly_manufactured(self, record: _Record, scope: ast.AST) -> bool:
@@ -1777,7 +2090,8 @@ class _ModuleScanner:
         if decision is None:
             return
         rule, claim, matched_on = decision
-        if rule is CONTRADICTED_SOURCE and not self._wholly_manufactured(record, scope):
+        if rule in (CONTRADICTED_SOURCE, UNREADABLE_STAMP) \
+                and not self._wholly_manufactured(record, scope):
             return
 
         split = next((s.value for s in record.stamps if s.field in SPLIT_FIELDS), "")
@@ -1811,9 +2125,27 @@ class _ModuleScanner:
         # aggravated form and the one a reader must see first; otherwise the
         # first tainted input field.
         hits.sort(key=lambda h: (not is_target_field(h[0]), h[0]))
+        if rule is UNREADABLE_STAMP and not is_target_field(hits[0][0]):
+            # The NA lane is scoped to a drawn TARGET, and only to that. A
+            # record whose INPUT columns are drawn under a dynamic source
+            # stamp is the ordinary conservative under-report this module has
+            # always taken; widening the NA to it would turn an unresolvable
+            # f-string on any manufactured row into a fleet-wide verdict
+            # change, which is what the over-fire budget exists to stop.
+            return
         data_fields = sum(1 for name, _ in record.data if not is_config_field(name)) \
             + len(record.carried)
         construction = ""
+        if rule is UNREADABLE_STAMP:
+            construction = (
+                f"unadjudicated: the record is wholly manufactured in this "
+                f"process and its target field carries an RNG draw, and the "
+                f"only provenance value it declares is "
+                f"{claim.field}={claim.value} -- an expression this module "
+                f"cannot resolve to a string. Neither a fabrication nor a "
+                f"clean record: NOT MEASURED. Resolve the value or declare "
+                f"the record's provenance beside it."
+            )
         if rule is CONTRADICTED_SOURCE:
             drawn = ", ".join(sorted({n for n, _ in hits}))
             construction = (
@@ -1843,7 +2175,11 @@ class _ModuleScanner:
                     corroborating=corroborating,
                     split=split,
                     snippet=self.snippet(record.node),
-                    severity=TARGET_FABRICATED if is_target_field(name) else INPUT_FABRICATED,
+                    severity=(
+                        UNREADABLE_STAMP if rule is UNREADABLE_STAMP
+                        else TARGET_FABRICATED if is_target_field(name)
+                        else INPUT_FABRICATED
+                    ),
                     rule=rule,
                     matched_on=matched_on,
                     construction=construction,
