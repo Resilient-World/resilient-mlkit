@@ -78,12 +78,30 @@ def test_the_gating_set_is_the_four_non_triage_phases() -> None:
     a repo whose serving path defines "promotable" for itself is not ready to
     train against a bar it can reinterpret.
 
+    It moved again, from 27 to 28, when D6 (``RESAMPLING_UNIT``) joined the
+    decision phase on 2026-09-01, and this paragraph is the "saying so".
+    ``assert len(ids) == 27`` → ``assert len(ids) == 28``; the assertion is the
+    same exact equality on a set one larger, and nothing else in this file
+    moved. D6 is a gating check on purpose, for R12's reason one layer up: a
+    repo whose interval rests on a resampling unit that contradicts its own
+    holdout policy has a promotion bar it can reinterpret. Round-8 adjudication
+    measured the size of that reinterpretation in ``resilient-fray`` — one
+    identical set of 1,365 rows, ``[+16.016, +29.646]`` under the unit the run
+    resampled and ``[-1.289, +41.704]`` under the unit its own split implies.
+
+    WHAT THIS DOES TO THE FLEET, measured rather than reasoned: nothing, today.
+    D6 answers NA wherever the ``resampling_declaration`` binding is absent,
+    which is every repo, and every repo already carries several NAs (D2, D3,
+    E1, E2, E3, R7 at minimum), so every repo was already IN-PROGRESS by the
+    branch above. What changes is the count in that state's message —
+    ``N of 27`` becomes ``N+1 of 28``.
+
     This is the ONLY place the number is written. The READY message below reads
     it back from ``gating_ids()`` rather than repeating it, because two copies
     of a count is how the version literal went stale in E-M08.
     """
     ids = gating_ids()
-    assert len(ids) == 27
+    assert len(ids) == 28
     assert set(PHASE_ORDER["triage"]).isdisjoint(ids), "triage diagnoses; it does not gate"
     for cid in HUMAN_ONLY:
         assert cid in ids, f"{cid} is reserved to the signatory and must still gate"
