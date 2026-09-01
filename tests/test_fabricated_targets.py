@@ -2716,3 +2716,101 @@ def test_residual_stage_2_two_shapes_the_na_lane_does_not_reach(
         f"{label}: an E-M22 residual has closed. Update the escalation rather "
         f"than re-pinning the silence: {[f.render() for f in findings]}"
     )
+
+
+# ---------------------------------------------------------------------------
+# M-04 ADVERSARIAL VERIFICATION (2026-08-31) — the NA lane must not call
+# "unreadable" a value it read.
+#
+# DRIVEN DEFECT at 70b21df, dual-interpreter against 8517341: on a record
+# whose target field carries an ``rng.normal`` draw,
+#
+#     {"yield_tonnes": <draw>, "source": None}   -> UNREADABLE_STAMP, R11 NA
+#     {"yield_tonnes": <draw>}                   -> silent, R11 PASS
+#
+# Two spellings of the same (absent) source claim, adjudicated differently on
+# the presence of a key whose value is nothing. That is the layout-reading
+# defect this module exists to close, one lane down, and the finding's own
+# wording -- "an expression this module cannot resolve to a string" -- is
+# false about ``None``: it resolved, it is simply not a string.
+#
+# ``source={}`` was NA while ``source=()``/``[]``/``set()`` were silent: the
+# empty-container arm stopped at ``ast.Dict`` for no stated reason.
+#
+# The firing rows below are the control that this narrowing is a narrowing of
+# EMPTY, not of UNREADABLE: every genuinely dynamic spelling still takes the
+# lane, and a NON-empty container is still an unread claim.
+# ---------------------------------------------------------------------------
+
+EMPTY_VALUE_CASES = [
+    ('"source": None', None),
+    ('"source": 0', None),
+    ('"source": 1.5', None),
+    ('"source": True', None),
+    ('"source": ...', None),
+    ('"source": b"era5_land"', None),
+    ('"source": ()', None),
+    ('"source": []', None),
+    ('"source": {}', None),
+    ('"data_source": None', None),
+    # ...and the lane still reaches everything it was built for.
+    ('"source": f"era5_{region}"', ft.UNREADABLE_STAMP),
+    ('"source": FEEDS[which]', ft.UNREADABLE_STAMP),
+    ('"source": "_".join(["era5", region])', ft.UNREADABLE_STAMP),
+    ('"source": {"primary": region}', ft.UNREADABLE_STAMP),
+    ('"source": cfg.feed', ft.UNREADABLE_STAMP),
+    # ...and a resolvable source label still FIRES the source rule outright,
+    # including one readable element inside an otherwise-dynamic container --
+    # measured identical at 8517341 and on this branch.
+    ('"source": "era5_land"', ft.CONTRADICTED_SOURCE),
+    ('"source": ["era5_land", region]', ft.CONTRADICTED_SOURCE),
+]
+
+
+@pytest.mark.parametrize(
+    ("stamp", "rule"),
+    [pytest.param(*c, id=c[0].replace(" ", "-")[:44]) for c in EMPTY_VALUE_CASES],
+)
+def test_stage_2_an_empty_source_value_is_not_an_unreadable_one(
+    stamp, rule, registry
+):
+    """CONTROL A + CONTROL B for the M-04 verification repair.
+
+    The ten silent rows each declare a source-naming field whose value this
+    module reads perfectly well and which asserts no origin. They must be
+    exactly as quiet as the record that omits the key, which
+    ``test_stage_2_an_absent_source_key_and_a_null_one_agree`` ties down.
+
+    The six firing rows are the lane's own territory, unchanged: an expression
+    with no resolvable string, including a NON-empty container.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(STAGE2_TARGET_RECORD.format(stamp=stamp)),
+        "src/loaders/grid.py",
+        registry,
+    )
+    if rule is None:
+        assert findings == [], (stamp, [f.render() for f in findings])
+    else:
+        assert len(findings) == 1, (stamp, [f.render() for f in findings])
+        assert findings[0].rule == rule, findings[0].render()
+
+
+def test_stage_2_an_absent_source_key_and_a_null_one_agree(registry):
+    """The tie itself: same record, key present-and-null vs key absent.
+
+    Asserted as EQUALITY between the two scans rather than as two separate
+    silences, because the defect was not "it fires" -- it was that the two
+    spellings of one claim disagreed.
+    """
+    assert_bound_to_this_worktree()
+    absent = ft.scan_source(
+        textwrap.dedent(STAGE2_TARGET_RECORD.format(stamp='"note": 1')),
+        "src/loaders/grid.py", registry,
+    )
+    null = ft.scan_source(
+        textwrap.dedent(STAGE2_TARGET_RECORD.format(stamp='"source": None, "note": 1')),
+        "src/loaders/grid.py", registry,
+    )
+    assert [f.render() for f in absent] == [f.render() for f in null] == []

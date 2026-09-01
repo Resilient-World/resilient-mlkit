@@ -1831,10 +1831,33 @@ class _ModuleScanner:
         the verdict it produces is NA: under-reporting here costs a record
         nobody was told to open, which is the same conservative direction
         every other conjunct in this module leans.
+
+        UNREADABLE IS NOT THE SAME AS EMPTY (adversarial verification of M-04,
+        2026-08-31). ``"source": None`` was driven to ``UNREADABLE_STAMP`` and
+        took R11 to NA, while the SAME record with the key left out stayed
+        PASS -- two spellings of the same (absent) claim adjudicated
+        differently, which is the layout-reading defect this whole module
+        exists to stop, one lane down. ``None``, a number, a bool, ``...``,
+        ``b"..."`` and an EMPTY container of any kind are values this module
+        reads perfectly well; they are simply not strings and they assert no
+        origin. Saying "an expression this check cannot resolve" about them is
+        a false claim about the instrument's own reach, and the finding's
+        wording says exactly that. The empty-container arm was already here
+        for tuple/list/set and stopped at ``ast.Dict`` for no reason a reader
+        could give; both halves are closed together.
+
+        A NON-empty container is still unread: ``source=["era5", region]``
+        carries a claim this module resolved no string out of.
         """
         if name not in SOURCE_NAMING_FIELDS:
             return []
         if isinstance(value, (ast.Tuple, ast.List, ast.Set)) and not value.elts:
+            return []
+        if isinstance(value, ast.Dict) and not value.values:
+            return []
+        if isinstance(value, ast.Constant):
+            # A non-string constant under a source-naming field declares no
+            # origin. It resolved; it is not a string. Silence, not NA.
             return []
         try:
             expression = ast.unparse(value)
