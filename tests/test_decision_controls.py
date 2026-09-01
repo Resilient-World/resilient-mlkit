@@ -769,6 +769,50 @@ def test_negative_control_the_non_finite_refusals_outrank_the_declaration(tmp_pa
     assert "NOMINAL_SELF_DECLARED" not in result.reason
 
 
+def test_the_declared_level_range_holds_at_both_of_its_edges(tmp_path):
+    """FIRES at 0 and is SILENT at 1, so the range is a range and not a slogan.
+
+    `nominal = 0` promises nothing and would make every coverage a pass;
+    `nominal = 1` is an odd but coherent promise -- every point inside the
+    interval -- and refusing it would fail an honest repo on a bound nobody
+    argued for. Both edges are driven because a bound with only one side tested
+    can be moved to either.
+    """
+    zero = _run_d3(
+        tmp_path, _coverage('"nominal": 0, "empirical": 0.90, "n": 5000'), nominal=0
+    )
+    assert zero.status is Status.FAIL
+    assert "not a coverage level" in zero.reason
+
+    one = _run_d3(
+        tmp_path, _coverage('"nominal": 1.0, "empirical": 0.99, "n": 5000'), nominal=1
+    )
+    assert one.status is Status.PASS
+    assert one.evidence["declared_nominal"] == 1.0
+
+
+def test_a_coverage_section_that_is_not_a_table_is_NA_not_a_pass(tmp_path):
+    """FIRES as NA: `[[coverage]]` parses to a LIST, and `.get` on a list raises.
+
+    Found by attacking the fix rather than by reading it. Every malformed shape
+    a repo can write -- an array of tables, a scalar under another name, a
+    mis-cased `[Coverage]` -- has to land on a refusal or an NA and never on a
+    pass, and it has to do it without raising out of the check, which would
+    take the whole run down rather than one row.
+    """
+    repo = _coverage_repo(
+        tmp_path, _coverage('"nominal": 0.90, "empirical": 0.90, "n": 5000'), nominal=None
+    )
+    config = repo.config_path
+    config.write_text(config.read_text() + "\n[[coverage]]\nnominal = 0.9\n")
+    try:
+        result = d3_uncertainty_coverage(repo, _ctx(tmp_path))
+    finally:
+        repo.release()
+    assert result.status is Status.NA
+    assert "NOMINAL_UNDECLARED" in result.reason
+
+
 def test_a_substituted_nominal_outranks_the_small_holdout_NA(tmp_path):
     """FIRES: n=40 is below the floor AND the level was replaced.
 
