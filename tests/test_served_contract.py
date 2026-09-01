@@ -22,8 +22,17 @@ import json
 
 import pytest
 
+import resilient_mlkit.core.served as served_module
 from resilient_mlkit.core.result import Status
 from resilient_mlkit.core.served import (
+    HIGHER_IS_BETTER,
+    IMPOSSIBLE_MEASUREMENT,
+    LOWER_IS_BETTER,
+    NO_SKILL,
+    NONNEGATIVE,
+    POLARITY_UNDECLARED,
+    REAL,
+    UNMEASURED_SKILL,
     ArtifactIntegrityError,
     ChallengerDecision,
     ClosedArm,
@@ -41,6 +50,18 @@ from resilient_mlkit.core.served import (
     skill,
     verify_at_load,
 )
+
+# Which `core.served` this suite actually exercised. A control pair driven
+# against a different installed copy of the package proves nothing about the
+# tree under test, and the failure mode is silent -- see the standing
+# `module.__file__` discipline. Printed on failure by pytest's assertion
+# rewriting, and asserted so a stale wheel on the path cannot masquerade.
+SERVED_MODULE_FILE = served_module.__file__
+
+
+def test_the_suite_is_driving_this_tree_s_core_served():
+    assert SERVED_MODULE_FILE.endswith("resilient_mlkit/core/served.py")
+    assert "site-packages" not in SERVED_MODULE_FILE
 
 # The artifact shape, parameterised on nothing that matters to the hash. The
 # positive and negative controls differ by exactly one byte of one value.
@@ -524,3 +545,234 @@ def test_a_non_finite_measurement_is_not_a_measurement():
 def test_a_recorded_bar_must_name_a_metric():
     with pytest.raises(ArtifactIntegrityError, match="names no decision metric"):
         RecordedBar(name="persistence", metrics=())
+
+
+# ---------------------------------------------------------------------------
+# M-01 — polarity and domain are DECLARED, never assumed (HOLE 1)
+# ---------------------------------------------------------------------------
+# Driven at 8517341 before this block existed, with
+# `resilient_mlkit.core.served.__file__` asserted in the driver:
+#
+#   mape -0.05 vs 0.20 -> PASS, promotable=True, skill {'mape': 1.25}
+#   r2    0.10 vs 0.90 -> PASS, promotable=True, skill {'r2': 0.8888888888888888}
+#
+# Both are the same root cause: `skill()` hard-coded `1 - candidate/reference`,
+# which is the lower-is-better formula, and applied it to every metric name a
+# caller passed without asking what direction that metric runs in or what
+# values it can take. A model that is worse on r2 by eight tenths promotes, and
+# an arithmetically impossible MAPE promotes hardest of all.
+#
+# The repair does NOT introduce a metric-name table. E-038 is the standing
+# lesson: a guard that enumerates the names it expects is blind to every name
+# outside the list, and `csi` in a word list does not catch
+# `critical_success_index`. Polarity and domain are DATA the caller declares
+# on the comparison, in the same shape `ServeArms` already makes the arm policy
+# data, and a comparison that declares neither is NA rather than assumed.
+
+
+def test_m01_control_a_a_negative_value_for_a_nonnegative_metric_refuses():
+    """CONTROL A. The drive that returned PASS/1.25 at 8517341."""
+    decision = challenger_decision(
+        [
+            Comparison(
+                reference=BAR,
+                metric="mape",
+                candidate_value=-0.05,
+                reference_value=0.20,
+                n_rows=500,
+                arm="val",
+                polarity=LOWER_IS_BETTER,
+                domain=NONNEGATIVE,
+            )
+        ],
+        recorded_bar=BAR,
+        metrics=("mape",),
+    )
+    assert decision.status is Status.NA
+    assert decision.promotable is False
+    assert decision.refusal_class == IMPOSSIBLE_MEASUREMENT
+    assert "mape" in decision.reason and "-0.05" in decision.reason
+    assert all(v is None for v in decision.skill.values())
+
+
+def test_m01_control_a_an_impossible_reference_refuses_too():
+    """Both operands are checked. A bar nobody could have measured is not a bar."""
+    decision = challenger_decision(
+        [
+            Comparison(
+                reference=BAR,
+                metric="mape",
+                candidate_value=0.05,
+                reference_value=-0.20,
+                n_rows=500,
+                arm="val",
+                polarity=LOWER_IS_BETTER,
+                domain=NONNEGATIVE,
+            )
+        ],
+        recorded_bar=BAR,
+        metrics=("mape",),
+    )
+    assert decision.status is Status.NA
+    assert decision.refusal_class == IMPOSSIBLE_MEASUREMENT
+
+
+def test_m01_control_a_an_undeclared_polarity_is_na_not_lower_is_better():
+    """CONTROL A. The r2 drive: 0.10 vs 0.90 PASSed at 8517341 on skill 0.8889.
+
+    Undeclared is NA, not "probably lower-is-better". The silent assumption is
+    the defect; replacing it with a different silent assumption would be the
+    same defect wearing the other sign.
+    """
+    decision = challenger_decision(
+        [Comparison(BAR, "r2", 0.10, 0.90, 500, arm="val")],
+        recorded_bar=BAR,
+        metrics=("r2",),
+    )
+    assert decision.status is Status.NA
+    assert decision.promotable is False
+    assert decision.refusal_class == POLARITY_UNDECLARED
+    assert "r2" in decision.reason
+    assert all(v is None for v in decision.skill.values())
+
+
+def test_m01_control_a_a_declared_higher_is_better_loss_fails():
+    """CONTROL A. Same numbers, now declared: a worse model is a FAIL."""
+    decision = challenger_decision(
+        [
+            Comparison(
+                BAR, "r2", 0.10, 0.90, 500, arm="val",
+                polarity=HIGHER_IS_BETTER,
+            )
+        ],
+        recorded_bar=BAR,
+        metrics=("r2",),
+    )
+    assert decision.status is Status.FAIL
+    assert decision.promotable is False
+    assert decision.refusal_class == NO_SKILL
+    # candidate/reference - 1, not 1 - candidate/reference.
+    assert decision.skill["r2"] == pytest.approx(0.10 / 0.90 - 1.0)
+    assert decision.skill["r2"] < 0.0
+
+
+def test_m01_a_declared_higher_is_better_win_passes_on_the_right_formula():
+    """The other half of the same clause: a genuinely better r2 promotes."""
+    decision = challenger_decision(
+        [
+            Comparison(
+                BAR, "r2", 0.90, 0.10, 500, arm="val",
+                polarity=HIGHER_IS_BETTER,
+            )
+        ],
+        recorded_bar=BAR,
+        metrics=("r2",),
+    )
+    assert decision.status is Status.PASS
+    assert decision.skill["r2"] == pytest.approx(0.90 / 0.10 - 1.0)
+
+
+def test_m01_control_b_an_honest_lower_is_better_loss_still_fails():
+    """CONTROL B (must not move). 0.25 against a 0.20 bar is still a loss."""
+    decision = challenger_decision(
+        [
+            Comparison(
+                BAR, "mae", 0.25, 0.20, 500, arm="val",
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+            )
+        ],
+        recorded_bar=BAR,
+        metrics=("mae",),
+    )
+    assert decision.status is Status.FAIL
+    assert decision.refusal_class == NO_SKILL
+
+
+def test_m01_control_b_an_honest_lower_is_better_win_promotes_bit_identically():
+    """CONTROL B (must not move), to the bit.
+
+    0.2500000000000001 is what `1 - 0.15/0.20` evaluates to in IEEE754 double,
+    and it is what this gate emitted at 8517341. `pytest.approx` would pass on
+    a repair that quietly changed the arithmetic, so the comparison is exact.
+    """
+    decision = challenger_decision(
+        [
+            Comparison(
+                BAR, "mae", 0.15, 0.20, 500, arm="val",
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+            )
+        ],
+        recorded_bar=BAR,
+        metrics=("mae",),
+    )
+    assert decision.status is Status.PASS
+    assert decision.promotable is True
+    assert decision.skill["mae"] == 1.0 - 0.15 / 0.20
+    assert repr(decision.skill["mae"]) == "0.2500000000000001"
+
+
+def test_m01_control_b_the_zero_reference_and_non_finite_refusals_are_unmoved():
+    """CONTROL B (must not move). The refusals that already existed still fire."""
+    assert skill(0.0, 0.0, polarity=LOWER_IS_BETTER) is None
+    assert skill(1.0, -1.0, polarity=LOWER_IS_BETTER) is None
+    assert skill(float("nan"), 1.0, polarity=LOWER_IS_BETTER) is None
+    assert skill(float("inf"), 1.0, polarity=LOWER_IS_BETTER) is None
+    assert skill(1.0, float("nan"), polarity=HIGHER_IS_BETTER) is None
+    assert skill(None, 1.0, polarity=LOWER_IS_BETTER) is None
+    assert skill(1.0, None, polarity=HIGHER_IS_BETTER) is None
+    decision = challenger_decision(
+        [
+            Comparison(
+                BAR, "mae", 0.0, 0.0, 500, arm="val",
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+            )
+        ],
+        recorded_bar=BAR,
+        metrics=("mae",),
+    )
+    assert decision.status is Status.NA
+    assert decision.refusal_class == UNMEASURED_SKILL
+
+
+def test_m01_an_undeclared_polarity_makes_skill_unmeasurable_at_the_function():
+    """The refusal is in `skill()` itself, not only in the decision wrapper.
+
+    A caller reaching past `challenger_decision` to the primitive gets the same
+    answer, so the clause cannot be stepped around by importing one level down.
+    """
+    assert skill(0.15, 0.20) is None
+    assert skill(0.15, 0.20, polarity=None) is None
+
+
+def test_m01_a_comparison_cannot_declare_a_polarity_that_is_not_one():
+    with pytest.raises(ServedContractError, match="polarity"):
+        Comparison(BAR, "mae", 0.15, 0.20, 500, arm="val", polarity="lower")
+
+
+def test_m01_a_comparison_cannot_declare_a_domain_that_is_not_one():
+    with pytest.raises(ServedContractError, match="domain"):
+        Comparison(
+            BAR, "mae", 0.15, 0.20, 500, arm="val",
+            polarity=LOWER_IS_BETTER, domain="positive-ish",
+        )
+
+
+def test_m01_the_declaration_travels_in_the_evidence():
+    """A reader of the record can see what direction the gate decided in.
+
+    A polarity that lives only in the deciding process is a polarity nobody can
+    audit afterwards, which is how the assumption survived unexamined.
+    """
+    decision = challenger_decision(
+        [
+            Comparison(
+                BAR, "mae", 0.15, 0.20, 500, arm="val",
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+            )
+        ],
+        recorded_bar=BAR,
+        metrics=("mae",),
+    )
+    row = decision.to_dict()["evidence"]["comparisons"][0]
+    assert row["polarity"] == LOWER_IS_BETTER
+    assert row["domain"] == NONNEGATIVE
