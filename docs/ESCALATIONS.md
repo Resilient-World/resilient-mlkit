@@ -946,7 +946,7 @@ both measured rather than argued:
 3. **A stamp applied outside the record's own scope** (`_stamp(row)`): the
    record arrives as a parameter, so it is not provably manufactured.
 4. ~~**A source value the folder cannot read.**~~ **CLOSED 2026-08-31 by
-   M-04 — see E-M20 below.** `_string_of` folds constants, one Name hop, one
+   M-04 — see E-M22 below.** `_string_of` folds constants, one Name hop, one
    Attribute hop off the enclosing class, `JoinedStr` and `BinOp(+)`. Four
    other spellings of the SAME literal were measured SILENT against this
    branch on the otherwise-firing `data_product=` positive (adversarial
@@ -958,7 +958,7 @@ both measured rather than argued:
    and deliberate direction, so this is a limit rather than a defect — but it
    is a limit, it is four more spellings than the six the branch closed, and
    it is recorded here because it was not. All four now fold; the residue
-   (a genuinely dynamic expression) is E-M20's OPEN half.
+   (a genuinely dynamic expression) is E-M22's OPEN half.
 
 ### Adversarial verification of this branch (2026-08-29)
 
@@ -1259,7 +1259,7 @@ budget and its own control pair, and it is not taken here.
 
 ---
 
-## E-M20 — E-M17 residual 4 is CLOSED: four more spellings of the same stamp now fold
+## E-M22 — E-M17 residual 4 is CLOSED: four more spellings of the same stamp now fold
 
 **Raised and repaired** 2026-08-31 on
 `fix/m-04-em17-residual-4-unresolvable-expressions` (round-8 item M-04).

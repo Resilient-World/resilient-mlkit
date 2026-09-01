@@ -64,9 +64,11 @@ decides whether Stage 2 ships; it is not ugly, so it does.
   `resilient-transect` have no `pyproject.toml` and are not adopters.
 - Each repo was cloned at `--depth 1`, so this measures each remote `main` as
   it stands, not its history.
-- R11's own conservative preconditions are unchanged by this branch; a record
-  this check did not adjudicate before is not adjudicated now for any reason
-  other than the four spellings.
+- R11's own conservative preconditions (`manufactured_of`, the honesty rule,
+  the source-claim branches) are unchanged by this branch. A record it did not
+  adjudicate before is adjudicated now only for one of two reasons: its stamp
+  is one of the four newly-folded spellings, or it falls in the Stage-2 NA
+  lane. Both are enumerated with their own controls in the suite.
 
 ## Control pair for the harness itself
 
@@ -118,7 +120,7 @@ demonstrably live inside this harness.
 
 The sweep in the table above was re-run against the final tree — including
 the `_template_is_safe_to_apply` width guard added by attacking the folds
-(E-M20, "Found by attacking the repair") — and returned the same
+(E-M22, "Found by attacking the repair") — and returned the same
 `0 → 0 / 0 new / 0 gone`.
 
 ## Reading of the budget

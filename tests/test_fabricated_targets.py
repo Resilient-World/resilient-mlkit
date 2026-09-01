@@ -2684,7 +2684,7 @@ def test_residual_stage_2_two_shapes_the_na_lane_does_not_reach(
     shows the LITERAL frame column does fire, so this is a gap in the NA lane
     specifically.
 
-    Both assert the CURRENT, WRONG silence. When one goes red, update E-M20
+    Both assert the CURRENT, WRONG silence. When one goes red, update E-M22
     rather than re-pinning it.
     """
     assert_bound_to_this_worktree()
@@ -2692,6 +2692,6 @@ def test_residual_stage_2_two_shapes_the_na_lane_does_not_reach(
         textwrap.dedent(source), "src/loaders/grid.py", registry
     )
     assert findings == [], (
-        f"{label}: an E-M20 residual has closed. Update the escalation rather "
+        f"{label}: an E-M22 residual has closed. Update the escalation rather "
         f"than re-pinning the silence: {[f.render() for f in findings]}"
     )
