@@ -33,9 +33,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from resilient_mlkit import __version__  # noqa: E402
-from resilient_mlkit.core.repo import PORTFOLIO, find_root  # noqa: E402
-from resilient_mlkit.core.served_reimplementation import (  # noqa: E402
+from resilient_mlkit import __version__
+from resilient_mlkit.core.repo import PORTFOLIO, find_root
+from resilient_mlkit.core.served_reimplementation import (
     CONTRACT_MODULE,
     REIMPLEMENTED,
     scan_repo,
