@@ -1438,3 +1438,136 @@ undeclared one). `CHANGELOG.md` is deliberately untouched here — its newest
 heading must equal `resilient_mlkit.__version__`, and the bump belongs to the
 tag — but by that file's own scale this is a MAJOR event and the entry that
 cuts the tag must name D3.
+
+---
+
+## E-M23 — M-05's declared level was the pass mark, read off the working tree; it is a committed read now
+
+**Raised and repaired** 2026-08-31 on `verify/m-05-declared-level-must-be-committed`
+(round-8 M-05 adversarial verification), from `fix/m-05-d3-nominal-is-data`
+`a48c975`. E-M21's defect stays closed. The bypass below is CLOSED. Two
+residuals are OPEN and neither is new.
+
+### The defect
+
+E-M21 moved D3's nominal level out of the dict the subject returns and into
+`.mlkit/repo.toml`, and staked the protection on a sentence in its own text:
+
+> The protection is that the level is committed, reviewable and static.
+
+Nothing enforced either half. `checks/decision.py` read the level with
+`repo.config()`, which parses the WORKING TREE, and it read it after
+`repo.resolve()` had already imported the subject's own module.
+
+Driven at `a48c975`, in an interpreter asserting its own
+`resilient_mlkit.__file__`, through the real `.mlkit/repo.toml` resolution
+path, in a real git repo:
+
+    HEAD:.mlkit/repo.toml   [coverage] nominal = 0.90
+    working tree, uncommitted, nominal = 0.8879423328964613
+    binding reports nominal == empirical == 0.8879423328964613, n=1526
+      -> PASS
+         evidence {'nominal': 0.8879423328964613,
+                   'declared_nominal': 0.8879423328964613,
+                   'reported_nominal': 0.8879423328964613, ...}
+         no allow-dirty marker
+         git status --porcelain: " M .mlkit/repo.toml"
+
+    [coverage] never committed at all, present only in the working tree
+      -> PASS, identical evidence
+
+    a binding whose MODULE BODY rewrites .mlkit/repo.toml before returning
+      -> PASS, identical evidence
+
+That is the tick-13 exploit — the level set equal to the empirical figure the
+binding just measured — restored intact by moving it one file across. The
+verdict row carries `repo.git_sha`, so it reads as a figure taken at a commit
+while its standard came from bytes on no ref.
+
+It is `docs/ESCALATIONS.md` E-M12's shape, one check after `checks/selection.py`
+was moved out of it. `core/artifact.py`'s own docstring names the precedent
+verbatim: `selection.py` "read `docs/selection.yaml` with `Path.read_text()`
+and S1-S4 emitted PASS from the working tree — the E-M12 shape itself, in the
+check pipeline of the tool that exists to refuse it." In one run, in one tree,
+S1 answered **NA** on a dirty register while D3 answered **PASS** on a dirty
+pass mark.
+
+The distinction that decides it: `repo.config()` is the right reader for what
+it was already asked for — which binding to import (`[bindings]`), which trees
+to walk (`[source]`), which region is declared (`[remote]`). Those say WHAT TO
+LOOK AT, and mlkit is about to look at the working tree anyway. `[coverage]
+nominal` says WHAT PASSES. That is the role `docs/selection.yaml` plays for
+S1-S4, and E-M12 is the entry about that role.
+
+### The repair
+
+The level is read through `core.artifact.load(repo, ".mlkit/repo.toml")` —
+`HEAD`'s blob, hashed, with the two-pass linked-worktree search and the
+committed-read refusals the module already owns. Rule 7: the reader was
+imported, not reimplemented. `core.artifact._parse` gained TOML beside JSON,
+JSONL and YAML — four lines, additive, no existing suffix's behaviour touched.
+
+Three outcomes:
+
+* committed and clean -> the ordinary E-M21 verdict, unchanged.
+* dirty, or on no ref at all -> **NA `NOMINAL_UNCOMMITTED`**, carrying
+  `core.artifact`'s own `NOT_COMMITTED` diagnosis naming the file and the blob.
+* `--allow-dirty` -> the working tree is read for diagnosis and the ref is
+  marked; the marker rides into `evidence` under `ALLOW_DIRTY_KEY`, and
+  `CheckResult.__post_init__` raises `UncommittedRead` rather than let it
+  become a PASS. A FAIL under the hatch renders and is refused downstream by
+  `portfolio.resolve`.
+
+Reading HEAD's blob is what closes the import-time write, and reordering is
+not: `repo.resolve()` imports the subject's module, so the subject's code runs
+before any read the check takes, however the check orders its own statements.
+
+### What the controls measured
+
+    full suite   757 at 8517341 -> 771 at a48c975 -> 777 here
+                 (+6 = exactly the new pins; zero pre-existing tests moved,
+                  zero removed — collected node ids diffed, not counted)
+
+    CONTROL A    uncommitted declaration substituting the empirical
+                                              PASS -> NA NOMINAL_UNCOMMITTED
+                 declaration only in the working tree
+                                              PASS -> NA NOMINAL_UNCOMMITTED
+                 binding writing the config from its module body
+                                              PASS -> NA (not the subject's number)
+                 binding writing malformed TOML mid-call
+                          BindingError ESCAPING the check -> NA, no traceback
+
+    CONTROL B    all ten E-M21 controls re-driven, evidence dicts compared
+                 field by field: A1 FAIL NOMINAL_SELF_DECLARED, A2 NA
+                 NOMINAL_UNDECLARED, honest PASS, the erased disclosure PASS,
+                 NaN tol / NaN empirical / NaN nominal FAIL with their own
+                 reasons, n=40 NA, 0.68-vs-0.90 FAIL, widened tol clamped —
+                 ALL UNMOVED. Committed-clean is the ordinary case and it is
+                 byte-identical.
+
+    CONTROL C    4 mutations, decision.py / artifact.py restored and sha256
+                 asserted byte-identical after each; 4/4 caught.
+
+### Residual 1 (OPEN, unchanged from E-M21 residual 1, now larger)
+
+No adopter declares a level, so arabica, torrent and surge still move to NA on
+adoption. They must now COMMIT the declaration, which is the same two lines and
+one `git add`. A repo running `mlkit check` on a dirty tree gets NA on D3 where
+it used to get a verdict; that is the same bargain S1-S4 already make.
+
+### Residual 2 (OPEN) — `empirical` and `n` are still the subject's alone
+
+Driven here and left open because it is not M-05's scope: with an honest
+committed 0.90, a binding returning `{"nominal": 0.90, "empirical": 0.90,
+"n": 1000000}` PASSes, and nothing ties either figure to a row set. E-M21 named
+the general form — "when a verdict is a comparison, every operand needs a tie"
+— and tied one of the three. The row-digest work in round-8 M-06 is the shape
+the remaining two need. **Unassigned.**
+
+**Status: the bypass CLOSED. E-M21's residuals 2 and 3 stand as written.
+Residual 2 above OPEN and unassigned.**
+
+*Numbering note: E-M21 is contended (mlkit PR #24 and PR #26 both took it) and
+E-M22 is taken by PR #25, all three still open at 2026-08-31. This entry took
+E-M23 to leave those alone; if the merge order makes E-M23 collide it is a
+heading rename and nothing else — no entry here is renumbered or rewritten.*
