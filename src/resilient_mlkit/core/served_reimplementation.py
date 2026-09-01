@@ -148,9 +148,9 @@ from . import fabrication
 __all__ = [
     "CLAUSES",
     "CONTRACT_MODULE",
-    "Finding",
     "REIMPLEMENTED",
     "SERVING_ADJACENT",
+    "Finding",
     "contract_importers",
     "iter_repo_python_files",
     "scan_repo",
@@ -813,17 +813,18 @@ class _ModuleScanner:
             # is exactly this: `promote: bool`, no status, so an unmeasured
             # comparison and a measured loss are the same value.
             for body_node in node.body:
-                if isinstance(body_node, ast.AnnAssign) and isinstance(
-                    body_node.target, ast.Name
+                if (
+                    isinstance(body_node, ast.AnnAssign)
+                    and isinstance(body_node.target, ast.Name)
+                    and body_node.target.id in _PROMOTION_KEYS
                 ):
-                    if body_node.target.id in _PROMOTION_KEYS:
-                        self._record(
-                            body_node, "PROMOTION_VERDICT",
-                            f"{node.name}.{body_node.target.id}",
-                            "a promotion verdict held as a record field; unless it is "
-                            "derived from a three-valued status, an unmeasured "
-                            "comparison and a measured loss are the same value",
-                        )
+                    self._record(
+                        body_node, "PROMOTION_VERDICT",
+                        f"{node.name}.{body_node.target.id}",
+                        "a promotion verdict held as a record field; unless it is "
+                        "derived from a three-valued status, an unmeasured "
+                        "comparison and a measured loss are the same value",
+                    )
 
     def _scan_verdict_functions(self) -> None:
         """A function that decides PASS/FAIL about a promotion, whatever it is called.
@@ -916,14 +917,14 @@ class _ModuleScanner:
                         "without disagreeing about the guard",
                     )
 
-        for node in ast.walk(self.tree):
-            if not isinstance(node, ast.If):
+        for if_node in ast.walk(self.tree):
+            if not isinstance(if_node, ast.If):
                 continue
-            if not any(isinstance(sub, ast.Raise) for sub in ast.walk(node)):
+            if not any(isinstance(sub, ast.Raise) for sub in ast.walk(if_node)):
                 continue
             names = [
                 getattr(sub, "id", "") or getattr(sub, "attr", "")
-                for sub in ast.walk(node.test)
+                for sub in ast.walk(if_node.test)
             ]
             if not any(_ARM_TOKEN_RE.search(n.lower()) for n in names if n):
                 continue
@@ -937,12 +938,12 @@ class _ModuleScanner:
                 isinstance(sub, ast.Constant)
                 and isinstance(sub.value, str)
                 and sub.value.lower() in _ARM_VALUES
-                for sub in ast.walk(node.test)
+                for sub in ast.walk(if_node.test)
             )
             if not about_serving:
                 continue
             self._record(
-                node, "SERVE_ARM", "if <arm> ... raise",
+                if_node, "SERVE_ARM", "if <arm> ... raise",
                 "refuses an arm inline; core.served.ServeArms.require is the "
                 "contract's guard and refuses an UNDECLARED arm too, which an "
                 "inline test against one name does not",
