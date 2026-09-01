@@ -1742,6 +1742,104 @@ def test_attack_hoisting_the_stamp_into_a_constant_is_still_a_finding(registry):
     assert borrowed == [], [f.render() for f in borrowed]
 
 
+# ---------------------------------------------------------------------------
+# M-04 STAGE 0 — E-M17 residual 4, the four spellings NOTHING RECORDS TODAY
+#
+# The residual was written down in the escalation and driven by hand; no test
+# held it, so the silence was carried by prose and could have closed or
+# regressed without anything going red. These four pins exist so the SILENCE
+# is a measured, committed fact before Stage 1 changes it, and so Stage 1's
+# flip is visible in a diff rather than asserted in a commit message.
+#
+# All four are the SAME three tokens as the plain literal that fires one test
+# above -- ``era5``, ``land`` -- written four other ways. The reference case
+# is included in the same table so the fixture itself is proved live: a table
+# where every row is silent is also what a broken fixture looks like.
+# ---------------------------------------------------------------------------
+
+RESIDUAL4_MODULE_DICT_READBACK = """
+    import numpy as np
+
+    FEEDS = {"primary": "era5_land"}
+
+    def build(days=365, seed=0):
+        rng = np.random.default_rng(seed)
+        return [
+            {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": FEEDS["primary"]}
+            for d in range(days)
+        ]
+"""
+
+#: (label, source, fires) -- ``fires`` is the MEASURED behaviour, not the
+#: desired one. Driven at 8517341 with the module binding asserted.
+RESIDUAL4_SPELLINGS = [
+    (
+        "reference literal",
+        SPELLING_RECORD.format(stamp='"zq7lk": "era5_land"'),
+        True,
+    ),
+    (
+        "str.join of constants",
+        SPELLING_RECORD.format(stamp='"zq7lk": "_".join(["era5", "land"])'),
+        False,
+    ),
+    (
+        "percent format of constants",
+        SPELLING_RECORD.format(stamp='"zq7lk": "era5_%s" % "land"'),
+        False,
+    ),
+    (
+        "str.format of constants",
+        SPELLING_RECORD.format(stamp='"zq7lk": "era5_{}".format("land")'),
+        False,
+    ),
+    (
+        "module-dict read-back",
+        RESIDUAL4_MODULE_DICT_READBACK,
+        False,
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("label", "source", "fires"),
+    [
+        pytest.param(*case, id=case[0].replace(" ", "-").replace(".", "-"))
+        for case in RESIDUAL4_SPELLINGS
+    ],
+)
+def test_residual_4_the_unfolded_spellings_are_still_silent(
+    label, source, fires, registry
+):
+    """RESIDUAL, pinned so the day it closes is visible.
+
+    E-M17 residual 4. ``_string_of`` folds ``+``, f-strings, module names and
+    class attributes; it does not fold ``str.join``, ``%``-format,
+    ``str.format`` or a constant-key read-back of a module dict. Each is the
+    hoist argument VERIFY-R11-A4 already won for numeric constants and that
+    ``test_attack_hoisting_the_stamp_into_a_constant_is_still_a_finding``
+    already won for ``SOURCE = "era5_land"``, one syntax over.
+
+    This test asserts the CURRENT behaviour on purpose, firing row included.
+    When Stage 1 folds these, the ``False`` rows flip to ``True`` in this
+    table and E-M17 gets updated -- the silence is not to be re-pinned.
+    """
+    assert_bound_to_this_worktree()
+    findings = ft.scan_source(
+        textwrap.dedent(source), "src/loaders/grid.py", registry
+    )
+    if fires:
+        assert len(findings) == 1, (label, [f.render() for f in findings])
+        assert findings[0].rule == ft.CONTRADICTED_SOURCE
+        assert findings[0].claim_value == "era5_land"
+    else:
+        assert findings == [], (
+            f"{label}: E-M17 residual 4 has moved. Update the escalation and "
+            "this table rather than re-pinning the silence: "
+            f"{[f.render() for f in findings]}"
+        )
+
+
 def test_attack_a_malformed_registry_is_reported_not_treated_as_empty(tmp_path):
     """ATTACK. Corrupt the file the check reads and see whether it skips quietly.
 
