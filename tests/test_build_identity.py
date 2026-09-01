@@ -73,6 +73,20 @@ assert Path(resilient_mlkit.__file__).resolve() == PACKAGE / "__init__.py", (
 )
 
 
+@pytest.fixture(autouse=True)
+def _fresh_identity_cache():
+    """`build_identity` is process-cached; no test here may poison another.
+
+    One test in this file deliberately makes the identity unmeasurable. Without
+    this the cached refusal would leak into every test that ran after it, and
+    the leak would look like a passing suite about a broken instrument -- which
+    is the exact failure shape the file is about.
+    """
+    identity.build_identity.cache_clear()
+    yield
+    identity.build_identity.cache_clear()
+
+
 # -- helpers ---------------------------------------------------------------
 
 
@@ -268,6 +282,50 @@ def test_no_partial_digest_is_returned_when_one_file_cannot_be_read(tmp_path) ->
     assert "checks/readiness.py" in why
 
 
+def test_the_running_package_is_one_directory_here() -> None:
+    """The precondition the digest rests on, asserted rather than assumed."""
+    assert identity.one_tree_or_reason(identity.package_root()) == ""
+    assert list(resilient_mlkit.__path__) == [str(identity.package_root())]
+
+
+def test_a_package_split_across_two_directories_refuses_to_name_an_identity(
+    tmp_path, monkeypatch
+) -> None:
+    """FIRES: the digest describes ONE directory, so two is a refusal.
+
+    Split the package -- a namespace package, a shadowing directory earlier on
+    sys.path, a half-installed second copy -- and `core/identity.py` can come
+    from one tree while `checks/readiness.py` comes from another. A digest of
+    the first would be a true statement about half the instrument, reading as
+    an identity while not being one. It must decline instead.
+    """
+    monkeypatch.setattr(
+        resilient_mlkit, "__path__",
+        [str(identity.package_root()), str(tmp_path)], raising=True,
+    )
+    identity.build_identity.cache_clear()
+    try:
+        ident = identity.build_identity()
+        assert ident.source_sha256 is None
+        assert ident.known is False
+        assert ident.stamp.endswith(identity.UNKNOWN_DIGEST)
+        assert "not one directory" in ident.unavailable
+        # And nothing downstream turns that into an equality.
+        verdict = identity.verify_report_text(
+            f"{identity.STAMP_PREFIX}`0.5.0+src.{'a' * 12}`\n"
+        )
+        assert verdict.verdict == identity.INDETERMINATE
+    finally:
+        # Undone HERE and not at teardown: the assertion below is the one that
+        # proves the refusal was caused by the split and not by something this
+        # test broke permanently, and it has to run with __path__ restored.
+        monkeypatch.undo()
+        identity.build_identity.cache_clear()
+
+    assert list(resilient_mlkit.__path__) == [str(identity.package_root())]
+    assert identity.build_identity().known is True
+
+
 def test_the_digest_covers_files_that_are_not_python(tmp_path) -> None:
     """A shipped data file can change behaviour; a .py-only digest would not see it."""
     tree = _tree(tmp_path / "a")
@@ -429,6 +487,78 @@ def test_the_spine_report_stamps_itself_and_its_json_twin(tmp_path) -> None:
     assert _sole_stamp(out.read_text()) == _installed()
     payload = json.loads(out.with_suffix(".json").read_text())
     assert payload["mlkit_build"] == identity.build_identity().to_dict()
+
+
+# -- no writer left behind -------------------------------------------------
+#
+# The six tests above prove the writers that exist TODAY stamp their output, by
+# calling them. They cannot prove anything about the seventh writer somebody
+# adds next month, and "every report mlkit writes" is the claim being made. The
+# two below are structural, over the source, and they are the half that keeps
+# the claim true as the file grows.
+
+#: Files that compose a report header. Both markers are counted in each.
+_HEADER_SOURCES = (
+    PACKAGE / "checks" / "readiness.py",
+    PACKAGE / "core" / "report.py",
+    PACKAGE / "cli.py",
+)
+
+#: The line every mlkit report header opens with, and the emitter that must
+#: appear once per occurrence of it.
+_NONCE_LINE = "- run nonce: "
+_EMITTERS = ("identity.header_lines()", "identity_mod.header_lines()")
+
+
+def test_every_report_header_in_the_source_calls_the_one_emitter() -> None:
+    """One nonce line, one identity stamp — counted, not merely co-present.
+
+    A file-level "does it mention the emitter anywhere" guard would pass a file
+    with five headers and one stamp. This counts, so a new report header with
+    no stamp fails by file name.
+    """
+    for path in _HEADER_SOURCES:
+        src = path.read_text(encoding="utf-8")
+        headers = src.count(_NONCE_LINE)
+        stamps = sum(src.count(marker) for marker in _EMITTERS)
+        assert headers > 0, f"{path.name} composes no report header any more"
+        assert headers == stamps, (
+            f"{path.name} composes {headers} report header(s) and emits "
+            f"{stamps} identity stamp(s); a report that does not name the "
+            "mlkit that wrote it is the defect E-M24 records"
+        )
+
+
+def test_every_payload_that_stamps_the_version_also_stamps_the_build() -> None:
+    """`mlkit_version` cannot identify a build; wherever it is written, the
+    identity must be written beside it.
+
+    Parsed with `ast` rather than grepped, so the two keys must be in the SAME
+    dict literal -- a `mlkit_build` elsewhere in the file would not satisfy a
+    reader looking at one payload.
+    """
+    import ast
+
+    sources = sorted(PACKAGE.rglob("*.py")) + sorted((ROOT / "scripts").glob("*.py"))
+    checked = 0
+    for path in sources:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Dict):
+                continue
+            keys = {k.value for k in node.keys if isinstance(k, ast.Constant)}
+            if "mlkit_version" not in keys:
+                continue
+            checked += 1
+            assert "mlkit_build" in keys, (
+                f"{path.relative_to(ROOT)}:{node.lineno} writes `mlkit_version` "
+                "into a payload without `mlkit_build` beside it; the version is "
+                "equal across builds whose gate source differs (E-M24)"
+            )
+    assert checked >= 4, (
+        f"only {checked} version-stamping payload(s) found; this control would "
+        "pass over an absence"
+    )
 
 
 def test_the_machine_payload_never_carries_a_bare_unexplained_na() -> None:

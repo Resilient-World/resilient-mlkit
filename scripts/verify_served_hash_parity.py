@@ -87,6 +87,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from resilient_mlkit import __version__
+from resilient_mlkit.core import identity as identity_mod
 from resilient_mlkit.core.repo import PORTFOLIO, find_root
 from resilient_mlkit.core.served import (
     HASH_KEY,
@@ -369,6 +370,10 @@ def main(argv: list[str] | None = None) -> int:
         "generated_at": datetime.now(UTC).isoformat(),
         "mlkit_version": __version__,
         "mlkit_git_sha": git_sha(REPO_ROOT),
+        # E-M24: which mlkit produced this parity verdict. `mlkit_version` is
+        # equal across builds whose core/served.py differs by 386 lines, and
+        # this script's whole subject is what core/served.py computes.
+        "mlkit_build": identity_mod.build_identity().to_dict(),
         "python": sys.version.split()[0],
         "portfolio_root": str(root),
         "searched_roots": list(ARTIFACT_ROOTS),

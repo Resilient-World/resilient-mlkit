@@ -366,6 +366,21 @@ def _ties_to_root(dist: object, payload: dict | None, root: Path) -> bool:
     return False
 
 
+def _dist_name(dist: object) -> str:
+    """A distribution's declared name, or ``""`` when its metadata is unusable.
+
+    Broad by design. The caller walks EVERY installed distribution in the
+    environment, most of which are nothing to do with mlkit, and one of them
+    with a malformed ``METADATA`` must not take the identity lookup down with
+    it. An empty name simply does not match ``DIST_NAME``, so the entry is
+    skipped exactly as any other package on the path is.
+    """
+    try:
+        return (dist.metadata["Name"] or "") if dist.metadata else ""  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001 - a malformed sibling dist is not ours
+        return ""
+
+
 def _vcs_of_installed_dist(root: Path) -> tuple[str | None, str | None, str]:
     """``(commit, url, reason)`` from the installed dist's ``direct_url.json``.
 
@@ -391,10 +406,7 @@ def _vcs_of_installed_dist(root: Path) -> tuple[str | None, str | None, str]:
 
     seen = 0
     for dist in dists:
-        try:
-            name = (dist.metadata["Name"] or "") if dist.metadata else ""
-        except Exception:  # noqa: BLE001 - a malformed sibling dist is not ours
-            continue
+        name = _dist_name(dist)
         if name.replace("_", "-").lower() != DIST_NAME:
             continue
         seen += 1
@@ -427,6 +439,40 @@ def _vcs_of_installed_dist(root: Path) -> tuple[str | None, str | None, str]:
     )
 
 
+def one_tree_or_reason(root: Path) -> str:
+    """``""`` when the running package is exactly the one directory at ``root``.
+
+    The digest describes ``Path(core/identity.py).parent.parent``. That is the
+    right answer only while ``resilient_mlkit`` IS one directory. Split the
+    package across two path entries -- a namespace package, a shadowing
+    directory earlier on ``sys.path``, a half-installed second copy -- and
+    ``core/identity.py`` can be loaded from one of them while
+    ``checks/readiness.py`` is loaded from the other. A digest of the first
+    would then be a true statement about half the running instrument, which is
+    worse than no statement: it would READ as an identity without being one.
+
+    So this is a REFUSAL, not a warning. Its caller drops the digest, the stamp
+    becomes ``+src.unknown``, and every comparison over it reports
+    INDETERMINATE. mlkit has a measured history with package-path order (see
+    the ``fix/evict-namespace-package-order`` work), and the identity must not
+    be the one field that quietly survives it.
+    """
+    import importlib
+
+    try:
+        pkg = importlib.import_module(__package__.rpartition(".")[0])
+    except Exception as exc:  # noqa: BLE001
+        return f"could not import the parent package to check its __path__: {exc}"
+    entries = [str(Path(p).resolve()) for p in getattr(pkg, "__path__", [])]
+    if entries == [str(root)]:
+        return ""
+    return (
+        f"resilient_mlkit.__path__ is {entries!r}, not exactly [{str(root)!r}]; "
+        "the package is not one directory on this interpreter, so a digest of "
+        "one directory would describe only part of the instrument that ran"
+    )
+
+
 @functools.lru_cache(maxsize=1)
 def build_identity() -> BuildIdentity:
     """The identity of the mlkit running in this interpreter.
@@ -437,7 +483,11 @@ def build_identity() -> BuildIdentity:
     from .. import __version__
 
     root = package_root()
-    sha, files, unavailable = digest_tree(root)
+    split = one_tree_or_reason(root)
+    if split:
+        sha, files, unavailable = None, 0, split
+    else:
+        sha, files, unavailable = digest_tree(root)
     commit, url, vcs_reason = _vcs_of_installed_dist(root)
     return BuildIdentity(
         version=__version__,
@@ -547,9 +597,12 @@ def verify_report_text(text: str, *, path: str | None = None) -> IdentityMatch:
                 "this report carries no `"
                 + STAMP_PREFIX.strip()
                 + "` line, so it does not say which mlkit measured it. That is "
-                "not a mismatch -- it is the absence this check exists to "
-                "retire, and it is what every report written before mlkit "
-                f"{build_identity().version} looks like"
+                "NOT a mismatch: it is the absence E-M24 records, and it is "
+                "what every report written by an mlkit predating this stamp "
+                "looks like. It cannot be repaired by editing the file -- the "
+                "fact is not recoverable from it. Re-run the phase under an "
+                f"mlkit that stamps ({installed}) and the regenerated report "
+                "will say so"
             ),
             (),
             path,
