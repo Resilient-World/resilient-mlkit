@@ -2352,3 +2352,47 @@ hand when they arm the bindings.
 **Status: the D2/E1 CONTRACT is closed. Arming D2/E1 in the eight repos, the
 D1-to-`null_value` tie, and the spine sync are all open and all outside an
 agent's reach.**
+
+### E-M24 — ADVERSARIAL VERIFICATION, appended (2026-09-01)
+
+Driven independently at `8acb333` in a fresh worktree, `module.__file__`
+asserted, three fixture batteries and the real `mlkit check` entrypoint. The
+contract holds: 31/31 mutations caught on re-run, 954 passed / 909 on main with
+no test on main edited, `ruff` and `mypy` clean, and the three-repo control pair
+reproduces byte-for-byte, including `gain_top_two = 0.08692947918972509` and
+fray's `null_distance_in_reference_effects = 2.7430162484828893`. Two
+corrections, both appended rather than overwriting the entry above.
+
+**(a) The disclosure sentence above overstates what the disclosure can show.**
+E-M24 says a runaway null "shows up as a large number in the portfolio row".
+Measured, that is true only under a ONE-SIDED region. Under `indicts = "either"`
+a PASS requires the null INSIDE the interval (`lo <= null <= hi`) and the
+interval strictly narrower than `reference_effect`, so
+
+    null_distance_in_reference_effects  =  |estimate - null| / |reference|
+                                        <  half_width / reference  <  1
+
+for every `either`-sided PASS there can ever be. The figure is bounded below 1
+in exactly the quadrant that has no sign tie. Driven: a placebo of
+`estimate = +17.0`, CI `[+8.0, +26.0]`, `reference_effect = +22.81138510740044`
+is `FAIL halt=True` undeclared, `FAIL halt=True` under fray's
+`indicts = "above"` declaration, and **PASS** under
+`null_value = 17.0, indicts = "either"` with any prose `estimand` — with
+`null_distance_in_reference_effects = 0.0` and `null_contained = true`, i.e. the
+disclosure reads MOST reassuring in the cleanest abuse of it.
+
+This does not change the conclusion the entry reaches — no magnitude bar can be
+invented here without fabricating an expected range, and D1 is the honest second
+operand — but the proposed D1 tie is load-bearing rather than a refinement, and
+the disclosure should not be read as partial cover for it in the meantime.
+
+**(b) REPAIRED on `verify/m-d2e1-seed-adoptable`, not escalated.** The seed
+`spine/mlkit/repo.toml` shipped `[placebo]` and `[scaling]` as live tables with
+their keys commented out, so a repo adopting it verbatim and binding
+`scaling_probe` got `E1 FAIL SCALING_MALFORMED: [scaling] fractions is absent`
+on a curve E1 never read — a FAIL on contract, the failure mode this entry
+exists to remove. Both headers are commented out and
+`tests/test_spine_seed_is_adoptable.py` drives the real seed bytes; it fires on
+the un-repaired seed and is silent on the repaired one. Note for whoever runs
+`scripts/sync_spine.py`: the seed is never overwritten, so any repo that already
+copied the live-header version must delete the two empty tables by hand.
