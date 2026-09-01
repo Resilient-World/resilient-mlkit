@@ -1914,3 +1914,112 @@ def test_control_c_the_registry_disclosure_is_r11s_and_r12_still_runs(tmp_path):
     )
     assert r11.evidence["source_registry"]["present"] is True
     assert "source_registry" not in r12.evidence
+
+
+# ---------------------------------------------------------------------------
+# M-04 / E-M17 residual 4 — the unresolvable-expression spellings
+#
+# Four spellings of the same stamp, driven SILENT against 8517341
+# (2026-08-31): a provenance value written as an expression `_string_of`
+# cannot fold is not a stamp at all, so the wholly manufactured record
+# underneath it is not adjudicated. Stage 0 pins the silence; Stage 1 folds
+# the three constant spellings; Stage 2 adjudicates the genuinely dynamic
+# remainder into an NA lane, gated on a measured fleet over-fire budget.
+# ---------------------------------------------------------------------------
+
+#: One record shape for all four spellings: two RNG-drawn fields, one of them
+#: (``tonnes``) a target, and a single ``source`` stamp whose spelling is the
+#: only variable. ``FEEDS`` is present in every variant so the fixtures are
+#: byte-identical except for the expression under test.
+DYNAMIC_STAMP_TEMPLATE = '''
+import numpy as np
+
+FEEDS = {"primary": "era5_land"}
+
+def build_daily_panel(days=365, seed=0):
+    rng = np.random.default_rng(seed)
+    rows = []
+    for d in range(days):
+        rows.append({
+            "t2m": float(22.0 + rng.normal(0, 1.2)),
+            "tonnes": float(4500.0 + rng.normal(0, 90.0)),
+            "source": __STAMP_EXPR__,
+        })
+    return rows
+'''
+
+
+def scan_dynamic_stamp(stamp_expr: str,
+                       registry: ft.SourceRegistry) -> list[ft.Finding]:
+    return ft.scan_source(
+        DYNAMIC_STAMP_TEMPLATE.replace("__STAMP_EXPR__", stamp_expr),
+        "src/loaders/grid.py",
+        registry,
+    )
+
+
+def test_m04_the_literal_twin_of_the_dynamic_spellings_fires(registry):
+    """POSITIVE anchor for the whole M-04 family.
+
+    The template with the stamp written as a plain literal is the ordinary
+    CONTRADICTED_SOURCE firing, target severity included. Every pin below is
+    this same code with only the SPELLING of the value changed, so this is
+    the twin that proves the silences are about spelling and nothing else.
+    """
+    assert_bound_to_this_worktree()
+    findings = scan_dynamic_stamp('"era5_land"', registry)
+    assert len(findings) == 1, [f.render() for f in findings]
+    assert findings[0].rule == ft.CONTRADICTED_SOURCE
+    assert findings[0].severity == ft.TARGET_FABRICATED
+    assert findings[0].field == "tonnes"
+    assert findings[0].claim_value == "era5_land"
+
+
+@pytest.mark.parametrize(
+    "stamp_expr",
+    [
+        '"_".join(["era5", "land"])',
+        '"era5_%s" % "land"',
+        '"{}_land".format("era5")',
+    ],
+    ids=["str-join", "percent-format", "str-format"],
+)
+def test_m04_pin_a_constant_foldable_spelling_is_still_silent(stamp_expr, registry):
+    """PIN, asserting the CURRENT, WRONG silence (M-04 Stage 0).
+
+    ``"_".join(["era5", "land"])``, ``"era5_%s" % "land"`` and
+    ``"{}_land".format("era5")`` are the literal ``"era5_land"`` written as
+    constant arithmetic the parser already has -- the same three tokens as
+    the ``BinOp(Add)`` spelling `_string_of` folds today, one operator over.
+    Driven silent against 8517341 on 2026-08-31. When Stage 1 folds them this
+    test goes red, and the red is the signal to flip it into the Control A
+    firing assertion, not to re-pin the silence.
+    """
+    assert_bound_to_this_worktree()
+    findings = scan_dynamic_stamp(stamp_expr, registry)
+    assert findings == [], (
+        "the constant-foldable spelling now resolves (M-04 Stage 1 landed): "
+        "flip this pin into the firing assertion beside the literal twin: "
+        f"{[f.render() for f in findings]}"
+    )
+
+
+def test_m04_pin_the_module_dict_read_back_is_still_silent(registry):
+    """PIN, asserting the CURRENT, WRONG silence (M-04 Stage 0).
+
+    ``FEEDS = {"primary": "era5_land"}`` at module level and
+    ``"source": FEEDS["primary"]`` on the record. `_string_of` resolves
+    module-level STRING constants but not a subscript into a module dict, so
+    the stamp is unreadable and the wholly manufactured record under it goes
+    unadjudicated. Driven silent against 8517341 on 2026-08-31. This is the
+    representative of the genuinely-dynamic class M-04 Stage 2 moves to an
+    NA lane; when that lands this test goes red and gets flipped, not
+    re-pinned.
+    """
+    assert_bound_to_this_worktree()
+    findings = scan_dynamic_stamp('FEEDS["primary"]', registry)
+    assert findings == [], (
+        "the dynamic-stamp silence has been closed (M-04 Stage 2 landed): "
+        "flip this pin into the UNREADABLE_STAMP assertion: "
+        f"{[f.render() for f in findings]}"
+    )
