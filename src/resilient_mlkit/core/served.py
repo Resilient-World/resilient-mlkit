@@ -115,6 +115,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -132,6 +133,8 @@ __all__ = [
     "POLARITIES",
     "POLARITY_UNDECLARED",
     "REAL",
+    "ROW_SET_MISMATCH",
+    "ROW_SET_UNTIED",
     "UNMEASURED",
     "ArtifactIntegrityError",
     "ChallengerDecision",
@@ -147,6 +150,7 @@ __all__ = [
     "canonical_payload_sha256",
     "challenger_decision",
     "out_of_domain",
+    "row_set_digest",
     "seal",
     "sha256_file",
     "skill",
@@ -242,6 +246,40 @@ def canonical_payload_sha256(payload: Mapping[str, Any], *, hash_key: str = HASH
     body = {k: v for k, v in payload.items() if k != hash_key}
     encoded = json.dumps(body, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+#: The shape every tie in this module is written in. A digest field that is
+#: neither empty nor a sha256 is a caller who meant to tie two things together
+#: and tied them to a placeholder instead.
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}")
+
+
+def row_set_digest(row_keys: Iterable[Any]) -> str:
+    """sha256 over the identifiers of the rows a figure was computed on.
+
+    ONE definition, here, for the same reason :func:`canonical_payload_sha256`
+    is one definition: two repos computing "the digest of the rows" two ways
+    can never compare their answers, and a comparison whose two sides tie to
+    incomparable digests is untied while looking tied.
+
+    Order-invariant, because a row SET has no order and two scorers that
+    iterated the same rows differently scored the same rows. Duplicates are
+    NOT collapsed: a row scored twice on one side and once on the other is a
+    genuine difference in what was compared.
+
+    An empty key set is refused. A digest over no rows is a constant, and two
+    comparisons carrying it would tie to each other and read as matched.
+    """
+    canonical = sorted(
+        json.dumps(k, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        for k in row_keys
+    )
+    if not canonical:
+        raise ServedContractError(
+            "a row-set digest over no rows identifies nothing, and two of them "
+            "would be equal to each other; pass the rows the figure was computed on"
+        )
+    return hashlib.sha256("\n".join(canonical).encode("utf-8")).hexdigest()
 
 
 def sha256_file(path: Path | str) -> str:
@@ -658,6 +696,21 @@ class Comparison:
     on a subset produced a number about a different row set, and two numbers
     about different row sets sitting side by side look comparable without being
     so (``fray/src/serve/county_yield.py:700-711``).
+
+    ``row_matched`` USED TO BE A CALLER-SUPPLIED ``bool`` DEFAULTING TO ``True``
+    (M-06, 2026-08-31). That default is the defect: the gate's whole
+    row-set clause rested on an assertion the caller made for free, and every
+    comparison that never thought about row sets asserted the strongest
+    possible claim about them. Measured at 8517341, an ordinary
+    ``Comparison(bar, "mae", 80.0, 100.0, 500, arm="val")`` — no row evidence of
+    any kind — reached PASS.
+
+    It is now DERIVED from two digests, and there is no way to spell the
+    assertion. Both digests present and equal → ``True``; present and unequal →
+    ``False``; either absent → ``None``, which is *untied*: not matched, not
+    mismatched, not known. ``None`` is NA at the gate, not a pass. This is
+    fray's split-identity/E-043 pattern moved into the contract — every
+    comparison operand needs a tie, and the tie is content, not a promise.
     """
 
     reference: str
@@ -666,7 +719,6 @@ class Comparison:
     reference_value: float | None
     n_rows: int
     arm: str = ""
-    row_matched: bool = True
     unmeasured_reason: str = ""
     #: Which direction this metric runs in, and what values it can take. Both
     #: are DATA the caller declares, in the same shape :class:`ServeArms` makes
@@ -675,6 +727,17 @@ class Comparison:
     #: comparison that declares no polarity is not decided against a guess.
     polarity: str = ""
     domain: str = REAL
+    #: sha256 of the row identifiers each side's figure was computed over, from
+    #: :func:`row_set_digest`. Content, not a promise: the only two things that
+    #: can make these equal are the same rows on both sides.
+    candidate_row_digest: str = ""
+    reference_row_digest: str = ""
+    #: DERIVED in ``__post_init__``, never passed in. ``init=False`` is the
+    #: point: ``Comparison(..., row_matched=True)`` is a TypeError naming the
+    #: argument, so the assertion the gate used to rest on cannot be spelled at
+    #: all — not by a caller who forgot to think about rows, and not by one who
+    #: wants the answer to be True.
+    row_matched: bool | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
         if not self.reference or not self.metric:
@@ -696,6 +759,26 @@ class Comparison:
                 f"comparison on {self.metric!r} declares domain {self.domain!r}; the "
                 f"declared domains are {list(DOMAINS)}"
             )
+        for side, digest in (
+            ("candidate", self.candidate_row_digest),
+            ("reference", self.reference_row_digest),
+        ):
+            if not digest:
+                continue
+            if not _SHA256_HEX.fullmatch(digest):
+                raise ServedContractError(
+                    f"comparison on {self.metric!r} carries {side}_row_digest "
+                    f"{digest!r}, which is not a sha256. Two placeholders are equal "
+                    "to each other, so a tie written in anything but content is a "
+                    "tie that always holds. Use core.served.row_set_digest."
+                )
+        if self.candidate_row_digest and self.reference_row_digest:
+            derived: bool | None = (
+                self.candidate_row_digest == self.reference_row_digest
+            )
+        else:
+            derived = None
+        object.__setattr__(self, "row_matched", derived)
 
     @property
     def declared(self) -> bool:
@@ -733,7 +816,13 @@ class Comparison:
             "domain": self.domain,
             "skill": UNMEASURED if measured is None else measured,
             "n_rows": self.n_rows,
-            "row_matched": self.row_matched,
+            "candidate_row_digest": self.candidate_row_digest or UNMEASURED,
+            "reference_row_digest": self.reference_row_digest or UNMEASURED,
+            # UNMEASURED rather than null, and never False: "nobody tied the row
+            # sets" and "the row sets differ" are different facts, and a reader
+            # who cannot tell them apart will read the first as the second and
+            # go looking for a split that is not there.
+            "row_matched": UNMEASURED if self.row_matched is None else self.row_matched,
             "unmeasured_reason": self.unmeasured_reason,
         }
 
@@ -755,6 +844,12 @@ CLEARS_BAR = "CLEARS_BAR"
 IMPOSSIBLE_MEASUREMENT = "IMPOSSIBLE_MEASUREMENT"
 #: Nobody said which direction the metric runs in, so nobody can say who won.
 POLARITY_UNDECLARED = "POLARITY_UNDECLARED"
+#: Nobody tied the two figures to the rows they were computed on. Kept apart
+#: from ``ROW_SET_MISMATCH`` on purpose: "the row sets differ" sends a reader
+#: to find the split, "nobody said" sends them to add the digests, and until
+#: 2026-08-31 the second condition silently reported the strongest form of the
+#: opposite (``row_matched: bool = True``).
+ROW_SET_UNTIED = "ROW_SET_UNTIED"
 
 
 @dataclass(frozen=True)
@@ -1017,7 +1112,28 @@ def challenger_decision(
             refusal_class=NO_ROWS,
         )
 
-    unmatched = [m for m in metrics if not by_metric[m].row_matched]
+    untied = [m for m in metrics if by_metric[m].row_matched is None]
+    if untied:
+        return ChallengerDecision(
+            status=Status.NA,
+            reason=(
+                f"the comparison against {recorded_bar!r} carries no row-set tie on "
+                f"{untied}: one or both sides did not say which rows its figure was "
+                "computed over, so whether the two numbers describe the same rows is "
+                "unknown. Until 2026-08-31 this contract took the caller's word for "
+                "it and defaulted the answer to True, which meant every comparison "
+                "that had never thought about row sets asserted the strongest "
+                "possible claim about them. Tie both sides with "
+                "core.served.row_set_digest."
+            ),
+            recorded_bar=recorded_bar,
+            metrics=metrics,
+            skill=none_skill,
+            n_rows=n_rows,
+            refusal_class=ROW_SET_UNTIED,
+        )
+
+    unmatched = [m for m in metrics if by_metric[m].row_matched is False]
     if unmatched:
         return ChallengerDecision(
             status=Status.NA,

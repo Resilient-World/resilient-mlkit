@@ -32,6 +32,8 @@ from resilient_mlkit.core.served import (
     NONNEGATIVE,
     POLARITY_UNDECLARED,
     REAL,
+    ROW_SET_MISMATCH,
+    ROW_SET_UNTIED,
     UNMEASURED_SKILL,
     ArtifactIntegrityError,
     ChallengerDecision,
@@ -45,6 +47,7 @@ from resilient_mlkit.core.served import (
     ServedModel,
     canonical_payload_sha256,
     challenger_decision,
+    row_set_digest,
     seal,
     sha256_file,
     skill,
@@ -220,17 +223,32 @@ def test_a_data_source_without_a_hash_pins_nothing():
 BAR = "persistence_t_minus_1"
 METRICS = ("mae", "rmse")
 
+#: A real row set, and a real digest over it. The fixture computes the tie the
+#: way an adopter must, rather than writing a placeholder that would be equal
+#: to every other placeholder.
+ROWS = [["01001", 2000 + i] for i in range(500)]
+SAME_ROWS = row_set_digest(ROWS)
+FEWER_ROWS = row_set_digest(ROWS[:-1])
+
+#: An honest row-set tie, spelled once. Every control below that means to
+#: exercise a clause OTHER than the row-set one carries it, so that the clause
+#: under test is the only thing wrong with the comparison — a control with two
+#: defects in it does not prove which one the gate reacted to.
+TIED = {"candidate_row_digest": SAME_ROWS, "reference_row_digest": SAME_ROWS}
+
 
 def comparisons(candidate, reference, **kw):
-    """MAE and RMSE, declared for what they are.
+    """MAE and RMSE, declared for what they are, and tied to the rows.
 
     ``polarity``/``domain`` are declarations this helper makes on the caller's
     behalf because MAE and RMSE genuinely are lower-is-better and genuinely
-    cannot be negative. Every assertion in the tests below is unchanged by
-    them; what changed on 2026-08-31 (M-01) is that the contract now requires
-    the fact to be stated rather than assuming it. The undeclared case has its
-    own pin —
-    ``test_m01_control_a_an_undeclared_polarity_is_na_not_lower_is_better``.
+    cannot be negative. The two row digests are equal because both figures here
+    genuinely are computed over the same 500 rows. Every assertion in the tests
+    below is unchanged by either; what changed on 2026-08-31 (M-01, M-06) is
+    that the contract now requires both facts to be STATED rather than assumed,
+    and both undeclared cases have their own pins —
+    ``test_m01_control_a_an_undeclared_polarity_is_na_not_lower_is_better`` and
+    ``test_m06_control_a_absent_digests_are_na_not_a_pass``.
     """
     return [
         Comparison(
@@ -242,6 +260,8 @@ def comparisons(candidate, reference, **kw):
             arm=kw.pop("arm", "val"),
             polarity=kw.pop("polarity", LOWER_IS_BETTER),
             domain=kw.pop("domain", NONNEGATIVE),
+            candidate_row_digest=kw.pop("candidate_row_digest", SAME_ROWS),
+            reference_row_digest=kw.pop("reference_row_digest", SAME_ROWS),
             **kw,
         )
         for metric in METRICS
@@ -289,6 +309,7 @@ def test_challenger_positive_control_unmeasurable_comparison_is_na_not_fail():
                 arm="val",
                 polarity=LOWER_IS_BETTER,
                 domain=NONNEGATIVE,
+                **TIED,
                 unmeasured_reason="the bar could not be scored on these rows",
             )
             for metric in METRICS
@@ -351,8 +372,15 @@ def test_a_comparison_over_no_rows_is_na():
 
 
 def test_a_reference_scored_on_different_rows_is_na():
+    """The reference's digest is over 499 of the candidate's 500 rows.
+
+    Written as unequal DIGESTS since M-06; it used to be written as
+    ``row_matched=False``, an assertion the caller made. The clause under test
+    is unchanged, and it is now driven by evidence rather than by the fixture
+    telling the gate what to conclude.
+    """
     decision = challenger_decision(
-        comparisons(80.0, 100.0, row_matched=False),
+        comparisons(80.0, 100.0, reference_row_digest=FEWER_ROWS),
         recorded_bar=BAR,
         metrics=METRICS,
     )
@@ -379,11 +407,11 @@ def test_a_win_on_one_metric_and_a_loss_on_the_other_fails():
         [
             Comparison(
                 BAR, "mae", 80.0, 100.0, 500, arm="val",
-                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE, **TIED,
             ),
             Comparison(
                 BAR, "rmse", 120.0, 100.0, 500, arm="val",
-                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE, **TIED,
             ),
         ],
         recorded_bar=BAR,
@@ -605,6 +633,7 @@ def test_m01_control_a_a_negative_value_for_a_nonnegative_metric_refuses():
                 arm="val",
                 polarity=LOWER_IS_BETTER,
                 domain=NONNEGATIVE,
+                **TIED,
             )
         ],
         recorded_bar=BAR,
@@ -630,6 +659,7 @@ def test_m01_control_a_an_impossible_reference_refuses_too():
                 arm="val",
                 polarity=LOWER_IS_BETTER,
                 domain=NONNEGATIVE,
+                **TIED,
             )
         ],
         recorded_bar=BAR,
@@ -647,7 +677,7 @@ def test_m01_control_a_an_undeclared_polarity_is_na_not_lower_is_better():
     same defect wearing the other sign.
     """
     decision = challenger_decision(
-        [Comparison(BAR, "r2", 0.10, 0.90, 500, arm="val")],
+        [Comparison(BAR, "r2", 0.10, 0.90, 500, arm="val", **TIED)],
         recorded_bar=BAR,
         metrics=("r2",),
     )
@@ -664,7 +694,7 @@ def test_m01_control_a_a_declared_higher_is_better_loss_fails():
         [
             Comparison(
                 BAR, "r2", 0.10, 0.90, 500, arm="val",
-                polarity=HIGHER_IS_BETTER,
+                polarity=HIGHER_IS_BETTER, **TIED,
             )
         ],
         recorded_bar=BAR,
@@ -684,7 +714,7 @@ def test_m01_a_declared_higher_is_better_win_passes_on_the_right_formula():
         [
             Comparison(
                 BAR, "r2", 0.90, 0.10, 500, arm="val",
-                polarity=HIGHER_IS_BETTER,
+                polarity=HIGHER_IS_BETTER, **TIED,
             )
         ],
         recorded_bar=BAR,
@@ -700,7 +730,7 @@ def test_m01_control_b_an_honest_lower_is_better_loss_still_fails():
         [
             Comparison(
                 BAR, "mae", 0.25, 0.20, 500, arm="val",
-                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE, **TIED,
             )
         ],
         recorded_bar=BAR,
@@ -721,7 +751,7 @@ def test_m01_control_b_an_honest_lower_is_better_win_promotes_bit_identically():
         [
             Comparison(
                 BAR, "mae", 0.15, 0.20, 500, arm="val",
-                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE, **TIED,
             )
         ],
         recorded_bar=BAR,
@@ -746,7 +776,7 @@ def test_m01_control_b_the_zero_reference_and_non_finite_refusals_are_unmoved():
         [
             Comparison(
                 BAR, "mae", 0.0, 0.0, 500, arm="val",
-                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE, **TIED,
             )
         ],
         recorded_bar=BAR,
@@ -789,7 +819,7 @@ def test_m01_the_declaration_travels_in_the_evidence():
         [
             Comparison(
                 BAR, "mae", 0.15, 0.20, 500, arm="val",
-                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE, **TIED,
             )
         ],
         recorded_bar=BAR,
@@ -883,3 +913,167 @@ def test_m02a_control_b_a_one_metric_decision_is_still_legitimate():
         metrics=("mae",), skill={"mae": 0.2},
     )
     assert d.promotable is True
+
+
+# ---------------------------------------------------------------------------
+# M-06 — `row_matched` is derived from row-set identity, never asserted
+# ---------------------------------------------------------------------------
+# Driven at 8517341:
+#
+#   c = Comparison(bar, "mae", 80.0, 100.0, 500, arm="val")
+#   c.row_matched                       -> True
+#   challenger_decision([c], ...)       -> PASS, promotable=True
+#
+# The gate's row-set clause was real and it fired correctly -- on a value the
+# CALLER supplied, defaulting to True. So the clause protected exactly the
+# comparisons whose authors had already thought about row sets, and every
+# comparison that had never thought about them made the strongest possible
+# claim about them for free. `row_matched: bool = True` is the whole defect in
+# one line of a field list.
+#
+# It is now derived from two content digests and has no init parameter at all:
+# both present and equal -> True; present and unequal -> False; either absent
+# -> None, which is UNTIED and is NA at the gate. That third state is the one
+# the old field could not hold, and it is the one almost every real comparison
+# in the fleet is actually in.
+
+
+def test_m06_control_a_the_caller_assertion_cannot_be_spelled_any_more():
+    """CONTROL A. There is no argument to pass, so there is nothing to assert."""
+    with pytest.raises(TypeError, match="row_matched"):
+        Comparison(
+            BAR, "mae", 80.0, 100.0, 500, arm="val",
+            polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+            row_matched=True,  # type: ignore[call-arg]
+        )
+
+
+def test_m06_control_a_unequal_digests_are_a_mismatch_whatever_the_caller_wants():
+    """CONTROL A. Content decides. The caller has no vote left to cast."""
+    c = Comparison(
+        BAR, "mae", 80.0, 100.0, 500, arm="val",
+        polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+        candidate_row_digest=SAME_ROWS, reference_row_digest=FEWER_ROWS,
+    )
+    assert c.row_matched is False
+    with pytest.raises(Exception):
+        c.row_matched = True  # frozen; type: ignore[misc]
+    decision = challenger_decision(
+        comparisons(80.0, 100.0, reference_row_digest=FEWER_ROWS),
+        recorded_bar=BAR, metrics=METRICS,
+    )
+    assert decision.status is Status.NA
+    assert decision.promotable is False
+    assert decision.refusal_class == ROW_SET_MISMATCH
+
+
+def test_m06_control_a_absent_digests_are_na_not_a_pass():
+    """CONTROL A. The drive that returned PASS at 8517341, verbatim."""
+    c = Comparison(BAR, "mae", 80.0, 100.0, 500, arm="val",
+                   polarity=LOWER_IS_BETTER, domain=NONNEGATIVE)
+    assert c.row_matched is None
+    decision = challenger_decision([c], recorded_bar=BAR, metrics=("mae",))
+    assert decision.status is Status.NA
+    assert decision.promotable is False
+    assert decision.refusal_class == ROW_SET_UNTIED
+    assert all(v is None for v in decision.skill.values())
+
+
+def test_m06_control_a_one_side_tied_is_still_untied():
+    """A tie needs two ends. One digest ties a figure to nothing."""
+    for kw in (
+        {"candidate_row_digest": SAME_ROWS},
+        {"reference_row_digest": SAME_ROWS},
+    ):
+        c = Comparison(BAR, "mae", 80.0, 100.0, 500, arm="val",
+                       polarity=LOWER_IS_BETTER, domain=NONNEGATIVE, **kw)
+        assert c.row_matched is None
+        d = challenger_decision([c], recorded_bar=BAR, metrics=("mae",))
+        assert d.refusal_class == ROW_SET_UNTIED
+
+
+def test_m06_control_a_untied_and_mismatched_are_different_refusals():
+    """The two facts stay apart, in the class and in the serialisation.
+
+    Collapsing "nobody said" into "they differ" sends a reader looking for a
+    row split that does not exist; collapsing it the other way is the defect
+    this item closes.
+    """
+    untied = challenger_decision(
+        [Comparison(BAR, "mae", 80.0, 100.0, 500, arm="val",
+                    polarity=LOWER_IS_BETTER, domain=NONNEGATIVE)],
+        recorded_bar=BAR, metrics=("mae",),
+    )
+    mismatched = challenger_decision(
+        [Comparison(BAR, "mae", 80.0, 100.0, 500, arm="val",
+                    polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+                    candidate_row_digest=SAME_ROWS,
+                    reference_row_digest=FEWER_ROWS)],
+        recorded_bar=BAR, metrics=("mae",),
+    )
+    assert untied.refusal_class == ROW_SET_UNTIED
+    assert mismatched.refusal_class == ROW_SET_MISMATCH
+    assert untied.refusal_class != mismatched.refusal_class
+
+
+def test_m06_control_a_a_placeholder_tie_is_refused_by_name():
+    """Two placeholders are equal to each other, so a tie in anything but
+    content is a tie that always holds."""
+    for digest in ("same", "", " " * 64, "Z" * 64, "a" * 63, "A" * 64):
+        if digest == "":
+            continue
+        with pytest.raises(ServedContractError, match="not a sha256"):
+            Comparison(
+                BAR, "mae", 80.0, 100.0, 500, arm="val",
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+                candidate_row_digest=digest, reference_row_digest=digest,
+            )
+
+
+def test_m06_control_b_equal_digests_give_the_bit_identical_honest_skill():
+    """CONTROL B (must not move). The honest path is unchanged, to the bit."""
+    decision = challenger_decision(
+        comparisons(80.0, 100.0), recorded_bar=BAR, metrics=METRICS
+    )
+    assert decision.status is Status.PASS
+    assert decision.promotable is True
+    assert decision.skill["mae"] == 1.0 - 80.0 / 100.0
+    assert repr(decision.skill["mae"]) == "0.19999999999999996"
+    fine = challenger_decision(
+        comparisons(0.15, 0.20), recorded_bar=BAR, metrics=METRICS
+    )
+    assert repr(fine.skill["mae"]) == "0.2500000000000001"
+
+
+def test_m06_control_b_the_negative_row_count_refusal_is_unmoved():
+    with pytest.raises(ServedContractError, match="not a row count"):
+        Comparison(BAR, "mae", 80.0, 100.0, -1, arm="val",
+                   polarity=LOWER_IS_BETTER, domain=NONNEGATIVE, **TIED)
+
+
+def test_m06_control_b_row_set_digest_is_order_invariant_and_content_sensitive():
+    """The one definition of the tie, exercised as a definition."""
+    assert row_set_digest(ROWS) == row_set_digest(list(reversed(ROWS)))
+    assert row_set_digest(ROWS) != row_set_digest(ROWS[:-1])
+    # A row scored twice on one side is a real difference in what was compared.
+    assert row_set_digest(ROWS) != row_set_digest([*ROWS, ROWS[0]])
+    assert len(row_set_digest(ROWS)) == 64
+    with pytest.raises(ServedContractError, match="identifies nothing"):
+        row_set_digest([])
+
+
+def test_m06_the_digests_and_the_derivation_travel_in_the_evidence():
+    decision = challenger_decision(
+        comparisons(80.0, 100.0), recorded_bar=BAR, metrics=METRICS
+    )
+    row = decision.to_dict()["evidence"]["comparisons"][0]
+    assert row["candidate_row_digest"] == SAME_ROWS
+    assert row["reference_row_digest"] == SAME_ROWS
+    assert row["row_matched"] is True
+    untied_row = Comparison(
+        BAR, "mae", 80.0, 100.0, 500, arm="val",
+        polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+    ).to_dict()
+    # "NA", never False: an untied comparison is not a mismatched one.
+    assert untied_row["row_matched"] == "NA"
+    assert untied_row["candidate_row_digest"] == "NA"
