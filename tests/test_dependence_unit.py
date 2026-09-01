@@ -63,6 +63,8 @@ from resilient_mlkit.core.served import (
     SINGLE_UNIT,
     UNIT_COARSER_THAN_BLOCK,
     UNIT_CROSSCUTS_ARMS,
+    UNIT_CROSSCUTS_BLOCK,
+    UNIT_FINER_THAN_BLOCK,
     UNIT_IS_THE_BLOCK,
     UNIT_LABEL_CONTRADICTS_CONTENT,
     UNMEASURED,
@@ -172,6 +174,7 @@ def test_positive_control_the_fray_shape_refuses_and_names_both_units() -> None:
     assert d.n_units_in_arm == 1365
     assert d.n_blocks_in_arm == 5
     assert d.n_rows == 1365
+    assert d.relation == UNIT_FINER_THAN_BLOCK
 
 
 def test_negative_control_the_repair_is_silent() -> None:
@@ -268,6 +271,29 @@ def test_not_dead_every_val_row_in_one_unit() -> None:
     d = declare(rows, unit="the_whole_arm")
     assert d.refusal == SINGLE_UNIT
     assert d.n_units_in_arm == 1
+
+
+def test_not_dead_a_unit_that_crosscuts_the_blocks_inside_the_arm() -> None:
+    """The fifth relation, reachable and refused.
+
+    Units that stay inside the arm, split some blocks AND are split by others —
+    neither refines the other. It still manufactures replicates out of the
+    blocked axis, so it refuses; the relation is a distinct value so a reader
+    can tell it from the plain finer case. A constant that is reachable and
+    never driven is a constant nobody has checked.
+    """
+    rows = []
+    for arm, years in (("train", TRAIN_YEARS), ("val", VAL_YEARS),
+                       ("test", TEST_YEARS)):
+        for year, n in years.items():
+            for county in range(n):
+                rows.append(
+                    RowUnit(row_key=(year, county), arm=arm, block_key=year,
+                            unit_key=(arm, county % 7))
+                )
+    d = declare(rows, unit="county_bucket")
+    assert d.relation == UNIT_CROSSCUTS_BLOCK
+    assert d.refusal == DEPENDENCE_UNIT_TOO_FINE
 
 
 def test_not_dead_the_label_is_not_the_tie() -> None:
@@ -549,6 +575,14 @@ def test_a_contradicting_unit_is_NA_naming_both_units() -> None:
     assert "'row'" in decision.reason and "'crop_year'" in decision.reason
     # An NA carries no skill number, as it never has.
     assert set(decision.skill.values()) == {None}
+    # The evidence carries EVERY declared metric under the key a PASS uses, and
+    # names which of them offended. A reader who saw one comparison beside three
+    # declared metrics would read the other two as uncompared, which is a
+    # different and worse fact than the one being reported.
+    payload = decision.to_dict()
+    assert [c["metric"] for c in payload["evidence"]["comparisons"]] == ["mae"]
+    assert payload["evidence"]["offending"] == ["mae"]
+    assert payload["resampling"][0]["refusal"] == DEPENDENCE_UNIT_TOO_FINE
 
 
 def test_a_positive_point_whose_interval_covers_zero_FAILS() -> None:

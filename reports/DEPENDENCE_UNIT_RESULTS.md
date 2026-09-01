@@ -5,7 +5,10 @@ preregistration is `reports/DEPENDENCE_UNIT_PREREGISTRATION.md`, committed as
 the first commit on `feat/dependence-unit-contract` before any source edit
 (`fefdc5e`, parent `origin/main` `6921e9a`).
 
-- branch head at writing: `f3a3b16`
+- branch: `feat/dependence-unit-contract`, five commits ahead of the base
+- lint / types, at the versions `.github/workflows/ci.yml` pins:
+  `ruff 0.16.5 check src tests scripts` → **all checks passed** (identical at
+  the base); `mypy 2.3.1 src/resilient_mlkit` → **no issues, 29 source files**
 - base: `origin/main` `6921e9a` (`git ls-remote`, this session)
 - interpreter: `/Users/david/Downloads/Claude Code/resilient-mlkit/.venv/bin/python`, 3.14.6
 - **binding asserted in every driver.** `tests/test_dependence_unit.py` carries
@@ -27,9 +30,9 @@ the first commit on `feat/dependence-unit-contract` before any source edit
 |---|---|
 | `origin/main` `6921e9a`, own worktree | **912 passed** in 71.60s |
 | this branch, before the new test file | **912 passed** in 53.72s |
-| this branch, with `tests/test_dependence_unit.py` (random order) | **976 passed** in 85.10s |
+| this branch, with `tests/test_dependence_unit.py` (random order) | **977 passed** in 98.69s |
 
-976 = 912 + 64. No test on `main` was edited, weakened or deleted. One test on
+977 = 912 + 65. No test on `main` was edited, weakened or deleted. One test on
 `main` was edited to record a change it exists to force — see "the tripwire"
 below — and both versions of its assertion are quoted in its own docstring.
 
@@ -68,6 +71,7 @@ and asserted in `tests/test_dependence_unit.py`.
 | **fray repaired** — crop-year blocks, CROP-YEAR units | `UNIT_IS_THE_BLOCK` | — | 5 | 5 |
 | **chokepoint** — date blocks, CORRIDOR units | `UNIT_CROSSCUTS_ARMS` | — | 28 | 20 |
 | coarser — crop-year blocks, year-pair units | `UNIT_COARSER_THAN_BLOCK` | — | 3 | 5 |
+| crop-year blocks, county-bucket units inside the arm | `UNIT_CROSSCUTS_BLOCK` | **`DEPENDENCE_UNIT_TOO_FINE`** | 7 | 5 |
 | a block straddling two arms | `UNIT_FINER_THAN_BLOCK` | **`BLOCKS_STRADDLE_ARMS`** | — | — |
 | one unit in the arm | `UNIT_IS_THE_BLOCK` | **`SINGLE_UNIT`** | 1 | — |
 | unit LABELLED as the blocking unit, content disagrees | `UNIT_CROSSCUTS_ARMS` | **`UNIT_LABEL_CONTRADICTS_CONTENT`** | — | — |

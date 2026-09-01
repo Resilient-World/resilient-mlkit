@@ -1791,7 +1791,16 @@ def challenger_decision(
             skill=none_skill,
             n_rows=n_rows,
             refusal_class=RESAMPLING_ROWS_UNTIED,
-            evidence={"resampling": [by_metric[m].to_dict() for m in rows_untied]},
+            # EVERY declared metric, not only the offending ones, under the same
+            # key a PASS uses. A reader who sees one comparison here and three
+            # metrics in `decision_metrics` will read the other two as
+            # uncompared, which is a different and worse fact than the one being
+            # reported. `offending` names which.
+            evidence={
+                "comparisons": [by_metric[m].to_dict() for m in metrics],
+                "arm": by_metric[metrics[0]].arm,
+                "offending": rows_untied,
+            },
         )
 
     contradicting = [
@@ -1818,7 +1827,11 @@ def challenger_decision(
             skill=none_skill,
             n_rows=n_rows,
             refusal_class=DEPENDENCE_UNIT_CONTRADICTS_POLICY,
-            evidence={"resampling": [by_metric[m].to_dict() for m in contradicting]},
+            evidence={
+                "comparisons": [by_metric[m].to_dict() for m in metrics],
+                "arm": by_metric[metrics[0]].arm,
+                "offending": contradicting,
+            },
         )
 
     measured: dict[str, float | None] = {m: by_metric[m].skill for m in metrics}
