@@ -332,6 +332,13 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
             evidence,
         )
 
+    # `declared`, not `nominal`. Past the gate above the two agree to within
+    # NOMINAL_AGREEMENT_EPS, so for any ordinary tolerance this is the same
+    # comparison either way -- mutating it back leaves the suite green unless
+    # something reaches the one place they come apart. A binding may declare a
+    # tolerance STRICTER than mlkit's with no floor, and a `tol` below the
+    # representation allowance makes the operand choice observable; the
+    # committed declaration is the standard there too.
     if abs(empirical - declared) > tol:
         return CheckResult.failed(
             "D3", PHASE,

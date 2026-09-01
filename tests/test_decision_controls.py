@@ -631,15 +631,13 @@ def test_an_undeclared_nominal_level_is_NA_not_a_silent_fallback(tmp_path):
     assert COVERAGE_SECTION in result.reason
 
 
-def test_the_verdict_is_measured_against_the_declared_level_not_the_reported_one(
-    tmp_path,
-):
-    """FIRES: a stricter declared level the callable agrees with, and misses.
+def test_there_is_no_default_level_and_the_declared_one_sets_the_bar(tmp_path):
+    """FIRES: a declared 0.99 that a 0.90 empirical misses by 0.09.
 
-    Without this the two branches above are satisfiable by a check that reads
-    the declaration only to compare it with the callable and then goes on using
-    the callable's copy. Here the declared 0.99 is the level the 0.90 empirical
-    is judged against, and 0.09 clears mlkit's 0.05.
+    What this pins is that D3 carries no level of its own -- the bar is
+    whatever the repo committed. It does NOT distinguish which of the two
+    now-equal operands the final comparison uses; see the boundary test below,
+    which does.
     """
     result = _run_d3(
         tmp_path, _coverage('"nominal": 0.99, "empirical": 0.90, "n": 5000'), nominal=0.99
@@ -647,6 +645,38 @@ def test_the_verdict_is_measured_against_the_declared_level_not_the_reported_one
     assert result.status is Status.FAIL
     assert "do not mean what they say" in result.reason
     assert result.evidence["declared_nominal"] == 0.99
+
+
+def test_the_final_comparison_uses_the_declared_level_not_the_reported_copy(tmp_path):
+    """FIRES only if the last comparison reads `declared`. Found by mutation.
+
+    The first version of this section could not tell the two apart, and said in
+    its docstring that it could. Rewriting `abs(empirical - declared)` back to
+    `abs(empirical - nominal)` left the whole suite green, because by the time
+    that line runs the agreement gate has forced the two within 1e-12 of each
+    other -- for any ordinary tolerance they ARE the same number.
+
+    They come apart in exactly one place, and it is reachable: a binding may
+    declare a tolerance STRICTER than mlkit's, with no floor, so a `tol` below
+    `NOMINAL_AGREEMENT_EPS` makes the representation allowance wider than the
+    tolerance. Here the reported level sits 5.0004e-13 above the declared one —
+    inside the allowance, so the substitution branch is silent — and `tol` is
+    1e-13. Against the declared level the miss is 0.0 and this PASSes; against
+    the reported copy it is 5.0004e-13 and it would FAIL. The committed
+    declaration is the standard even when the subject's copy is nearer.
+    """
+    reported = 0.9 + 5e-13
+    assert abs(reported - 0.9) < NOMINAL_AGREEMENT_EPS, "precondition: inside the allowance"
+    assert abs(reported - 0.9) > 1e-13, "precondition: outside the tolerance below"
+    result = _run_d3(
+        tmp_path,
+        _coverage(f'"nominal": {reported!r}, "empirical": 0.9, "n": 5000, "tol": 1e-13'),
+        nominal=0.9,
+    )
+    assert result.status is Status.PASS
+    assert result.evidence["tol"] == 1e-13
+    assert result.evidence["reported_nominal"] == reported
+    assert result.evidence["declared_nominal"] == 0.9
 
 
 def test_a_float_representation_difference_is_not_a_disagreement(tmp_path):
