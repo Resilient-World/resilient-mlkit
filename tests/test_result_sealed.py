@@ -248,6 +248,42 @@ def test_control_b_measured_wrapper_still_builds_over_a_sealed_result():
 # ---------------------------------------------------------------------------
 # RESIDUAL, disclosed rather than half-closed
 # ---------------------------------------------------------------------------
+def test_residual_e_dict_surgery_defeats_the_seal_as_it_defeats_frozen():
+    """STATED LIMIT, and the same one every frozen dataclass here has.
+
+    All three of these land, and no Python-level seal stops them:
+    `object.__setattr__(r, "status", ...)`, `r.__dict__["status"] = ...`, and
+    `del r.__dict__["_sealed"]` followed by an ordinary assignment.
+    `core.served`'s own frozen dataclasses call `object.__setattr__` in their
+    `__post_init__`, so this is Python's boundary rather than this class's.
+
+    A two-signal seal that survived the `del` was written and MEASURED: it also
+    read "the evidence mapping is sealed" as proof of construction, and it broke
+    the R2/T2 delegation at `checks/readiness.py:195`, which builds a new
+    CheckResult from another result's evidence — the dataclass `__init__`
+    assigns `evidence` before `measured_at`, so the inherited seal was live
+    while the new object was still being built. Six tests red. It is not here.
+
+    What matters is that this is a LOUD limit. Nothing reaches into `__dict__`
+    by accident, and accident is what the seal exists to stop: one ordinary
+    assignment in a check module, which now refuses. Pinned so the disclosure
+    is a measurement, and so a future repair that closes it fails here and
+    updates the text instead of re-pinning the silence.
+    """
+    a = failing()
+    a.__dict__["status"] = Status.PASS
+    assert a.to_dict()["status"] == "PASS"
+
+    b = failing()
+    object.__setattr__(b, "status", Status.PASS)
+    assert b.to_dict()["status"] == "PASS"
+
+    c = failing()
+    del c.__dict__["_sealed"]
+    c.status = Status.PASS
+    assert c.to_dict()["status"] == "PASS"
+
+
 def test_residual_a_nested_evidence_value_is_still_mutable_in_place():
     """STATED LIMIT. The seal is one level deep.
 

@@ -298,6 +298,15 @@ class CheckResult:
     measured_at: str = ""
 
     def __post_init__(self) -> None:
+        # Open the seal explicitly for the duration of construction, and take a
+        # FRESH unsealed copy of the evidence. Both matter: a caller may hand
+        # in another result's already-sealed evidence mapping (the R2/T2
+        # delegation in checks.readiness does exactly this), and without the
+        # fresh copy `_is_sealed()` would read that inherited seal and refuse
+        # this object's own construction. Copying also means a caller's dict,
+        # mutated later, cannot reach a formed verdict.
+        object.__setattr__(self, "_sealed", False)
+        object.__setattr__(self, "evidence", SealedEvidence(dict(self.evidence)))
         if isinstance(self.status, str):
             self.status = Status(self.status)
         # Redact before anything else can read, print or persist this.
@@ -328,10 +337,37 @@ class CheckResult:
         # Everything above is the verdict being formed. From here on it is a
         # record of a measurement that happened, and a record that can be
         # edited is a record of nothing.
-        if not isinstance(self.evidence, SealedEvidence):
-            self.evidence = SealedEvidence(self.evidence)
         self.evidence.seal()
         object.__setattr__(self, "_sealed", True)
+
+    def _is_sealed(self) -> bool:
+        """Whether this result's verdict has been formed.
+
+        ONE signal, set at the end of ``__post_init__``, deliberately.
+
+        A two-signal version was written and MEASURED, and it is not here: it
+        also treated "the evidence mapping is sealed" as proof of construction,
+        so that ``del r.__dict__["_sealed"]`` could not re-open the object. It
+        broke the R2/T2 delegation in ``checks.readiness:195``, which
+        constructs a new CheckResult from ANOTHER result's evidence -- the
+        dataclass ``__init__`` assigns ``evidence`` before ``measured_at``, so
+        the inherited seal was live while the new object was still being built
+        and refused its own construction. Six tests went red. The variant that
+        survives that ordering needs a second conjunct on ``measured_at``, and
+        subtle correctness inside a guard is its own defect class.
+
+        What the two-signal version bought was raising the price of one
+        ``__dict__`` reach to two. Both are ``__dict__`` surgery, which defeats
+        this exactly as it defeats every frozen dataclass in this package --
+        ``core.served``'s own frozen types call ``object.__setattr__`` in their
+        ``__post_init__``. That is a stated limit of Python, not a hole this
+        class can close, and it is a LOUD limit: nothing edits a verdict that
+        way by accident, and accident is what the seal exists to stop
+        (``result.status = Status.PASS``, one ordinary assignment, in a check
+        module -- which now refuses). Disclosed and pinned in
+        ``tests/test_result_sealed.py::test_residual_e_dict_surgery_defeats_the_seal_as_it_defeats_frozen``.
+        """
+        return self.__dict__.get("_sealed") is True
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Refuse every edit to a formed verdict; allow the runner's stamps once.
@@ -342,7 +378,7 @@ class CheckResult:
         evidence, satisfies every clause in ``__post_init__``. See
         :class:`VerdictSealed`.
         """
-        if self.__dict__.get("_sealed"):
+        if self._is_sealed():
             if name in _VERDICT_FIELDS:
                 raise VerdictSealed(
                     f"{self.__dict__.get('check_id', '?')}: refusing to assign "

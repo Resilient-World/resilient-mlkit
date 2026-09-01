@@ -1077,3 +1077,147 @@ def test_m06_the_digests_and_the_derivation_travel_in_the_evidence():
     # "NA", never False: an untied comparison is not a mismatched one.
     assert untied_row["row_matched"] == "NA"
     assert untied_row["candidate_row_digest"] == "NA"
+
+
+# ---------------------------------------------------------------------------
+# FOUND BY ATTACKING THE ABOVE — three holes in the repairs themselves
+# ---------------------------------------------------------------------------
+# Each of these was reachable on the branch AFTER M-01/M-02/M-03/M-06 landed
+# and before this block, driven with core.served.__file__ asserted. They are
+# in the surface this train built, so they are this train's to close.
+
+
+def test_attack_a_pass_cannot_carry_a_nan_skill():
+    """`float('nan') <= 0.0` is False, so a NaN skill cleared the bar clause.
+
+    Driven: ChallengerDecision(status=PASS, ..., skill={"m": nan}) constructed
+    and reported promotable=True.
+    """
+    for value in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ServedContractError, match="non-finite skill"):
+            ChallengerDecision(
+                status=Status.PASS, reason="won", recorded_bar=BAR,
+                metrics=("mae",), skill={"mae": value},
+            )
+
+
+def test_attack_a_non_finite_skill_is_refused_on_a_fail_too():
+    """Not a PASS-only clause: a FAIL reporting NaN reports nothing."""
+    with pytest.raises(ServedContractError, match="non-finite skill"):
+        ChallengerDecision(
+            status=Status.FAIL, reason="lost", recorded_bar=BAR,
+            metrics=("mae",), skill={"mae": float("nan")},
+        )
+
+
+def test_attack_the_skill_map_cannot_be_wider_than_the_declared_metrics():
+    """A figure nobody decided on, sitting where decided figures sit.
+
+    Driven: skill={"mae": 0.2, "other": -9.0} on metrics=("mae",) constructed,
+    and `skill_vs_recorded_bar` carried the -9.0 downstream indistinguishably.
+    """
+    with pytest.raises(ServedContractError, match="reports skill for"):
+        ChallengerDecision(
+            status=Status.PASS, reason="won", recorded_bar=BAR,
+            metrics=("mae",), skill={"mae": 0.2, "other": -9.0},
+        )
+
+
+def test_attack_to_dict_does_not_hand_out_the_decision_s_own_evidence():
+    """`dict(evidence)` was shallow, and the comparisons live one level down.
+
+    Driven: `d.to_dict()["evidence"]["comparisons"][0]["skill"] = 99` changed
+    what `d.to_dict()` returned on the next call.
+    """
+    d = challenger_decision(
+        comparisons(80.0, 100.0), recorded_bar=BAR, metrics=METRICS
+    )
+    before = d.to_dict()["evidence"]["comparisons"][0]["skill"]
+    handed_out = d.to_dict()
+    handed_out["evidence"]["comparisons"][0]["skill"] = 99
+    handed_out["evidence"]["arm"] = "test"
+    assert d.to_dict()["evidence"]["comparisons"][0]["skill"] == before
+    assert d.to_dict()["evidence"]["arm"] == "val"
+
+
+# ---------------------------------------------------------------------------
+# RESIDUALS — measured, disclosed, and pinned so they fail when they close
+# ---------------------------------------------------------------------------
+def test_residual_b_an_undeclared_domain_buys_no_domain_check():
+    """STATED LIMIT. `domain` defaults to REAL, which claims nothing.
+
+    A caller who declares polarity but leaves the domain alone gets the
+    polarity clause and not the impossibility clause, so the negative-MAPE
+    drive still reaches PASS under `domain=REAL`.
+
+    This is deliberately NOT the `row_matched=True` defect wearing new clothes,
+    and the difference is the direction of the default. `row_matched=True`
+    asserted the STRONGEST claim on the caller's behalf; `domain=REAL` asserts
+    the WEAKEST one — every real number is admissible — so the failure mode is
+    an absent check, not a fabricated pass. There is no safe default here:
+    NONNEGATIVE would be wrong for r2, which legitimately goes negative.
+
+    Making the domain mandatory (as polarity is) is a second contract break
+    with its own adopter cost, and it is not taken inside M-01. Recorded in
+    mlkit docs/ESCALATIONS.md E-M20.
+    """
+    decision = challenger_decision(
+        [
+            Comparison(
+                BAR, "mape", -0.05, 0.20, 500, arm="val",
+                polarity=LOWER_IS_BETTER, **TIED,  # domain left at REAL
+            )
+        ],
+        recorded_bar=BAR, metrics=("mape",),
+    )
+    assert decision.status is Status.PASS
+    assert decision.skill["mape"] == 1.25
+
+
+def test_residual_c_a_declared_polarity_can_be_declared_wrongly():
+    """STATED LIMIT. The contract checks that a direction was declared, and
+    cannot check that it is the right one for that metric.
+
+    Closing this needs a name->polarity table, which is the E-038 defect
+    (`core.metric_registry`) re-introduced at the point that decides
+    promotions. The declaration travels in the evidence instead, so a reader
+    auditing the record can see `mae / higher_is_better` and object; nobody
+    could audit the assumption it replaced, because it was never written down.
+    """
+    decision = challenger_decision(
+        [
+            Comparison(
+                BAR, "mae", 100.0, 80.0, 500, arm="val",
+                polarity=HIGHER_IS_BETTER, domain=NONNEGATIVE, **TIED,
+            )
+        ],
+        recorded_bar=BAR, metrics=("mae",),
+    )
+    assert decision.status is Status.PASS
+    assert decision.to_dict()["evidence"]["comparisons"][0]["polarity"] == (
+        HIGHER_IS_BETTER
+    )
+
+
+def test_residual_d_n_rows_is_still_a_caller_assertion_untied_to_the_digests():
+    """STATED LIMIT. M-06 tied the row SETS; it did not tie the row COUNT.
+
+    A digest over two rows alongside `n_rows=500` passes: the digest is opaque
+    and carries no count, and `n_rows` feeds only the NO_ROWS lane. Closing it
+    means either deriving `n_rows` from the digest input (which the digest does
+    not retain) or carrying a signed count beside it, which is a further design
+    step with its own adopter cost. Recorded in mlkit docs/ESCALATIONS.md E-M20.
+    """
+    two = row_set_digest(ROWS[:2])
+    decision = challenger_decision(
+        [
+            Comparison(
+                BAR, "mae", 80.0, 100.0, 500, arm="val",
+                polarity=LOWER_IS_BETTER, domain=NONNEGATIVE,
+                candidate_row_digest=two, reference_row_digest=two,
+            )
+        ],
+        recorded_bar=BAR, metrics=("mae",),
+    )
+    assert decision.status is Status.PASS
+    assert decision.n_rows == 500

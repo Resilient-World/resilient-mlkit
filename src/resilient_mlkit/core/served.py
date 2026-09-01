@@ -116,6 +116,7 @@ import hashlib
 import json
 import math
 import re
+from copy import deepcopy as _deepcopy
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -924,6 +925,34 @@ class ChallengerDecision:
                 f"decision declares metrics {list(self.metrics)} but reports no skill "
                 f"entry for {missing}; a metric with no entry is a metric nobody scored"
             )
+        # Found by driving this class adversarially after the M-02 repair
+        # landed: a skill dict WIDER than the declared metrics constructed
+        # cleanly, and `skill_vs_recorded_bar` then carried a figure for a
+        # metric the decision never decided on. Downstream that number is
+        # quotable exactly like the ones that were decided, with nothing in the
+        # record marking it as an extra.
+        extra = sorted(set(self.skill) - set(self.metrics))
+        if extra:
+            raise ServedContractError(
+                f"decision declares metrics {list(self.metrics)} but reports skill "
+                f"for {extra} as well. A figure in the skill map that no clause of "
+                "this decision examined is a number nobody decided on, sitting where "
+                "readers take numbers to have been decided on."
+            )
+        # Same drive: `float('nan') <= 0.0` is False, so a PASS carrying a NaN
+        # skill satisfied the non-positive clause below and came out
+        # promotable. A non-finite skill is not a margin over the bar in either
+        # direction, on any status.
+        nonfinite = sorted(
+            m for m, v in self.skill.items()
+            if v is not None and not math.isfinite(float(v))
+        )
+        if nonfinite:
+            raise ServedContractError(
+                f"decision reports non-finite skill on {nonfinite}. A NaN is not a "
+                "margin over the bar and an infinity is not a bigger one; neither "
+                "compares to zero, which is the only question this verdict asks."
+            )
         if self.status is Status.NA:
             reported = {k: v for k, v in self.skill.items() if v is not None}
             if reported:
@@ -969,7 +998,13 @@ class ChallengerDecision:
             "n_rows_compared": self.n_rows,
             "refusal_class": self.refusal_class,
             "reason": self.reason,
-            "evidence": dict(self.evidence),
+            # A DEEP copy. `dict(self.evidence)` is shallow, and the evidence
+            # this class carries is a list of comparison dicts one level down:
+            # driven adversarially, editing `to_dict()["evidence"]
+            # ["comparisons"][0]["skill"]` edited the decision's own record.
+            # A verdict hands out what it decided on; it does not hand out the
+            # thing it decided on.
+            "evidence": _deepcopy(dict(self.evidence)),
         }
 
 
