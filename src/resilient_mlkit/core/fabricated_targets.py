@@ -275,6 +275,7 @@ from __future__ import annotations
 import ast
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from itertools import pairwise
 from pathlib import Path
 
 from . import fabrication, policy
@@ -571,7 +572,7 @@ class SourceRegistry:
             for part in parts:
                 if _is_naming_token(part) and part in bag:
                     hit.add(part)
-            for left, right in zip(parts, parts[1:]):
+            for left, right in pairwise(parts):
                 joined = left + right
                 if _is_naming_token(joined) and joined in bag:
                     hit.add(left)
@@ -1251,9 +1252,9 @@ class _ModuleScanner:
                                 args.defaults):
             if self._is_literal_default(default):
                 out.add(arg.arg)
-        for arg, default in zip(args.kwonlyargs, args.kw_defaults):
-            if self._is_literal_default(default):
-                out.add(arg.arg)
+        for kwarg, kw_default in zip(args.kwonlyargs, args.kw_defaults):
+            if kw_default is not None and self._is_literal_default(kw_default):
+                out.add(kwarg.arg)
         return out
 
     @staticmethod
@@ -1281,6 +1282,7 @@ class _ModuleScanner:
             # A draw manufactures its output -- provided its own parameters
             # were manufactured too. ``rng.normal(loc=df.mean(), scale=0.1)``
             # is noise centred on real data and is not adjudicated here.
+            assert isinstance(node, ast.Call)
             return (
                 all(self._manufactured_expr(a, names) for a in node.args)
                 and all(self._manufactured_expr(k.value, names) for k in node.keywords)
@@ -1340,6 +1342,8 @@ class _ModuleScanner:
                 if isinstance(sub, ast.Assign):
                     pairs = [(self._bound_names(t), sub.value) for t in sub.targets]
                 elif isinstance(sub, ast.AnnAssign):
+                    if sub.value is None:
+                        continue
                     pairs = [(self._bound_names(sub.target), sub.value)]
                 else:
                     continue
@@ -1628,8 +1632,7 @@ class _ModuleScanner:
             stamps.setdefault(holder_name, []).extend(found)
             anchors.setdefault(holder_name, sub)
         out: list[_Record] = []
-        for name in anchors:
-            anchor = anchors[name]
+        for name, anchor in anchors.items():
             record = _Record(anchor, getattr(anchor, "lineno", 0))
             record.stamps = stamps.get(name, [])
             record.literals = literals.get(name, [])
@@ -1686,7 +1689,7 @@ class _ModuleScanner:
             if claim is SIMULATED or claim is CONTRADICTED:
                 continue
             if claim is OBSERVED and observed_hit is None and is_label_value(text):
-                token = sorted(set(tokenise(text)) & OBSERVED_CLAIM_TOKENS)[0]
+                token = min(set(tokenise(text)) & OBSERVED_CLAIM_TOKENS)
                 observed_hit = (Stamp(name, text, OBSERVED), f"observed-token:{token}")
                 continue
             if registry_hit is None:
