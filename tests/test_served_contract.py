@@ -798,3 +798,88 @@ def test_m01_the_declaration_travels_in_the_evidence():
     row = decision.to_dict()["evidence"]["comparisons"][0]
     assert row["polarity"] == LOWER_IS_BETTER
     assert row["domain"] == NONNEGATIVE
+
+
+# ---------------------------------------------------------------------------
+# M-02(a) — a verdict object refuses construction-time forgery (HOLE 2a)
+# ---------------------------------------------------------------------------
+# Driven at 8517341:
+#
+#   ChallengerDecision(status=Status.PASS, reason="nothing was compared",
+#                      recorded_bar=BAR, metrics=(), skill={})
+#     -> PASS, promotable=True, metrics=()
+#
+# `challenger_decision()` refuses an empty metric set ("a gate that decides on
+# nothing passes everything") -- but that refusal lives in the FUNCTION, and
+# the verdict TYPE is public, constructible, and was reachable around it. Every
+# guard in `__post_init__` is written as a comprehension over `self.metrics`,
+# so all of them are vacuously satisfied by an empty tuple: no metric is
+# missing from `skill`, none is unmeasured, none has non-positive skill. The
+# object that exists to make "PASS" mean something rendered a PASS that meant
+# nothing, and `promotable` -- correctly derived, doing its job -- said True.
+
+
+def test_m02a_control_a_a_decision_over_no_metric_cannot_be_constructed():
+    """CONTROL A. The drive that returned a promotable PASS at 8517341."""
+    with pytest.raises(ServedContractError, match="declares no metric"):
+        ChallengerDecision(
+            status=Status.PASS,
+            reason="nothing was compared",
+            recorded_bar=BAR,
+            metrics=(),
+            skill={},
+        )
+
+
+def test_m02a_control_a_the_empty_metric_set_is_refused_on_every_status():
+    """Not a PASS-only clause. An NA over no metric is equally uninformative."""
+    for status, reason in (
+        (Status.PASS, "everything is fine"),
+        (Status.FAIL, "it lost"),
+        (Status.NA, "could not measure"),
+    ):
+        with pytest.raises(ServedContractError, match="declares no metric"):
+            ChallengerDecision(
+                status=status, reason=reason, recorded_bar=BAR,
+                metrics=(), skill={},
+            )
+
+
+def test_m02a_control_b_the_function_level_refusal_is_unmoved():
+    """CONTROL B. The guard that already existed still fires, with its wording."""
+    with pytest.raises(ServedContractError, match="decides on nothing"):
+        challenger_decision(comparisons(80.0, 100.0), recorded_bar=BAR, metrics=())
+
+
+def test_m02a_control_b_every_decision_the_function_builds_still_builds():
+    """CONTROL B. All eight lanes of challenger_decision construct as before."""
+    lanes = {
+        "CLEARS_BAR": challenger_decision(
+            comparisons(80.0, 100.0), recorded_bar=BAR, metrics=METRICS),
+        "NO_SKILL": challenger_decision(
+            comparisons(120.0, 100.0), recorded_bar=BAR, metrics=METRICS),
+        "NO_ROWS": challenger_decision(
+            comparisons(80.0, 100.0, n_rows=0), recorded_bar=BAR, metrics=METRICS),
+        "UNMEASURED_SKILL": challenger_decision(
+            comparisons(80.0, None), recorded_bar=BAR, metrics=METRICS),
+        "ARM_MISMATCH": challenger_decision(
+            comparisons(80.0, 100.0), recorded_bar=BAR, metrics=METRICS,
+            deciding_arm="test"),
+        "NOT_COMPARED": challenger_decision(
+            comparisons(80.0, 100.0), recorded_bar="another_bar",
+            metrics=METRICS),
+    }
+    assert {k: v.refusal_class for k, v in lanes.items()} == {
+        k: k for k in lanes
+    }
+    assert lanes["CLEARS_BAR"].promotable is True
+    assert all(v.promotable is False for k, v in lanes.items() if k != "CLEARS_BAR")
+
+
+def test_m02a_control_b_a_one_metric_decision_is_still_legitimate():
+    """The refusal is about ZERO metrics, not about small metric sets."""
+    d = ChallengerDecision(
+        status=Status.PASS, reason="won", recorded_bar=BAR,
+        metrics=("mae",), skill={"mae": 0.2},
+    )
+    assert d.promotable is True
