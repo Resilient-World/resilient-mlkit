@@ -26,6 +26,23 @@ MAX_COVERAGE_TOL = 0.05
 #: measurement cannot support the verdict either way.
 MIN_COVERAGE_N = 100
 
+#: The ``.mlkit/repo.toml`` section carrying D3's nominal coverage level as
+#: DATA -- ``[coverage]`` / ``nominal = 0.90`` -- beside the ``coverage``
+#: binding it adjudicates. See :func:`d3_uncertainty_coverage`.
+COVERAGE_SECTION = "coverage"
+
+#: How far the coverage binding's self-reported ``nominal`` may sit from the
+#: declared level and still be the same number.
+#:
+#: This is a FLOAT REPRESENTATION allowance and emphatically not a tolerance.
+#: A repo may compute its level as ``1 - alpha`` and hand back something whose
+#: last bits differ from the literal in its config; that is one number written
+#: two ways. Anything a person could mean by "a different level" is many orders
+#: of magnitude above this -- the incident that motivated the check missed by
+#: 1.2e-2. Widening it would turn the tie back into a second tolerance, which
+#: is the thing being removed.
+NOMINAL_AGREEMENT_EPS = 1e-12
+
 
 @check("D1", PHASE, "COUNTERFACTUAL_SPEC — human sign-off", human_only=True)
 def d1_counterfactual_spec(repo: Repo, ctx: RunContext) -> CheckResult:
@@ -134,8 +151,52 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
     return CheckResult.passed("D2", PHASE, evidence)
 
 
-@check("D3", PHASE, "UNCERTAINTY_COVERAGE — empirical coverage matches nominal")
+@check("D3", PHASE, "UNCERTAINTY_COVERAGE — empirical coverage matches the DECLARED nominal")
 def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
+    """Empirical coverage against the level this repo DECLARED it promises.
+
+    D3's verdict is ``abs(empirical - nominal) > tol``, and for most of this
+    package's life BOTH operands of that subtraction arrived in the single dict
+    the subject had just handed the check. Only ``tol`` was mlkit's. Tick 13
+    measured what that buys, independently in two repos in one tick:
+
+    * arabica set ``nominal`` equal to the empirical ``0.8879423328964613`` it
+      had just measured, in both ``coverage_for_d3`` and ``levels[alpha=0.1]``.
+      D3 returned PASS on evidence reading ``nominal == empirical``, erasing a
+      shortfall of ``-0.012057667103538727`` the repo had truthfully disclosed
+      for its SERVED model of record. The second leg of that same PR re-derived
+      the coverage from the rows, agreed to 1e-12, and raised nothing -- it was
+      checking the operand nobody had touched.
+    * surge wrote a genuine ``(nominal, qhat, empirical)`` triple from a
+      DIFFERENT calibrated level into the level whose ``alpha`` still said 0.1.
+      Every individual number was real; only the pairing was a lie, and nothing
+      compared the pairing.
+
+    Pinning ``tol`` pinned nothing about ``nominal``, and pinning ``alpha``
+    pinned nothing either. A gate is only as tied as its loosest term.
+
+    So the level is DATA now, declared in ``.mlkit/repo.toml`` beside the
+    binding it judges::
+
+        [coverage]
+        nominal = 0.90   # the level these prediction intervals promise
+
+    which is the same reason ``core.served.ServeArms`` keeps the serve-arm
+    policy as data: mlkit cannot know which level a product promises, and a
+    check that asked the subject would be asking the party with the motive.
+    The binding still reports its own ``nominal``, and that report is now
+    something this check ADJUDICATES rather than the standard it judges by.
+
+    Three verdicts follow, and they are deliberately different instructions:
+
+    * the reported level disagrees with the declared one -> FAIL
+      ``NOMINAL_SELF_DECLARED``. The subject substituted its own pass mark.
+    * no declaration exists -> NA ``NOMINAL_UNDECLARED``. There is no second
+      operand, and falling back to the subject's claim would be the old
+      behaviour wearing a conditional.
+    * they agree -> the ordinary coverage verdict, measured against the
+      DECLARED level.
+    """
     try:
         fn = repo.resolve("coverage")
     except BindingError as exc:
@@ -188,6 +249,81 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
             evidence,
         )
 
+    # -- the other operand ------------------------------------------------
+    #
+    # Everything above this point reasons about figures the SUBJECT reported,
+    # and refuses the ones that did not resolve to a number. Those refusals
+    # come first on purpose: a NaN disagrees with every declared level, so
+    # folding them into the disagreement branch below would replace "this
+    # coverage was never measured" with "this level was substituted" and make
+    # the E-M09/E-M10 non-finite guards unreachable through D3.
+    #
+    # Below this point the declared level enters, and the subject's `nominal`
+    # stops being the standard.
+    section = repo.config().get(COVERAGE_SECTION)
+    raw = section.get("nominal") if isinstance(section, dict) else None
+    if raw is None:
+        return CheckResult.na(
+            "D3", PHASE,
+            f"NOMINAL_UNDECLARED: no `nominal` under [{COVERAGE_SECTION}] in "
+            ".mlkit/repo.toml, so the only nominal level available is the one the "
+            "coverage binding reported about itself -- and D3's verdict is a "
+            "comparison whose other operand would then come from the same dict. "
+            "Declare the level these intervals promise, e.g. "
+            f"`[{COVERAGE_SECTION}]` / `nominal = 0.90`. Reading the subject's "
+            "claim as the standard is what docs/ESCALATIONS.md E-M21 records "
+            "being exploited in two repos in one tick.",
+            evidence,
+        )
+    # `bool` is an `int` in Python, so `nominal = true` would reach `float()`
+    # as a perfectly valid 1.0 -- a 100% promise nobody wrote. Refused on type,
+    # before anything is read out of it, for the same reason `float("0.90")`
+    # would have accepted a string level without anyone noticing.
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return CheckResult.failed(
+            "D3", PHASE,
+            f"the declared nominal coverage {raw!r} is a {type(raw).__name__}, not a "
+            f"number; [{COVERAGE_SECTION}] nominal must be the probability these "
+            "intervals promise, written as a number",
+            {**evidence, "declared_nominal": raw},
+        )
+    declared = float(raw)
+    if not math.isfinite(declared) or not 0.0 < declared <= 1.0:
+        return CheckResult.failed(
+            "D3", PHASE,
+            f"the declared nominal coverage {declared!r} is not a coverage level; "
+            "declare a probability in (0, 1] -- 0.90 for 90% intervals, not 90. "
+            "A level outside that range makes every possible coverage miss it, so "
+            "the repo would fail D3 forever with a message about its intervals "
+            "rather than about its declaration",
+            {**evidence, "declared_nominal": declared},
+        )
+
+    evidence["declared_nominal"] = declared
+    evidence["reported_nominal"] = nominal
+    # `nominal` in the evidence is the level the verdict was taken against, so
+    # that an artifact quoting it quotes the standard rather than the claim.
+    evidence["nominal"] = declared
+
+    # This fires BEFORE the small-holdout NA below. "We could not measure this"
+    # reads as a gap to fill, and a substituted level is not a gap -- it does
+    # not become less true on fewer rows, and reporting NA would hide it.
+    gap = abs(nominal - declared)
+    if gap > NOMINAL_AGREEMENT_EPS:
+        return CheckResult.failed(
+            "D3", PHASE,
+            f"NOMINAL_SELF_DECLARED: the coverage binding reported a nominal level "
+            f"of {nominal!r} against the {declared!r} declared under "
+            f"[{COVERAGE_SECTION}] in .mlkit/repo.toml (differ by {gap:.6g}). The "
+            "level a set of intervals promises is not the subject's to restate at "
+            "measurement time: setting it equal to the empirical coverage returns "
+            "PASS on any coverage at all, which is how a disclosed shortfall was "
+            "erased for a served model of record (E-M21). Either the declaration "
+            "is stale or these are not the intervals it describes; both need a "
+            "person, not a tolerance",
+            evidence,
+        )
+
     if n < MIN_COVERAGE_N:
         return CheckResult.na(
             "D3", PHASE,
@@ -196,11 +332,12 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
             evidence,
         )
 
-    if abs(empirical - nominal) > tol:
+    if abs(empirical - declared) > tol:
         return CheckResult.failed(
             "D3", PHASE,
-            f"empirical coverage {empirical:.3f} vs nominal {nominal:.3f} on n={n} "
-            f"exceeds tolerance {tol:.3f}; the prediction intervals do not mean what they say",
+            f"empirical coverage {empirical:.3f} vs declared nominal {declared:.3f} "
+            f"on n={n} exceeds tolerance {tol:.3f}; the prediction intervals do not "
+            "mean what they say",
             evidence,
         )
     return CheckResult.passed("D3", PHASE, evidence)

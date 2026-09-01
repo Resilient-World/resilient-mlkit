@@ -34,22 +34,16 @@ import textwrap
 
 from resilient_mlkit.checks import RunContext
 from resilient_mlkit.checks.decision import (
+    COVERAGE_SECTION,
     MAX_COVERAGE_TOL,
     MIN_COVERAGE_N,
+    NOMINAL_AGREEMENT_EPS,
     d2_placebo_test,
     d3_uncertainty_coverage,
 )
-
 from resilient_mlkit.core.repo import Repo
 from resilient_mlkit.core.result import Status
 from resilient_mlkit.portfolio import BLOCKED, resolve
-
-#: Bound to `decision.COVERAGE_SECTION` / `decision.NOMINAL_AGREEMENT_EPS` by
-#: the fix commit. Written as literals in THIS commit so the pins below fail on
-#: the assertion that names the defect rather than on an ImportError, which
-#: would prove only that a constant is missing.
-COVERAGE_SECTION = "coverage"
-NOMINAL_AGREEMENT_EPS = 1e-12
 
 #: Unique per fixture; see the note in tests/test_r3_blocked_splits.py. Two
 #: repos both naming their adapter module the same thing is the collision
@@ -610,7 +604,10 @@ def test_negative_control_the_honest_disclosure_the_exploit_erased_is_silent(tmp
     )
     assert result.status is Status.PASS
     assert result.evidence["declared_nominal"] == _ARABICA_DECLARED
-    assert result.evidence["reported_nominal"] == _ARABICA_EMPIRICAL
+    # The honest binding restates the declared level; the shortfall stays
+    # visible in `empirical`, which is the disclosure the exploit erased.
+    assert result.evidence["reported_nominal"] == _ARABICA_DECLARED
+    assert result.evidence["empirical"] == _ARABICA_EMPIRICAL
 
 
 def test_an_undeclared_nominal_level_is_NA_not_a_silent_fallback(tmp_path):
