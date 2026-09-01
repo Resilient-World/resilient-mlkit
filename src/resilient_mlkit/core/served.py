@@ -472,6 +472,22 @@ class ResamplingDeclaration:
     unit: str
     arm: str
     assignment: InitVar[Iterable[RowUnit]]
+    #: WHICH of the repo's holdout policies this declaration was taken under,
+    #: by the name the ``splits`` binding gives it. ``""`` — the default, and
+    #: what every current adopter carries — means "this repo has one, unnamed,
+    #: track", and on that path nothing below changes.
+    #:
+    #: THIS ONE IS DECLARED, NOT DERIVED, AND THAT IS NOT AN EXCEPTION TO THE
+    #: RULE ABOVE. The counts, the digests, the relation and the refusal are
+    #: facts ABOUT the assignment, and the assignment is their only admissible
+    #: source; spelling them would be spelling the verdict. ``track`` is not a
+    #: fact about the assignment at all — it is a POINTER INTO ANOTHER BINDING,
+    #: and the assignment does not contain, and cannot contain, the name a
+    #: different callable gave a partition. Deriving it would mean mlkit
+    #: guessing which of a repo's partitions this declaration meant, which is a
+    #: check choosing the operand of its own verdict (E-M21's shape). D6
+    #: refuses the ambiguity instead: see ``TRACK_UNDECLARED``.
+    track: str = ""
 
     # -- derived; see the class docstring. None of these is settable. --------
     n_rows: int = field(init=False, default=0)
@@ -497,6 +513,23 @@ class ResamplingDeclaration:
                     f"a resampling declaration must name its {name}; an unnamed "
                     "resampling procedure is the state this contract exists to end"
                 )
+        # `track` is optional, so it is checked for being WRITEABLE rather than
+        # for being present: an unset track is a repo with one partition, and a
+        # track that is a non-string or is only whitespace is a pointer that
+        # cannot be matched against any name `splits` can produce
+        # (`normalise_tracked_splits` refuses a blank track name on that side).
+        if not isinstance(self.track, str):
+            raise ServedContractError(
+                f"a resampling declaration's track is a {type(self.track).__name__}; "
+                "it names one of the holdout policies the `splits` binding "
+                "declares, and a name that is not a string cannot be that"
+            )
+        if self.track and not self.track.strip():
+            raise ServedContractError(
+                f"a resampling declaration's track is {self.track!r} -- whitespace. "
+                "An unset track means this repo has one partition; a blank one "
+                "means it has several and this declaration points at none of them"
+            )
         draws = self.draws
         if isinstance(draws, bool) or not isinstance(draws, int) or draws < 1:
             raise ServedContractError(
@@ -649,7 +682,7 @@ class ResamplingDeclaration:
         return bool(self.refusal)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "procedure": self.procedure,
             "draws": self.draws,
             "policy": self.policy,
@@ -671,6 +704,13 @@ class ResamplingDeclaration:
             "refusal": self.refusal or UNMEASURED,
             "detail": self.detail,
         }
+        # Emitted ONLY when set. A repo with one partition declares no track,
+        # and its evidence bytes are the bytes it had before tracks existed --
+        # which is what makes the single-track control a byte comparison rather
+        # than a reading.
+        if self.track:
+            out["track"] = self.track
+        return out
 
 
 # ---------------------------------------------------------------------------
