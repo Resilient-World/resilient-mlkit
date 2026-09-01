@@ -39,9 +39,17 @@ from resilient_mlkit.checks.decision import (
     d2_placebo_test,
     d3_uncertainty_coverage,
 )
+
 from resilient_mlkit.core.repo import Repo
 from resilient_mlkit.core.result import Status
 from resilient_mlkit.portfolio import BLOCKED, resolve
+
+#: Bound to `decision.COVERAGE_SECTION` / `decision.NOMINAL_AGREEMENT_EPS` by
+#: the fix commit. Written as literals in THIS commit so the pins below fail on
+#: the assertion that names the defect rather than on an ImportError, which
+#: would prove only that a constant is missing.
+COVERAGE_SECTION = "coverage"
+NOMINAL_AGREEMENT_EPS = 1e-12
 
 #: Unique per fixture; see the note in tests/test_r3_blocked_splits.py. Two
 #: repos both naming their adapter module the same thing is the collision
@@ -417,21 +425,29 @@ def test_negative_control_an_ordinary_finite_placebo_is_untouched_by_the_guard(t
 # is the underpowered one — below MIN_COVERAGE_N the binomial standard error
 # alone exceeds the tolerance, so the measurement cannot support a verdict in
 # either direction and the honest answer is NA.
+#
+# Every fixture below declares its nominal level in `.mlkit/repo.toml`, because
+# that is where the level lives (E-M21). `nominal=None` is the undeclared repo,
+# and it has its own control further down.
 
 
-def _coverage_repo(tmp_path, body: str, *, declare: bool = True) -> Repo:
+def _coverage_repo(
+    tmp_path, body: str, *, declare: bool = True, nominal: object = 0.90
+) -> Repo:
     module = f"d3_bindings_{next(_SERIAL)}"
     (tmp_path / f"{module}.py").write_text(textwrap.dedent(body))
     (tmp_path / ".mlkit").mkdir(parents=True, exist_ok=True)
     toml = '[repo]\nname = "fixturerepo"\n'
     if declare:
         toml += f'\n[bindings]\ncoverage = "{module}:coverage"\n'
+    if nominal is not None:
+        toml += f"\n[{COVERAGE_SECTION}]\nnominal = {nominal}\n"
     (tmp_path / ".mlkit" / "repo.toml").write_text(toml)
     return Repo(name="fixturerepo", path=tmp_path)
 
 
-def _run_d3(tmp_path, body: str, *, declare: bool = True):
-    repo = _coverage_repo(tmp_path, body, declare=declare)
+def _run_d3(tmp_path, body: str, *, declare: bool = True, nominal: object = 0.90):
+    repo = _coverage_repo(tmp_path, body, declare=declare, nominal=nominal)
     try:
         return d3_uncertainty_coverage(repo, _ctx(tmp_path))
     finally:
@@ -519,3 +535,226 @@ def test_an_undeclared_coverage_binding_is_NA(tmp_path):
     )
     assert result.status is Status.NA
     assert "no 'coverage' binding declared" in result.reason
+
+
+# -- D3: the nominal level is DATA, not the subject's own claim (E-M21) ----
+#
+# Tick 13's finding, found independently in two repos in one tick: TIE ONE
+# OPERAND, LEAVE THE OTHER. D3's verdict is `abs(empirical - nominal) > tol`,
+# and until this section existed BOTH operands were read out of the single dict
+# the subject had just handed the check. Two repos tied `empirical` to the
+# observed rows -- carefully, with controls of their own -- and left `nominal`,
+# the other term of the same subtraction, tied only to a copy of itself.
+#
+# The arabica figures below are that incident's, verbatim: `nominal` set equal
+# to the empirical 0.8879423328964613 in both `coverage_for_d3` and
+# `levels[alpha=0.1]`, D3 returning PASS on evidence reading
+# `{'nominal': 0.8879423328964613, 'empirical': 0.8879423328964613, ...}`,
+# erasing a shortfall of -0.012057667103538727 the repo had truthfully
+# disclosed for its served model of record. The second leg of that PR re-derived
+# the coverage from the rows, agreed to 1e-12, and raised nothing -- because it
+# was checking the operand that had not been touched.
+#
+# The pairing that carries the weight here is the first pair: the SAME rows and
+# the SAME empirical figure, differing only in whether the callable restates the
+# declared level or replaces it. If both were PASS or both were FAIL the check
+# would not be reading the declaration at all.
+
+#: The level the repo promises, and the coverage it actually got, from the
+#: tick-13 arabica incident (scratchpad STATE.md, TICK 13).
+_ARABICA_DECLARED = 0.90
+_ARABICA_EMPIRICAL = 0.8879423328964613
+
+
+def test_positive_control_a_self_declared_nominal_cannot_replace_the_declared_level(
+    tmp_path,
+):
+    """FIRES: the tick-13 exploit, with the repo's real promise on disk.
+
+    `.mlkit/repo.toml` declares 90% intervals. The callable reports its nominal
+    as the empirical coverage it just measured. Every individual number here is
+    genuine -- 0.8879423328964613 really was the coverage -- and only the
+    PAIRING is a lie, which is exactly the shape surge's half of the incident
+    took. Nothing compared the pairing until this branch.
+    """
+    result = _run_d3(
+        tmp_path,
+        _coverage(
+            f'"nominal": {_ARABICA_EMPIRICAL!r}, "empirical": {_ARABICA_EMPIRICAL!r}, '
+            '"n": 1526, "tol": 0.05'
+        ),
+        nominal=_ARABICA_DECLARED,
+    )
+    assert result.status is Status.FAIL
+    assert "NOMINAL_SELF_DECLARED" in result.reason
+    # A refusal that does not print both operands cannot be acted on.
+    assert result.evidence["declared_nominal"] == _ARABICA_DECLARED
+    assert result.evidence["reported_nominal"] == _ARABICA_EMPIRICAL
+
+
+def test_negative_control_the_honest_disclosure_the_exploit_erased_is_silent(tmp_path):
+    """SILENT: the same rows, the same empirical, the level told truthfully.
+
+    This is the half that makes the test above a control rather than a blanket
+    refusal of coverage bindings. The shortfall of -0.0121 is inside mlkit's
+    0.05 tolerance, so the honest report PASSes and the substituted one does
+    not -- the verdict moves on the substitution alone.
+    """
+    result = _run_d3(
+        tmp_path,
+        _coverage(
+            f'"nominal": {_ARABICA_DECLARED!r}, "empirical": {_ARABICA_EMPIRICAL!r}, '
+            '"n": 1526, "tol": 0.05'
+        ),
+        nominal=_ARABICA_DECLARED,
+    )
+    assert result.status is Status.PASS
+    assert result.evidence["declared_nominal"] == _ARABICA_DECLARED
+    assert result.evidence["reported_nominal"] == _ARABICA_EMPIRICAL
+
+
+def test_an_undeclared_nominal_level_is_NA_not_a_silent_fallback(tmp_path):
+    """FIRES as NA: with no declaration there is no second operand.
+
+    The tempting fallback -- "no declaration, so trust the binding's nominal" --
+    is the pre-branch behaviour wearing a conditional, and it is the one a repo
+    reaches by deleting four characters from its own config. An undeclared level
+    is not a licence to read the subject's claim as the standard.
+    """
+    result = _run_d3(
+        tmp_path,
+        _coverage(
+            f'"nominal": {_ARABICA_EMPIRICAL!r}, "empirical": {_ARABICA_EMPIRICAL!r}, '
+            '"n": 1526, "tol": 0.05'
+        ),
+        nominal=None,
+    )
+    assert result.status is Status.NA
+    assert "NOMINAL_UNDECLARED" in result.reason
+    assert COVERAGE_SECTION in result.reason
+
+
+def test_the_verdict_is_measured_against_the_declared_level_not_the_reported_one(
+    tmp_path,
+):
+    """FIRES: a stricter declared level the callable agrees with, and misses.
+
+    Without this the two branches above are satisfiable by a check that reads
+    the declaration only to compare it with the callable and then goes on using
+    the callable's copy. Here the declared 0.99 is the level the 0.90 empirical
+    is judged against, and 0.09 clears mlkit's 0.05.
+    """
+    result = _run_d3(
+        tmp_path, _coverage('"nominal": 0.99, "empirical": 0.90, "n": 5000'), nominal=0.99
+    )
+    assert result.status is Status.FAIL
+    assert "do not mean what they say" in result.reason
+    assert result.evidence["declared_nominal"] == 0.99
+
+
+def test_a_float_representation_difference_is_not_a_disagreement(tmp_path):
+    """SILENT: `1 - 0.1` is not the literal `0.9`, and a repo may compute it.
+
+    The agreement bar is a representation allowance, not a tolerance: a
+    disagreement smaller than 1e-12 is the same number written two ways. The
+    incident this section pins missed by 0.0121, ten orders of magnitude above
+    the bar, and the test below holds the bar's other side.
+    """
+    result = _run_d3(
+        tmp_path,
+        _coverage('"nominal": 1 - 0.1, "empirical": 0.89, "n": 5000'),
+        nominal=0.9,
+    )
+    assert result.status is Status.PASS
+
+
+def test_a_disagreement_just_above_the_representation_bar_is_refused(tmp_path):
+    """FIRES: the other side of the allowance, so it is a bar and not a hole.
+
+    1e-9 is far too small to matter to any coverage claim, and it is refused
+    anyway, because the question this branch asks is not "is the level close"
+    but "did the subject restate the level or replace it".
+    """
+    result = _run_d3(
+        tmp_path,
+        _coverage('"nominal": 0.900000001, "empirical": 0.89, "n": 5000'),
+        nominal=0.9,
+    )
+    assert result.status is Status.FAIL
+    assert "NOMINAL_SELF_DECLARED" in result.reason
+    assert abs(0.900000001 - 0.9) > NOMINAL_AGREEMENT_EPS
+
+
+def test_a_declared_level_that_is_not_a_probability_is_refused_by_name(tmp_path):
+    """FIRES: `nominal = 90` is the percentage/probability confusion.
+
+    Read as a level, 90 makes `abs(empirical - 90) > tol` true for every
+    possible coverage, so the repo would fail D3 forever with a message about
+    its intervals rather than about its config. A declaration that is not a
+    probability is refused as a declaration.
+    """
+    result = _run_d3(
+        tmp_path, _coverage('"nominal": 90, "empirical": 0.90, "n": 5000'), nominal=90
+    )
+    assert result.status is Status.FAIL
+    assert "not a coverage level" in result.reason
+
+
+def test_a_non_numeric_declared_level_is_refused_by_name(tmp_path):
+    """FIRES: a string level. `float("0.90")` would have accepted it silently,
+    and `bool` is an `int` in Python, so `nominal = true` would have declared a
+    100% promise. Both are refused on type before anything is read from them."""
+    result = _run_d3(
+        tmp_path,
+        _coverage('"nominal": 0.90, "empirical": 0.90, "n": 5000'),
+        nominal='"0.90"',
+    )
+    assert result.status is Status.FAIL
+    assert "not a number" in result.reason
+
+
+def test_a_boolean_declared_level_is_refused_by_name(tmp_path):
+    """FIRES: `nominal = true` is `1.0` to `float()` and a valid probability."""
+    result = _run_d3(
+        tmp_path,
+        _coverage('"nominal": 1.0, "empirical": 1.0, "n": 5000'),
+        nominal="true",
+    )
+    assert result.status is Status.FAIL
+    assert "not a number" in result.reason
+
+
+def test_negative_control_the_non_finite_refusals_outrank_the_declaration(tmp_path):
+    """SILENT as a declaration verdict: a NaN empirical is still refused as NaN.
+
+    Ordering control. A broken measurement gets the diagnosis that names what
+    broke; folding it into NOMINAL_SELF_DECLARED (NaN disagrees with every
+    declared level) would replace a precise refusal with a misleading one, and
+    would make the E-M09/E-M10 non-finite guards unreachable through D3.
+    """
+    result = _run_d3(
+        tmp_path,
+        _coverage('"nominal": float("nan"), "empirical": 0.90, "n": 200'),
+        nominal=0.90,
+    )
+    assert result.status is Status.FAIL
+    assert "non-finite" in result.reason
+    assert "NOMINAL_SELF_DECLARED" not in result.reason
+
+
+def test_a_substituted_nominal_outranks_the_small_holdout_NA(tmp_path):
+    """FIRES: n=40 is below the floor AND the level was replaced.
+
+    NA would be the wrong answer: "we could not measure this" reads as a gap to
+    fill, and hides that the level itself was rewritten. The substitution does
+    not become less true on fewer rows.
+    """
+    result = _run_d3(
+        tmp_path,
+        _coverage(
+            f'"nominal": {_ARABICA_EMPIRICAL!r}, "empirical": {_ARABICA_EMPIRICAL!r}, "n": 40'
+        ),
+        nominal=_ARABICA_DECLARED,
+    )
+    assert result.status is Status.FAIL
+    assert "NOMINAL_SELF_DECLARED" in result.reason
