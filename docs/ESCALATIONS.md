@@ -2234,3 +2234,121 @@ verification entry is an append.
 
 **Status: M-04 STANDS on its substance. One NA-lane over-fire found by driving
 and REPAIRED on this branch; two measured behaviours recorded OPEN above.**
+
+---
+
+## E-M24 — D2/E1 are bindable now; arming them in the eight repos is not mlkit's to do
+
+**Measured by** `mlkit check --phase decision` / `--phase economics` on
+`resilient-fray` (round 8 adjudication §2.4), and by reading all eight
+`.mlkit/repo.toml` files at their checked-out HEADs on 2026-09-01.
+
+### What was closed here
+
+The two contract mismatches §2.4 recorded are fixed in `mlkit`, on
+`feat/m-d2e1-declared-contract`:
+
+* D2's halt region is now a committed `[placebo]` declaration — `estimand`,
+  `null_value`, `indicts` — read from `HEAD:.mlkit/repo.toml`. fray's honest
+  "skill against the persistence floor" surrogate, CI `[-71.998, -53.146]`, can
+  be bound without tripping a spurious fleet-wide hard stop.
+* E1's ladder is now a committed `[scaling] fractions` declaration. A probe that
+  ran 10% and 25% is judged between 10% and 25%, on mlkit's own **relative** 1%
+  bar, instead of failing on contract for a 1% rung it never ran.
+
+Undeclared repos are unchanged, and that is measured rather than asserted:
+**zero of the eight** `.mlkit/repo.toml` files carry a `[placebo]` or
+`[scaling]` section, so no verdict anywhere in the fleet moves on this release.
+
+### What is NOT closed, and why it cannot be closed from here
+
+**1. The bindings themselves. All eight repos, still.**
+
+The same read shows **zero of the eight** declare a `placebo_test` or a
+`scaling_probe` binding. D2 and E1 are NA in every repo in the portfolio, and
+they were NA before this change too — what moved is that the contract no longer
+stands in the way. `baseline1.md` records the remaining blocker for
+`resilient-chokepoint`, and it is the same everywhere: the placebo run and the
+scaling probe are SageMaker Processing Jobs, and the training plane has not been
+bootstrapped. Bootstrapping it is IAM and billing resource creation.
+
+**Cannot be done from here**: writing a binding is a write into another repo,
+and standing up the training plane is CLAUDE.md rule 12 — reserved to the
+signatory.
+
+**Proposed**: bootstrap the plane, then bind `placebo_test` and `scaling_probe`
+in fray first, since fray is the repo whose estimand this contract was measured
+against. fray's `[placebo]` declaration would read:
+
+```toml
+[placebo]
+estimand   = "skill against the persistence floor, lb/ac"
+null_value = 0.0
+indicts    = "above"
+```
+
+and its `reference_effect` is `+22.81138510740044` lb/ac (persistence floor
+`151.74139194139195` − VAL MAE `128.9300068339915`), which is positive and so
+agrees with `indicts = "above"` as the sign tie requires. Both figures are round
+8's, from the unseen-year track; they are quoted here so the declaration can be
+checked rather than retyped, and `mlkit` must re-measure them before anyone
+commits them.
+
+**2. The MAGNITUDE of a declared `null_value` is not adjudicated, and cannot
+honestly be, by mlkit alone.**
+
+What the contract ties: the null must be a finite number, committed, reviewable
+in a diff, declared beside a written `estimand`, and — under a one-sided region
+— pointing the same way as the real run's claimed effect. What it does **not**
+tie is how far the declared null may sit from anything. A repo declaring
+`null_value = 1e9` with `indicts = "above"` would pass D2 on any interval below
+`1e9`, and the sign tie would not fire, because `reference_effect` is still
+positive.
+
+No magnitude bar is invented here. Any threshold on "how far is too far" would
+be an expected range mlkit fabricated, which is exactly CLAUDE.md rule 2 — and
+it would have refused the one genuine case it has been shown: fray's placebo
+sits `62.572` from its null, `2.743` reference-effects away, which is entirely
+ordinary for a skill-against-a-floor estimand. A bar that refuses the real case
+is not a bar.
+
+What ships instead is disclosure carrying the number a reviewer needs:
+`evidence["null_distance_in_reference_effects"]` is
+`|estimate − null| / |reference_effect|` on every D2 verdict that reaches the
+power bar, so a runaway null shows up as a large number in the portfolio row
+rather than as a silent PASS. Disclosure is **not** a gate — E-M12 is the record
+of what disclosure alone buys — and this entry says so rather than claiming
+otherwise.
+
+**Cannot be done from here**: the honest second operand for a declared null is
+**D1**, `COUNTERFACTUAL_SPEC`, which already states what the counterfactual is
+and what would make the claim false, and which is already reserved to the
+signatory — so the subject cannot write it.
+
+**Proposed**: have D1's written spec name the estimand and its no-signal value,
+and have D2 adjudicate `[placebo] null_value` against D1's the way D3
+adjudicates a binding's `nominal` against `[coverage]`. That is the same repair
+E-M21 made for D3 — tie the operand the subject supplies to one it may not — and
+it is a signatory decision because D1 is.
+
+**3. The spine's canonical `docs/DECISION_VALIDITY.md` and
+`docs/RUN_ECONOMICS.md` changed, so all eight deployed copies now read
+DRIFTED.**
+
+Both files document the contract this branch changed, and both are CANONICAL
+(`core/spine.py:CANONICAL_FILES`) — authored here and synced outward. The
+deployed copies are correct about the old contract and wrong about the new one
+until `scripts/sync_spine.py` runs.
+
+**Cannot be done from here**: the sync writes into eight other repos.
+
+**Proposed**: run `python scripts/sync_spine.py` when this lands, in the same
+change that repins the adopters, so the eight repos do not sit with
+documentation describing a contract their pinned mlkit does not implement.
+`spine/mlkit/repo.toml` is a SEED file and is never overwritten, so the two new
+commented sections it gained reach new adopters only; existing repos add them by
+hand when they arm the bindings.
+
+**Status: the D2/E1 CONTRACT is closed. Arming D2/E1 in the eight repos, the
+D1-to-`null_value` tie, and the spine sync are all open and all outside an
+agent's reach.**

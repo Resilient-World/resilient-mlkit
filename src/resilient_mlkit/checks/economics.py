@@ -41,6 +41,7 @@ mark.
 from __future__ import annotations
 
 import math
+from itertools import pairwise
 
 from ..core import declaration
 from ..core.repo import BindingError, Repo
@@ -150,7 +151,7 @@ def read_fraction_ladder(
             f"needs at least {MIN_RUNGS}. Two points cannot answer the question, and "
             "declaring a ladder is not a way around that refusal"
         )
-    if any(b <= a for a, b in zip(rungs, rungs[1:])):
+    if any(b <= a for a, b in pairwise(rungs)):
         return None, {}, "", (
             f"SCALING_MALFORMED: [{SCALING_SECTION}] fractions {rungs} is not strictly "
             "increasing; E1 reads the LAST two rungs as the top of the ladder, so an "

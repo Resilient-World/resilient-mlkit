@@ -48,8 +48,8 @@ from . import artifact
 from .repo import BindingError, Repo
 
 __all__ = [
-    "Declaration",
     "REPO_CONFIG_RELPATH",
+    "Declaration",
     "finite_number",
     "read",
     "table_and_keys",

@@ -407,9 +407,15 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
     # direction its own D2 was testing, and every remaining verdict this check
     # could return would be vacuous.
     #
-    # Zero fails it too, and for the same reason it fails the power bar below:
-    # an effect of exactly zero lies on neither side, so there is nothing for
-    # the exemption to agree with.
+    # An effect of exactly zero fails this too. It lies on NEITHER side, so
+    # there is nothing for a one-sided exemption to agree with -- and the
+    # comparison is `> 0` rather than `>= 0` for that reason. The power bar
+    # below refuses a zero reference as well, so the STATUS is FAIL either way
+    # and only the diagnosis differs; under a one-sided declaration the
+    # diagnosis this branch gives is the precise one, and `test_a_zero_
+    # reference_effect_under_a_one_sided_region_names_the_sign` pins it. That
+    # test exists because a mutation drive found `>=` here changed nothing any
+    # control could see.
     #
     # Under the default two-sided region the sign is not read at all -- both
     # sides indict, so there is nothing to disagree with, and `abs()` is the
@@ -426,12 +432,27 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
                 f"PLACEBO_EXEMPTS_THE_CLAIM: [{PLACEBO_SECTION}] declares that only "
                 f"excursions {region.indicts} the null {region.null:.6g} indict, but the "
                 f"real-run effect this placebo must be able to detect is reported as "
-                f"{reported:.6g}, which lies on the exempt side. The direction the "
-                "product's claim lives in is the one direction D2 has to be able to "
-                "refuse; exempting it makes every other verdict here vacuous. Either "
-                "the declaration or the reported effect is the wrong way round",
+                f"{reported:.6g}, which does not lie on the indicting side. The "
+                "direction the product's claim lives in is the one direction D2 has to "
+                "be able to refuse; exempting it makes every other verdict here vacuous. "
+                "Either the declaration or the reported effect is the wrong way round",
                 evidence,
             )
+
+    # Disclosure, and deliberately NOT a gate. mlkit ties the null's finiteness,
+    # its committedness, the estimand written beside it and -- one-sided -- its
+    # DIRECTION against the real-run claim. It does not tie its MAGNITUDE, and
+    # cannot: any bar on "how far from the estimate may a declared null sit"
+    # would be an expected range mlkit invented (CLAUDE.md rule 2), and it would
+    # refuse the one real case this contract was measured against -- fray's
+    # placebo sits 2.743 reference-effects from its null, which is ordinary for
+    # a skill-against-a-floor estimand. So the number a reviewer would need is
+    # PRINTED instead: a runaway null shows up as a large figure in the
+    # portfolio row rather than as a silent PASS. docs/ESCALATIONS.md E-M24
+    # records that disclosure is not a gate, and what the gate would need (D1,
+    # which is the signatory's).
+    if reference:
+        evidence["null_distance_in_reference_effects"] = abs(estimate - region.null) / reference
 
     if reference == 0 or half_width >= reference:
         return CheckResult.failed(

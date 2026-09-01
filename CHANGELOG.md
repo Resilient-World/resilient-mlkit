@@ -27,6 +27,76 @@ true before the tag was cut. It is withdrawn here rather than quietly dropped,
 and `tests/test_version_declaration.py` now FIRES on it: the newest entry may
 not restate it, and must name at least one of the checks whose verdict moved.
 
+### D2 and E1 became bindable: the halt region and the fraction ladder are DECLARED data
+
+**Neither check changes verdict on unchanged repo code, in any of the eight
+repos, and that is measured rather than asserted.** `grep -c '^\[placebo\]|^\[scaling\]'`
+over all eight `.mlkit/repo.toml` files returns **0** for every one, and so
+does `grep -c '^placebo_test =|^scaling_probe ='` — so D2 and E1 are NA
+everywhere in the fleet today, and both stay NA on this release. What moves is
+that they can now be *armed*.
+
+**What was wrong.** Round 8's adjudication measured `resilient-fray`'s D2 and E1
+as NA at head and at main, and found the reason was mlkit's contract, not
+fray's wiring:
+
+* D2 halted on `lo > 0 or hi < 0` — a two-sided interval around a literal zero.
+  fray's placebo estimand is *skill against the persistence floor*, whose
+  no-signal value is not zero: a shuffled-target run is expected to land far
+  below the floor, and fray's placebo CI is `[-71.998, -53.146]`. Binding that
+  honest surrogate under `placebo_test` would have tripped a **spurious
+  fleet-wide hard stop**, so fray did not bind it.
+* E1 required the fractions `{0.01, 0.10, 0.25}` and nothing else. fray's probe
+  ran 10% and 25%. Under mlkit's own **relative** rule that curve is comfortably
+  not flat — `(-138.13969 − −151.29137) / |−151.29137|` = `+0.08693`, against a
+  1% bar — so E1 would have **failed on contract, not on substance**.
+
+A hard stop nobody can arm reads as coverage and is not coverage. Both repos'
+hard stops that round were the trainers' own in-script constructions: genuine,
+honestly computed, and not the fleet's gates.
+
+**What changed.** Two optional sections of `.mlkit/repo.toml`, read **from the
+blob at HEAD** through `core.artifact` — the discipline E-M21/E-M23 forced on
+D3's nominal level, for the same reason:
+
+```toml
+[placebo]  estimand / null_value / indicts     # D2's halt region
+[scaling]  fractions                            # E1's ladder
+```
+
+**What pays for the widening.** None of it optional:
+
+* **Undeclared is unchanged.** Defaults are `0.0`/`"either"` and
+  `(0.01, 0.10, 0.25)`. Every fallback — absent section, malformed working-tree
+  config, dirty tree with the section deleted — lands on the strictest setting,
+  so a repo cannot loosen anything by breaking something.
+* **Committed or it does not exist.** A section in the working tree and not at
+  HEAD is NA naming the file; malformed is FAIL; an unknown key is FAIL naming
+  it. A binding that rewrites the config from its own module body cannot move
+  the standard.
+* **A moved halt region cannot be anonymous.** Shifting `null_value` off zero or
+  `indicts` off `"either"` requires a written `estimand` in the same table, and
+  that sentence rides in the verdict's evidence.
+* **The exemption must point the same way as the claim.** Under a one-sided
+  region the sign of `reference_effect` — the real run's effect, already
+  required, already measured from the same null — must lie on the *indicting*
+  side. A repo that exempts the direction its product's claim lives in has
+  exempted the only direction D2 was testing, and that is a FAIL.
+* **A declared ladder cannot buy a pass.** Its top rung may not sit below 0.25,
+  and its top two rungs may be no further apart than mlkit's own
+  `0.25 / 0.10 = 2.5` — the one way widening a ladder could make a flat curve
+  look steep. At least three rungs, strictly increasing, each in `(0, 1]`.
+* **No threshold moved.** `FLATNESS_EPSILON`, the D2 power bar and its strict
+  boundary, and every non-finite refusal and its ordering are untouched. No test
+  that existed on `main` was edited; `tests/test_declared_hard_stops.py` adds 39
+  controls and the suite goes 909 → 948.
+
+`evidence["gain_10_to_25"]` is now emitted **only** when the ladder really is
+`(0.10, 0.25)`; `gain_top_two`, `from_fraction` and `to_fraction` are always
+emitted. A key naming two fractions that were not the ones measured is a
+fabricated label on a real number, which is the one thing a reader does not
+check.
+
 ### R10 `absence adjudicated as a pass` fired on honest NA-reporting guards (E-M19)
 
 **R10 changes verdict on unchanged repo code in one repo**, in the direction

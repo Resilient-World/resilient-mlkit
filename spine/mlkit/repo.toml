@@ -28,12 +28,19 @@ name = "REPLACE_ME"
 #   metric_known_answer()  -> [{name, computed, expected, tol}]
 #   provenance()           -> {"train": {"real": n, "synthetic": n, ...}, "val": ..., "test": ...}
 #   deterministic_run(seed)-> any repr-comparable result
-#   placebo_test()         -> {estimate, ci_low, ci_high, run_id}
+#   placebo_test()         -> {estimate, ci_low, ci_high, reference_effect, run_id}
+#                             `reference_effect` is the REAL RUN's effect size,
+#                             measured from the same null this placebo is judged
+#                             against, and D2 requires it: an interval wide
+#                             enough to contain everything contains the null
+#                             too. Report it SIGNED -- see [placebo] below.
 #   coverage()             -> {nominal, empirical, n, tol}
 #                             `nominal` is CROSS-CHECKED against the level
 #                             declared in [coverage] below, not trusted as the
 #                             standard; see that section.
-#   scaling_probe()        -> {0.01: metric, 0.10: metric, 0.25: metric}  (larger is better)
+#   scaling_probe()        -> {fraction: metric, ...}  (larger is better)
+#                             Defaults to {0.01, 0.10, 0.25}; declare a
+#                             different ladder in [scaling] below.
 #   hparam_sanity()        -> {lr_range, throughput_curve, winning_config, mlflow_run_id}
 #   efficiency()           -> {gpu_util, profiler_trace, dataloader_bound}
 
@@ -58,6 +65,61 @@ name = "REPLACE_ME"
 # probability, not the percentage.
 [coverage]
 # nominal = 0.90
+
+# ── Placebo halt region (D2) ────────────────────────────────────────────────
+# WHICH EXCURSIONS FROM WHICH VALUE MEAN THE ESTIMATOR IS BROKEN.
+#
+# D2 halts when `placebo_test`'s confidence interval excludes the value the
+# estimand takes UNDER NO SIGNAL. For an avoided-loss estimand that value is
+# zero and both sides indict, which is what mlkit applies when this section is
+# absent -- and is the right default for most repos.
+#
+# It is not right for every estimand. `resilient-fray`'s placebo estimand is
+# skill against the persistence floor: a shuffled-target run is EXPECTED to
+# land far below the floor (its CI is [-71.998, -53.146]), and only a placebo
+# that BEATS the floor is leakage. Under the two-sided default that honest
+# surrogate would have tripped a spurious hard stop, so fray did not bind it at
+# all and its D2 read NA -- a gate nobody can bind is an absent one.
+#
+# Declaring this section is not free, and the costs are the reason it is safe:
+#   * moving `null_value` off 0.0, or `indicts` off "either", REQUIRES a written
+#     `estimand`. mlkit cannot adjudicate prose; it can refuse an anonymous
+#     exemption and quote the justification in every verdict.
+#   * under a one-sided region, the SIGN of `reference_effect` must lie on the
+#     indicting side. Exempting the direction your product's claim lives in
+#     makes every verdict D2 could return vacuous, and is a FAIL.
+#   * the power bar is unchanged: the interval must be strictly narrower than
+#     `reference_effect`, whatever the null is.
+# The section is read from HEAD, not from the working tree. An uncommitted
+# declaration is NA, not a silent default.
+[placebo]
+# estimand   = "skill against the persistence floor, lb/ac"
+# null_value = 0.0
+# indicts    = "above"      # "either" (default) | "above" | "below"
+
+# ── Scaling ladder (E1) ─────────────────────────────────────────────────────
+# THE FRACTIONS OF THE DATA THIS REPO'S PROBE ACTUALLY RUNS.
+#
+# E1's verdict is the RELATIVE gain between the TOP TWO rungs, against mlkit's
+# 1% flatness bar. With no declaration the ladder is [0.01, 0.10, 0.25] and the
+# verdict is taken between 10% and 25%, exactly as before this section existed.
+#
+# Declare your own when your probe runs a different ladder -- a repo whose
+# probe never ran a 1% rung used to FAIL E1 ON CONTRACT with a curve that was
+# comfortably not flat, which tells nobody anything about whether the run buys
+# something. Two rules keep a declared ladder honest, and both refuse the
+# DECLARATION before any curve is read:
+#   * the top rung may not sit below 0.25. E1 asks whether the run you would
+#     actually buy is worth buying; a ladder topping out at 5% never asks it.
+#   * the top two rungs may be no further apart than mlkit's own 0.25/0.10 =
+#     2.5x. Widening that step is the one way a declared ladder could make a
+#     flat curve look steep: more data always buys something if you ask for
+#     enough more.
+# At least three rungs, strictly increasing, each in (0, 1]. Read from HEAD.
+#
+# The 1% flatness threshold itself is mlkit's and is NOT declarable.
+[scaling]
+# fractions = [0.01, 0.10, 0.25]
 
 # ── Remote parity (R7) ──────────────────────────────────────────────────────
 # Populated once Loop 0 has been performed by the signatory. Region must be
