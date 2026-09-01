@@ -468,3 +468,118 @@ class CheckResult:
             nonce=d.get("nonce", ""),
             measured_at=d.get("measured_at", ""),
         )
+
+
+class GateAggregateError(FabricationError):
+    """Raised when a gate verdict is claimed over checks that cannot support it."""
+
+
+@dataclass(frozen=True)
+class GateAggregate:
+    """Many checks, one gate verdict — DERIVED, and stored nowhere.
+
+    WHY THIS TYPE EXISTS
+    --------------------
+    Every repo in the fleet needs to say "did the gate pass", and every repo
+    that needed it hand-rolled it. The measured instance is
+    ``resilient-fray/src/registry/promotion_gate.py``: a mutable ``GateResult``
+    at ``:401``, initialised ``GateResult(passed=True)`` at ``:851`` and
+    narrowed check by check with ``&=``. Three properties of that shape, each
+    on its own enough:
+
+    * the verdict starts at **True** and is argued down. A loop that fails to
+      run, an exception swallowed between the initialiser and the first ``&=``,
+      or a check silently skipped, all leave a PASS standing;
+    * ``passed`` is a stored field, so it can be assigned. Whatever the checks
+      said, ``result.passed = True`` says otherwise, and nothing downstream can
+      tell the two apart;
+    * ``&=`` collapses three statuses into two. NA is not PASS and it is not
+      FAIL, and ``bool(NA)`` has to pick one.
+
+    Here ``passed`` is a property over a tuple of :class:`CheckResult`. There is
+    no field to assign, no initial value to leave standing, and no accumulation
+    step to skip: the verdict is recomputed from the results every time it is
+    asked for, and a caller holding this object cannot make it disagree with
+    the checks it holds.
+
+    **NA IS NOT PASS.** ``passed`` is ``all(status is PASS)``, not
+    ``not any(status is FAIL)``. That is the readiness semantics this package
+    already documents on :class:`Status`: "we could not measure it" is not
+    coverage, and a gate that treats it as coverage reports readiness the repo
+    does not have. DEFERRED, STALE and ESCALATED are likewise not passes.
+
+    An aggregate over ZERO checks is refused rather than reported as True. It
+    is the same vacuity ``ChallengerDecision`` refuses for ``metrics=()``
+    (M-02): ``all([])`` is True, so a gate that ran nothing passes everything.
+    """
+
+    gate: str
+    results: tuple[CheckResult, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "results", tuple(self.results))
+        if not str(self.gate).strip():
+            raise GateAggregateError(
+                "a gate aggregate must name the gate it is the verdict of; an "
+                "unnamed verdict cannot be attributed to anything"
+            )
+        if not self.results:
+            raise GateAggregateError(
+                f"gate {self.gate!r} aggregates no check. `all([])` is True, so a "
+                "verdict over an empty check set is a pass nobody measured -- the "
+                "same vacuity ChallengerDecision refuses for an empty metric set."
+            )
+        wrong = [r for r in self.results if not isinstance(r, CheckResult)]
+        if wrong:
+            raise GateAggregateError(
+                f"gate {self.gate!r} aggregates {[type(r).__name__ for r in wrong]}; "
+                "this verdict is derived from CheckResults, and a bare bool or dict "
+                "in the set is a verdict somebody formed elsewhere and posted in"
+            )
+        seen: dict[str, int] = {}
+        for r in self.results:
+            seen[r.check_id] = seen.get(r.check_id, 0) + 1
+        repeated = sorted(cid for cid, n in seen.items() if n > 1)
+        if repeated:
+            raise GateAggregateError(
+                f"gate {self.gate!r} carries {repeated} more than once. Two results "
+                "for one check id are two answers to one question, and which one "
+                "the verdict rests on would depend on iteration order."
+            )
+
+    @property
+    def passed(self) -> bool:
+        """True only when EVERY check passed. Derived; there is no field."""
+        return all(r.status is Status.PASS for r in self.results)
+
+    @property
+    def statuses(self) -> dict[str, Status]:
+        return {r.check_id: r.status for r in self.results}
+
+    @property
+    def blocking(self) -> tuple[str, ...]:
+        """The check ids standing between this gate and a pass, in order."""
+        return tuple(r.check_id for r in self.results if r.status is not Status.PASS)
+
+    @property
+    def counts(self) -> dict[str, int]:
+        tally: dict[str, int] = {}
+        for r in self.results:
+            tally[r.status.value] = tally.get(r.status.value, 0) + 1
+        return tally
+
+    def result(self, check_id: str) -> CheckResult | None:
+        for r in self.results:
+            if r.check_id == check_id:
+                return r
+        return None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "gate": self.gate,
+            "passed": self.passed,
+            "n_checks": len(self.results),
+            "counts": self.counts,
+            "blocking": list(self.blocking),
+            "results": [r.to_dict() for r in self.results],
+        }
