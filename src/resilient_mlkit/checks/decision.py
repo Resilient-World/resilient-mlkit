@@ -2,18 +2,43 @@
 
 D2 is the strongest check in the package. Run the full pipeline on a
 pre-intervention period, or with treatment assignment permuted, and the
-avoided-loss estimate must come back indistinguishable from zero. If it does
-not, the estimator is capturing something other than the intervention, and no
-amount of tuning fixes that -- so a D2 failure is a hard stop for the repo
-rather than a finding to work around. It costs cents on a Processing Job and
-can invalidate a model before a single GPU-hour is bought.
+avoided-loss estimate must come back indistinguishable from the value it takes
+when there is no signal. If it does not, the estimator is capturing something
+other than the intervention, and no amount of tuning fixes that -- so a D2
+failure is a hard stop for the repo rather than a finding to work around. It
+costs cents on a Processing Job and can invalidate a model before a single
+GPU-hour is bought.
+
+"The value it takes when there is no signal" was written as a literal zero for
+this package's whole life, and for an avoided-loss estimand that is right. It
+is not right for every estimand an adopter may honestly place under the name
+``placebo_test``, and round 8 measured what that costs: ``resilient-fray``'s
+placebo estimand is SKILL AGAINST THE PERSISTENCE FLOOR, whose no-signal value
+is emphatically not zero -- a shuffled-target run is expected to be far WORSE
+than the floor, and fray's placebo CI is ``[-71.998, -53.146]``. Binding that
+honest surrogate under this name would have tripped a SPURIOUS FLEET-WIDE HARD
+STOP, so fray did not bind it, and its D2 read NA at head and at main while the
+run's hard stops were the trainer's own in-script constructions. A gate nobody
+can bind is not a strict gate; it is an absent one.
+
+So the halt region is DECLARABLE now -- see ``PLACEBO_SECTION`` and
+:func:`d2_placebo_test` -- and every path that widens it is paid for:
+
+* the declaration lives in COMMITTED data, not in the dict the subject returns;
+* a one-sided or shifted halt region requires a written ``estimand``, so the
+  exemption cannot be anonymous;
+* the sign of ``reference_effect`` must lie on the INDICTING side, so a repo
+  cannot exempt the direction its own product claim lives in;
+* the power bar, the non-finite guards and their order are untouched;
+* and a repo that declares nothing gets exactly the rule it got before.
 """
 
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
-from ..core import artifact
+from ..core import artifact, declaration
 from ..core.repo import BindingError, Repo
 from ..core.result import ALLOW_DIRTY_KEY, CheckResult, CredentialRequired
 from . import RunContext, check
@@ -36,7 +61,42 @@ COVERAGE_SECTION = "coverage"
 #: D3 reads it FROM COMMITTED STATE. ``repo.config()`` would read the working
 #: tree, and the level is a pass mark rather than a scope declaration: see
 #: :func:`d3_uncertainty_coverage` and docs/ESCALATIONS.md E-M12/E-M23.
-REPO_CONFIG_RELPATH = ".mlkit/repo.toml"
+#:
+#: Defined once in ``core.declaration`` and re-exported under its historical
+#: name. Two spellings of the same path is how two checks in one file come to
+#: disagree about which file carries the standard.
+REPO_CONFIG_RELPATH = declaration.REPO_CONFIG_RELPATH
+
+#: The ``.mlkit/repo.toml`` section carrying D2's HALT REGION as data --
+#: ``[placebo]`` / ``estimand``, ``null_value``, ``indicts`` -- beside the
+#: ``placebo_test`` binding it adjudicates. Optional: a repo that declares
+#: nothing is judged by ``DEFAULT_NULL`` and ``INDICTS_EITHER``, which is the
+#: rule D2 carried before the section existed.
+PLACEBO_SECTION = "placebo"
+
+#: Which excursions from the declared null indict the estimator.
+#:
+#: ``either`` is the default and is the two-sided rule: an avoided-loss
+#: estimate that comes back confidently POSITIVE on a period where nothing was
+#: avoided is broken, and one that comes back confidently NEGATIVE is broken in
+#: the same way. Naming the sign of the artefact is not the point.
+#:
+#: ``above``/``below`` exist for an estimand whose two sides are not
+#: symmetric. fray's is the worked case: under "skill against the persistence
+#: floor", a placebo that BEATS the floor is leakage and indicts, while a
+#: placebo far BELOW it is what no signal looks like. Choosing one costs the
+#: repo a written ``estimand`` and a ``reference_effect`` whose sign agrees --
+#: see :func:`d2_placebo_test`.
+INDICTS_EITHER = "either"
+INDICTS_ABOVE = "above"
+INDICTS_BELOW = "below"
+INDICTS_VALUES = (INDICTS_EITHER, INDICTS_ABOVE, INDICTS_BELOW)
+
+#: The value the estimand takes under no signal, when the repo declares none.
+DEFAULT_NULL = 0.0
+
+#: Every key ``[placebo]`` may carry. Anything else is a FAIL naming it.
+PLACEBO_KEYS = frozenset({"estimand", "null_value", "indicts"})
 
 #: How far the coverage binding's self-reported ``nominal`` may sit from the
 #: declared level and still be the same number.
@@ -60,7 +120,137 @@ def d1_counterfactual_spec(repo: Repo, ctx: RunContext) -> CheckResult:
     )
 
 
-@check("D2", PHASE, "PLACEBO_TEST — estimate indistinguishable from zero")
+@dataclass(frozen=True)
+class HaltRegion:
+    """The rule D2 takes its verdict by: which excursions from which null indict.
+
+    Built either from a repo's committed ``[placebo]`` table or, when there is
+    none, from ``DEFAULT_NULL``/``INDICTS_EITHER`` -- which is byte-for-byte the
+    rule ``lo > 0 or hi < 0`` that D2 carried before this type existed.
+    """
+
+    null: float = DEFAULT_NULL
+    indicts: str = INDICTS_EITHER
+    estimand: str = ""
+    declared: bool = False
+    source: str = ""
+    allow_dirty: bool = False
+
+    @property
+    def halts_above(self) -> bool:
+        return self.indicts in (INDICTS_EITHER, INDICTS_ABOVE)
+
+    @property
+    def halts_below(self) -> bool:
+        return self.indicts in (INDICTS_EITHER, INDICTS_BELOW)
+
+    @property
+    def is_default(self) -> bool:
+        """True when this region is the one mlkit would have applied anyway.
+
+        ``null == DEFAULT_NULL`` rather than ``not declared``: a repo that
+        writes out the default explicitly gets the default's verdict AND the
+        default's wording, because the two rules are the same rule.
+        """
+        return self.null == DEFAULT_NULL and self.indicts == INDICTS_EITHER
+
+    def evidence(self) -> dict[str, object]:
+        out: dict[str, object] = {"null_value": self.null, "indicts": self.indicts}
+        if self.declared:
+            out["placebo_declared_in"] = self.source
+            if self.estimand:
+                out["estimand"] = self.estimand
+        if self.allow_dirty:
+            out[ALLOW_DIRTY_KEY] = True
+        return out
+
+
+def read_halt_region(repo: Repo, ctx: RunContext) -> tuple[HaltRegion | None, str, str]:
+    """``(region, "", "")``, or ``(None, na_reason, "")``, or ``(None, "", fail_reason)``.
+
+    Three outcomes because they are three different instructions. An
+    UNCOMMITTED declaration is an NA: the repo has written a standard whose
+    bytes no reader can fetch, which is ``docs/ESCALATIONS.md`` E-M12's shape
+    and is fixed by committing it. A MALFORMED declaration is a FAIL: the repo
+    has written something mlkit cannot read as a rule at all. And no
+    declaration is neither -- it is the default, silently, because that is what
+    every repo in the fleet is running under today.
+    """
+    decl = declaration.read(repo, PLACEBO_SECTION, allow_dirty=ctx.allow_dirty)
+    if decl.uncommitted:
+        return None, (
+            f"PLACEBO_UNDECLARED_AT_HEAD: {decl.detail}. The halt region is the "
+            "standard D2 takes its verdict by, so it is read from the blob at HEAD "
+            "and not from the working tree; a rule that is in nobody's git history "
+            "cannot be fetched by the reader the verdict is quoted to. Commit it, or "
+            "pass --allow-dirty for a diagnosis that cannot reach a PASS"
+        ), ""
+    if not decl.declared:
+        return HaltRegion(), "", ""
+
+    shape = declaration.table_and_keys(decl, PLACEBO_KEYS)
+    if shape:
+        return None, "", f"PLACEBO_MALFORMED: {shape}"
+
+    table = dict(decl.value)
+    estimand = table.get("estimand", "")
+    if not isinstance(estimand, str):
+        return None, "", (
+            f"PLACEBO_MALFORMED: [{PLACEBO_SECTION}] estimand is a "
+            f"{type(estimand).__name__}, not a string; it is prose naming what "
+            "placebo_test estimates"
+        )
+    estimand = estimand.strip()
+
+    indicts = table.get("indicts", INDICTS_EITHER)
+    if indicts not in INDICTS_VALUES:
+        return None, "", (
+            f"PLACEBO_MALFORMED: [{PLACEBO_SECTION}] indicts is {indicts!r}; it must be "
+            f"one of {', '.join(repr(v) for v in INDICTS_VALUES)}"
+        )
+
+    null: float = DEFAULT_NULL
+    if "null_value" in table:
+        parsed, problem = declaration.finite_number(
+            table["null_value"], f"[{PLACEBO_SECTION}] null_value"
+        )
+        if parsed is None:
+            return None, "", (
+                f"PLACEBO_MALFORMED: {problem}. It is the value this estimand takes "
+                "under no signal, and every comparison D2 makes is against it"
+            )
+        null = parsed
+
+    region = HaltRegion(
+        null=null,
+        indicts=indicts,
+        estimand=estimand,
+        declared=True,
+        source=decl.source,
+        allow_dirty=decl.allow_dirty,
+    )
+
+    # A widened halt region may not be anonymous. `either` at a null of zero is
+    # what mlkit applies to a repo that has declared nothing, so it needs no
+    # justification; anything else is this repo asserting that its estimand's
+    # no-signal value is somewhere other than where D2 assumes, and that
+    # assertion has to be WRITTEN DOWN next to the number it licenses. mlkit
+    # cannot adjudicate prose. What it can do is refuse an exemption nobody
+    # signed their name to, and put the sentence in the evidence so the verdict
+    # quotes the justification rather than only the result.
+    if not region.is_default and not estimand:
+        return None, "", (
+            f"PLACEBO_ESTIMAND_UNDECLARED: [{PLACEBO_SECTION}] moves D2's halt region "
+            f"(null_value={null:.6g}, indicts={indicts!r}) without declaring an "
+            "`estimand`. The default -- a two-sided interval around zero -- is the one "
+            "rule that needs no justification, because it is the one every repo is "
+            "measured by. Moving it requires saying, in the same committed table, what "
+            "this placebo estimates and why its no-signal value is not zero"
+        )
+    return region, "", ""
+
+
+@check("D2", PHASE, "PLACEBO_TEST — estimate indistinguishable from its declared null")
 def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
     try:
         fn = repo.resolve("placebo_test")
@@ -70,6 +260,22 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
             f"{exc}; the placebo run is a SageMaker Processing Job and the training "
             "plane has not been bootstrapped",
         )
+
+    # The halt region is read AFTER `repo.resolve` has imported the subject's
+    # module -- deliberately, and it does not matter. A module-body write to
+    # `.mlkit/repo.toml` lands before any read taken inside this check, however
+    # this check orders its own statements, so ordering is not the protection
+    # and never was. Reading HEAD's blob is: the write makes the tree dirty and
+    # `core.artifact` refuses it. `d3_uncertainty_coverage` below carries the
+    # same note and the same control (E-M23).
+    region, na_reason, fail_reason = read_halt_region(repo, ctx)
+    if region is None:
+        return (
+            CheckResult.na("D2", PHASE, na_reason)
+            if na_reason
+            else CheckResult.failed("D2", PHASE, fail_reason)
+        )
+
     try:
         out = dict(fn())
     except CredentialRequired:
@@ -83,20 +289,37 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
 
     estimate = float(out["estimate"])
     lo, hi = float(out["ci_low"]), float(out["ci_high"])
-    evidence = {"estimate": estimate, "ci_low": lo, "ci_high": hi, "run": out.get("run_id", "")}
+    evidence = {
+        "estimate": estimate,
+        "ci_low": lo,
+        "ci_high": hi,
+        "run": out.get("run_id", ""),
+        **region.evidence(),
+    }
 
-    # Distinguishable from zero == the interval excludes zero.
-    if lo > 0 or hi < 0:
+    # Distinguishable from the null == the interval excludes it, on a side this
+    # repo has declared to be indicting. With no declaration `null` is 0.0 and
+    # both sides indict, so this is `lo > 0 or hi < 0` -- the same expression,
+    # with both of its operands and its sidedness now tied to something a
+    # reader can fetch instead of to a literal only mlkit knew.
+    if (region.halts_above and lo > region.null) or (region.halts_below and hi < region.null):
+        boundary = "zero" if region.null == 0.0 else f"the declared null {region.null:.6g}"
+        side = "" if region.is_default else (
+            f", on the {region.indicts!r} side this repo declared indicting"
+        )
         return CheckResult.failed(
             "D2", PHASE,
-            f"placebo estimate {estimate:.6g} with CI [{lo:.6g}, {hi:.6g}] excludes zero; "
+            f"placebo estimate {estimate:.6g} with CI [{lo:.6g}, {hi:.6g}] excludes "
+            f"{boundary}{side}; "
             "the estimator is capturing something other than the intervention. "
             "HARD STOP — do not tune, do not scale, do not schedule a training run.",
             {**evidence, "halt": True},
         )
 
-    # Everything below this line reasons about an interval that CONTAINS zero,
-    # and a non-finite figure reaches here by failing to be anything at all.
+    # Everything below this line reasons about an interval that CONTAINS the
+    # null -- or, under a one-sided declaration, sits on the side this repo
+    # declared not to indict -- and a non-finite figure reaches here by failing
+    # to be anything at all.
     # `float()` accepts NaN and the infinities, including as the strings
     # "nan"/"inf", and every comparison a NaN takes part in is False -- so
     # `lo > 0`, `hi < 0` and, further down, `half_width >= reference` are all
@@ -119,24 +342,44 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
             evidence,
         )
 
-    # Containing zero is necessary but nowhere near sufficient. An interval
-    # wide enough to contain everything contains zero too, and would sail
+    # Whether the interval CONTAINS the null is a separate fact from whether it
+    # indicts, and under a one-sided declaration they come apart: fray's
+    # [-71.998, -53.146] contains no null at all and does not indict, because
+    # the side it sits on is the side a shuffled-target run is expected to sit
+    # on. Recorded rather than inferred, so a portfolio reader can see which of
+    # the two a PASS rests on instead of assuming the older, narrower one.
+    evidence["null_contained"] = bool(lo <= region.null <= hi)
+
+    # Not indicting is necessary but nowhere near sufficient. An interval wide
+    # enough to contain everything contains the null too, and would sail
     # through the package's self-described strongest check while proving
     # nothing. Passing requires enough power to have detected the effect the
     # real run claims -- otherwise this is a null result and a no-power result
     # wearing the same face.
     reference = out.get("reference_effect")
     if reference is None:
+        standing = (
+            "placebo interval contains zero"
+            if region.is_default
+            else "placebo interval does not indict under this repo's declared halt region"
+        )
         return CheckResult.na(
             "D2", PHASE,
-            "placebo interval contains zero, but no reference_effect was reported, "
+            f"{standing}, but no reference_effect was reported, "
             "so a true null cannot be told apart from a test with no power. "
             "Report the real-run effect size this placebo must be able to detect.",
             evidence,
         )
-    reference = abs(float(reference))
+    # The SIGN is read out before `abs()` discards it, and it is read for one
+    # reason only -- see the tie below. The power bar's operand is unchanged.
+    reported = float(reference)
+    reference = abs(reported)
     half_width = (hi - lo) / 2.0
-    evidence.update({"reference_effect": reference, "ci_half_width": half_width})
+    evidence.update({
+        "reference_effect": reference,
+        "reference_effect_reported": reported,
+        "ci_half_width": half_width,
+    })
     # The power bar is `half_width >= reference`. A NaN reference makes that
     # False for every interval, so the requirement would be satisfied by a
     # figure that does not exist -- the one thing this branch was added to stop.
@@ -147,6 +390,49 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
             "satisfied by an effect size that was never measured",
             evidence,
         )
+
+    # THE TIE THAT PAYS FOR THE ONE-SIDED EXEMPTION.
+    #
+    # A one-sided halt region says: excursions this way indict, excursions that
+    # way are what no signal looks like. That is a real and often correct claim
+    # about an estimand -- and it is also, written down carelessly, a way to
+    # exempt precisely the direction the placebo was going to fail in.
+    #
+    # There is one operand already in the dict that can be tied to it without
+    # asking the subject anything new: `reference_effect` is the size of the
+    # effect THE REAL RUN CLAIMS, measured from this same null, and D2 already
+    # requires it. If the product's claim lives ABOVE the null, then a placebo
+    # reproducing that claim would land above the null, and "above" is the side
+    # that must indict. A repo declaring the opposite has exempted the only
+    # direction its own D2 was testing, and every remaining verdict this check
+    # could return would be vacuous.
+    #
+    # Zero fails it too, and for the same reason it fails the power bar below:
+    # an effect of exactly zero lies on neither side, so there is nothing for
+    # the exemption to agree with.
+    #
+    # Under the default two-sided region the sign is not read at all -- both
+    # sides indict, so there is nothing to disagree with, and `abs()` is the
+    # whole of the arithmetic exactly as it was.
+    if not region.is_default:
+        indicting_sign = (
+            1.0 if region.indicts == INDICTS_ABOVE
+            else -1.0 if region.indicts == INDICTS_BELOW
+            else 0.0
+        )
+        if indicting_sign and not (reported * indicting_sign > 0):
+            return CheckResult.failed(
+                "D2", PHASE,
+                f"PLACEBO_EXEMPTS_THE_CLAIM: [{PLACEBO_SECTION}] declares that only "
+                f"excursions {region.indicts} the null {region.null:.6g} indict, but the "
+                f"real-run effect this placebo must be able to detect is reported as "
+                f"{reported:.6g}, which lies on the exempt side. The direction the "
+                "product's claim lives in is the one direction D2 has to be able to "
+                "refuse; exempting it makes every other verdict here vacuous. Either "
+                "the declaration or the reported effect is the wrong way round",
+                evidence,
+            )
+
     if reference == 0 or half_width >= reference:
         return CheckResult.failed(
             "D2", PHASE,
