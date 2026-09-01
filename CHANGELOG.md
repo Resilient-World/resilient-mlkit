@@ -77,6 +77,16 @@ a PASS anywhere would have been evidence the check is blind. Every repo already
 carried several NAs, so no repo's terminal state moves; only the count in its
 message does.
 
+**One artifact's BYTES move, and no verdict does.**
+`ChallengerDecision.to_dict()` gains a top-level `resampling` key and each
+comparison in `evidence` gains three. Grepped across the fleet rather than
+assumed: `resilient-fray/src/registry/promotion_gate.py:360` embeds a decision
+dict inside the promotion record it writes at `:928` and the release bundle at
+`:910`, so fray's promotion records gain four keys reading `"NA"` the first time
+it repins. `resilient-chokepoint` serialises no `ChallengerDecision`. Nothing
+about `canonical_payload_sha256` or a served-model artifact's own hash changes;
+every committed `artifact_sha256` in the fleet is unaffected.
+
 **Adoption is a write into other repos and is not done here** — see
 `docs/ESCALATIONS.md` E-M24 and E-M25.
 

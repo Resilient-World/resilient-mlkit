@@ -156,6 +156,28 @@ DECISION: 0/6 PASS  ESCALATED=3  NA=3        exit 3
 D6     NA         fray: no 'resampling_declaration' binding declared in .mlkit/repo.toml; …
 ```
 
+## One consumer impact found by looking, not by reasoning
+
+`ChallengerDecision.to_dict()` gains a top-level `resampling` key, and each
+comparison inside `evidence` gains `skill_interval`, `interval_clears_zero` and
+`resampling`. **That changes the BYTES of at least one committed artifact in the
+fleet.** Grepped, not assumed:
+
+* `resilient-fray/src/registry/promotion_gate.py:360` embeds
+  `self.decision.to_dict()` inside `PromotionResult.to_dict()`, which
+  `write_promotion_record` (`:928`) writes as JSON and `write_release_bundle`
+  (`:910`) carries into the release evidence bundle.
+* `resilient-chokepoint` has no equivalent: nothing there serialises a
+  `ChallengerDecision`.
+
+No verdict moves — `status`, `promoted`, `reason`, `skill` and `refusal_class`
+are untouched for a comparison with no interval — but a reader diffing fray's
+promotion record after it repins mlkit will see three new keys per comparison
+and one at the top, all reading `"NA"` until fray declares a unit. Anything that
+hashes that file will see the hash move once, at repin time, for that reason.
+Named here so it is a known consequence rather than a surprise in somebody's
+freshness check.
+
 ## The tripwire, and what it cost
 
 `tests/test_promotion_state.py` holds `assert len(gating_ids()) == 27` with a
