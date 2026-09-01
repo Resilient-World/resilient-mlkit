@@ -1183,6 +1183,33 @@ class _ModuleScanner:
             return None
         return text
 
+    @staticmethod
+    def _template_is_safe_to_apply(template: str) -> bool:
+        """Refuse a template whose padding would build the string first.
+
+        ``_bounded`` throws the result away, but ``"{:>999999999}".format("a")``
+        has already allocated a gigabyte by the time it can. A scanner reads
+        whatever source a repo happens to contain, so "the result is discarded"
+        is not a defence against a template written to exhaust it -- the same
+        argument as the cycle guard below: a scanner that dies reports nothing
+        at all, which is strictly worse than the silence it replaced.
+
+        A width or precision of five digits or more is not a source label.
+        Refusing it makes the expression unreadable, which is the quiet
+        direction.
+        """
+        if len(template) > _ModuleScanner._FOLD_LIMIT:
+            return False
+        run = 0
+        for character in template:
+            if character.isdigit():
+                run += 1
+                if run >= 5:
+                    return False
+            else:
+                run = 0
+        return True
+
     def _fold_percent(self, node: ast.BinOp) -> str | None:
         """``"era5_%s" % "land"`` and ``"%s_%s" % ("era5", "land")``.
 
@@ -1192,7 +1219,7 @@ class _ModuleScanner:
         this fold cannot be the place a numeric conversion gets invented.
         """
         template = self._string_of(node.left)
-        if template is None:
+        if template is None or not self._template_is_safe_to_apply(template):
             return None
         if isinstance(node.right, (ast.Tuple, ast.List)):
             operands = [self._string_of(e) for e in node.right.elts]
@@ -1232,6 +1259,8 @@ class _ModuleScanner:
                 return None
             return self._bounded(receiver.join([p for p in parts if p is not None]))
         if func.attr == "format":
+            if not self._template_is_safe_to_apply(receiver):
+                return None
             positional = [self._string_of(a) for a in node.args]
             if any(p is None for p in positional):
                 return None

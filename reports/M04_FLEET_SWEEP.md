@@ -116,6 +116,11 @@ rather than on a fixture string. So the `0 → 0` on the actual fleet is a
 measured zero, not a harness that scans nothing, and **both** new lanes are
 demonstrably live inside this harness.
 
+The sweep in the table above was re-run against the final tree — including
+the `_template_is_safe_to_apply` width guard added by attacking the folds
+(E-M20, "Found by attacking the repair") — and returned the same
+`0 → 0 / 0 new / 0 gone`.
+
 ## Reading of the budget
 
 Stage 1 changes what R11 can READ, not what it is willing to adjudicate: the

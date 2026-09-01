@@ -1445,6 +1445,36 @@ go NA, which is the intended behaviour. The three adopters pinned to
 with no review step; that belongs to M-08's enumeration and M-09's tag
 annotation, and it is repeated here so it is not discovered by a re-lock.
 
+### Found by attacking the repair, not by reading it
+
+The `%` and `.format` folds APPLY a template, which means the template chooses
+how much memory the fold allocates. `_bounded` throws an over-long result
+away, but the string has already been built by then, and R11 reads whatever
+source a repo happens to contain. Measured on this branch with the width
+guard deleted and nothing else changed:
+
+| stamp expression | with the guard deleted | with the guard |
+|---|---|---|
+| `"{:>999999999}".format("era5_land")` | 0.083 s, 0 findings (1 GB built) | 0.001 s, 0 findings |
+| `"%999999999s" % "era5_land"` | 0.107 s, 0 findings (1 GB built) | 0.001 s, 0 findings |
+| `"{:>99999999999}".format("era5_land")` | **never returns — SIGKILLed, exit 137, under a 60-second bound** | 0.001 s, 0 findings |
+
+So `_template_is_safe_to_apply` refuses a digit run of five or more before
+applying anything. Note what discriminates that control and what does not:
+**silence does not** — all three are silent either way, because `_bounded`
+still discards the result. What changes is whether the scan RETURNS. The
+third fixture is therefore the live half, and if the guard is removed it does
+not fail politely, it takes the runner with it. Because a resource control
+cannot tell a guard that is too strict from one that is correct, the
+predicate's boundary is asserted directly as well
+(`::test_residual_4_the_width_guard_is_a_width_guard` — a four-digit year and
+`{:>9999}` still fold, `{:>99999}` does not), and deleting the digit-run half
+alone fails exactly that test.
+
+Also from attacking it: `_module_dict_entry` is the one fold that follows a
+name across the tree instead of down it, so it carries a cycle guard — see
+Control C above, where removing it alone gives `RecursionError`.
+
 ### RESIDUALS OF THIS ENTRY, pinned as tests that assert the current silence
 
 Both are driven, both are stated rather than papered over, and both are held
@@ -1475,5 +1505,5 @@ be reading the layout again.
 dynamic residue on a source-naming field is adjudicated NA instead of silently
 PASSed. The two residuals above are OPEN and pinned.**
 
-**mlkit `pytest`: 757 at `8517341` (re-measured on branch start) → 792 on this
+**mlkit `pytest`: 757 at `8517341` (re-measured on branch start) → 794 on this
 branch.**

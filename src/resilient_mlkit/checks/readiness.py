@@ -849,7 +849,14 @@ def _write_r11_report(
         f"- git SHA: `{repo.git_sha}`",
         (f"- files walked: {files} (every `.py` in the repo, excluding vendored "
          "directories and `tests/`)"),
-        f"- findings: {len(findings)}",
+        # Broken out, because the two numbers mean different things and a
+        # single total would let an NA row be read as a defect (or a defect
+        # be diluted by NA rows). These match the check's own `findings` and
+        # `unreadable_stamp` evidence keys exactly.
+        (f"- findings: {sum(1 for f in findings if f.severity != fabricated_targets.UNREADABLE_STAMP)}"
+         f" (defects) + {sum(1 for f in findings if f.severity == fabricated_targets.UNREADABLE_STAMP)}"
+         " unadjudicated (`UNREADABLE_STAMP`, see below — these do not fail"
+         " this check, they take it to NA)"),
         (f"- real-source registry: `{registry.path}` — "
          + (f"{len(registry.entries)} signed entries"
             if registry.present else "ABSENT")

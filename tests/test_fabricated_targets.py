@@ -2027,6 +2027,84 @@ def test_residual_4_a_self_referential_module_dict_does_not_recurse(registry):
     assert {f.claim_value for f in twice} == {"era5_land"}
 
 
+def test_residual_4_a_padding_template_cannot_be_used_to_exhaust_the_scanner(
+    registry,
+):
+    """ATTACK on the folds themselves, not on what they read.
+
+    ``_bounded`` throws an over-long fold away -- but the string has already
+    been BUILT by the time it can, and R11 reads whatever source a repo
+    happens to contain. "The result is discarded" is not a defence against a
+    template written to exhaust the process: a scanner that dies reports
+    nothing at all, which is strictly worse than the silence it replaced.
+
+    This is a RESOURCE control, so read what discriminates it carefully.
+    Silence is NOT the discriminator: with the width guard deleted these
+    fixtures are still silent, because ``_bounded`` still throws the result
+    away. What changes is whether the scan RETURNS. Measured on this branch
+    with the guard deleted and nothing else changed:
+
+        "{:>999999999}".format("era5_land")   0.083s, 0 findings (1 GB built)
+        "%999999999s" % "era5_land"           0.107s, 0 findings (1 GB built)
+        "{:>99999999999}".format("era5_land") never returns -- the process was
+                                              SIGKILLed (exit 137) under a
+                                              60-second bound
+
+    and with the guard in place the last one is 0.001s, 0 findings. So the
+    third fixture below is the live half of this control: if the guard is
+    removed, this test does not fail politely, it takes the runner with it.
+
+    The two honest twins at the end are the control that this is a WIDTH
+    guard and not a blanket refusal of digits -- ``era5`` and ``sentinel2``
+    are product designators and must keep folding.
+    """
+    assert_bound_to_this_worktree()
+    for stamp in (
+        '"zq7lk": "{:>999999999}".format("era5_land")',
+        '"zq7lk": "%999999999s" % "era5_land"',
+        '"zq7lk": "{:>99999999999}".format("era5_land")',
+    ):
+        findings = ft.scan_source(
+            textwrap.dedent(SPELLING_RECORD.format(stamp=stamp)),
+            "src/loaders/grid.py",
+            registry,
+        )
+        assert findings == [], (stamp, [f.render() for f in findings])
+
+    # ... and templates with ordinary widths still fold and still fire.
+    for stamp in (
+        '"zq7lk": "{:>4}".format("era5_land")',
+        '"zq7lk": "%s" % "era5_land"',
+    ):
+        honest = ft.scan_source(
+            textwrap.dedent(SPELLING_RECORD.format(stamp=stamp)),
+            "src/loaders/grid.py",
+            registry,
+        )
+        assert len(honest) == 1, (stamp, [f.render() for f in honest])
+        assert honest[0].claim_value == "era5_land", honest[0].render()
+
+
+def test_residual_4_the_width_guard_is_a_width_guard(registry):
+    """The predicate itself, at its boundary.
+
+    ``_template_is_safe_to_apply`` refuses a run of five or more digits. The
+    resource control above cannot distinguish a guard that is too strict from
+    one that is correct -- both are silent -- so the boundary is asserted
+    directly, and the folding controls above assert that real product
+    designators (``era5``, ``sentinel2``, four-digit years) still get through.
+    """
+    assert_bound_to_this_worktree()
+    safe = ft._ModuleScanner._template_is_safe_to_apply
+    assert safe("era5_%s") is True
+    assert safe("sentinel2_{}") is True
+    assert safe("%s_2026_reanalysis") is True     # a four-digit year is fine
+    assert safe("{:>9999}") is True               # four digits, at the edge
+    assert safe("{:>99999}") is False             # five digits, refused
+    assert safe("%99999s") is False
+    assert safe("x" * (ft._ModuleScanner._FOLD_LIMIT + 1)) is False
+
+
 def test_residual_4_control_b_the_folds_do_not_reach_past_their_scope(registry):
     """CONTROL B. The two records the folds must leave exactly where they were.
 
