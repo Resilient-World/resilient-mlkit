@@ -19,7 +19,7 @@ import datetime as _dt
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Self
 
 #: Longest reason we will print. Reasons land in tables that get pasted into
 #: transcripts and PRs, and an untruncated traceback sets the column width for
@@ -233,7 +233,7 @@ class SealedEvidence(dict):
         self._refuse("evidence.update(...)")
         super().update(*args, **kwargs)
 
-    def __ior__(self, other: Any) -> SealedEvidence:
+    def __ior__(self, other: Any) -> Self:  # type: ignore[misc]
         self._refuse("evidence |= ...")
         return super().__ior__(other)  # type: ignore[return-value]
 
@@ -337,7 +337,9 @@ class CheckResult:
         # Everything above is the verdict being formed. From here on it is a
         # record of a measurement that happened, and a record that can be
         # edited is a record of nothing.
-        self.evidence.seal()
+        sealed = self.evidence
+        assert isinstance(sealed, SealedEvidence)
+        sealed.seal()
         object.__setattr__(self, "_sealed", True)
 
     def _is_sealed(self) -> bool:

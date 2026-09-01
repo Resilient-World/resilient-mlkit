@@ -18,6 +18,7 @@ Four clauses, four pairs:
 
 from __future__ import annotations
 
+import dataclasses
 import json
 
 import pytest
@@ -31,7 +32,6 @@ from resilient_mlkit.core.served import (
     NO_SKILL,
     NONNEGATIVE,
     POLARITY_UNDECLARED,
-    REAL,
     ROW_SET_MISMATCH,
     ROW_SET_UNTIED,
     UNMEASURED_SKILL,
@@ -956,7 +956,7 @@ def test_m06_control_a_unequal_digests_are_a_mismatch_whatever_the_caller_wants(
         candidate_row_digest=SAME_ROWS, reference_row_digest=FEWER_ROWS,
     )
     assert c.row_matched is False
-    with pytest.raises(Exception):
+    with pytest.raises(dataclasses.FrozenInstanceError):
         c.row_matched = True  # frozen; type: ignore[misc]
     decision = challenger_decision(
         comparisons(80.0, 100.0, reference_row_digest=FEWER_ROWS),
