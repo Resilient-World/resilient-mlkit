@@ -60,6 +60,15 @@ WHAT IS DELIBERATELY *NOT* IN HERE
 * **A metric.** RMSE, MAE, AAL, CSI and BSS all appear as *the* decision metric
   in one repo or another. The contract takes the metric NAMES a caller declares
   and decides on measured skill; it does not compute anyone's loss function.
+
+  It does, since 2026-08-31, require the caller to declare which DIRECTION each
+  of those names runs in and what values it can take — see
+  :data:`LOWER_IS_BETTER` / :data:`HIGHER_IS_BETTER` and :data:`NONNEGATIVE`.
+  That is not a metric; it is the one property of a metric without which
+  "beating the bar" has no meaning. Declared, never inferred from the name: a
+  name→polarity table is the E-038 defect (``core.metric_registry``), where a
+  guard keyed on a word list was blind to every name outside it and ``csi``
+  in the list did not catch ``critical_success_index``.
 * **A router.** ``ShadowRouter`` exists twice with the same name and opposite
   production semantics (see the divergence note below), and no third repo has
   one at all. Forcing five repos to grow a router two of them need would be the
@@ -106,7 +115,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from collections.abc import Iterable, Mapping, Sequence
+from copy import deepcopy as _deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -114,7 +125,17 @@ from typing import Any
 from .result import Status
 
 __all__ = [
+    "DOMAINS",
     "HASH_KEY",
+    "HIGHER_IS_BETTER",
+    "IMPOSSIBLE_MEASUREMENT",
+    "LOWER_IS_BETTER",
+    "NONNEGATIVE",
+    "POLARITIES",
+    "POLARITY_UNDECLARED",
+    "REAL",
+    "ROW_SET_MISMATCH",
+    "ROW_SET_UNTIED",
     "UNMEASURED",
     "ArtifactIntegrityError",
     "ChallengerDecision",
@@ -129,6 +150,8 @@ __all__ = [
     "ServedModel",
     "canonical_payload_sha256",
     "challenger_decision",
+    "out_of_domain",
+    "row_set_digest",
     "seal",
     "sha256_file",
     "skill",
@@ -151,6 +174,43 @@ UNMEASURED = "NA"
 #: measured-and-won, measured-and-lost, or not measured. There is no DEFERRED
 #: promotion.
 DECISION_STATUSES = (Status.PASS, Status.FAIL, Status.NA)
+
+
+# ---------------------------------------------------------------------------
+# What a metric IS, declared rather than assumed
+# ---------------------------------------------------------------------------
+#: The two directions a decision metric can run in. Which one applies is a
+#: property of the metric, not of the gate, and the gate cannot derive it: MAE,
+#: RMSE, MAPE, CRPS and pinball loss run one way; R², CSI, BSS, hit rate and
+#: coverage run the other, and every one of those appears as *the* decision
+#: metric somewhere in this fleet.
+LOWER_IS_BETTER = "lower_is_better"
+HIGHER_IS_BETTER = "higher_is_better"
+POLARITIES = (LOWER_IS_BETTER, HIGHER_IS_BETTER)
+
+#: What values the metric can take at all. ``REAL`` claims nothing. A metric
+#: declared ``NONNEGATIVE`` cannot be negative in any arithmetic that produced
+#: it, so a negative figure under that declaration is not a bad score — it is
+#: evidence that whatever emitted it was not computing the metric it labelled.
+REAL = "real"
+NONNEGATIVE = "nonnegative"
+DOMAINS = (REAL, NONNEGATIVE)
+
+
+def out_of_domain(value: float | None, domain: str) -> bool:
+    """True when ``value`` is a figure the declared ``domain`` cannot contain.
+
+    ``None`` is not out of domain — it is unmeasured, which is a different
+    verdict with a different refusal class, and collapsing the two would hide
+    an impossible number inside the ordinary NA lane. Non-finite is likewise
+    left to :func:`skill`, which already refuses it.
+    """
+    if value is None:
+        return False
+    value = float(value)
+    if not math.isfinite(value):
+        return False
+    return domain == NONNEGATIVE and value < 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +247,40 @@ def canonical_payload_sha256(payload: Mapping[str, Any], *, hash_key: str = HASH
     body = {k: v for k, v in payload.items() if k != hash_key}
     encoded = json.dumps(body, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+#: The shape every tie in this module is written in. A digest field that is
+#: neither empty nor a sha256 is a caller who meant to tie two things together
+#: and tied them to a placeholder instead.
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}")
+
+
+def row_set_digest(row_keys: Iterable[Any]) -> str:
+    """sha256 over the identifiers of the rows a figure was computed on.
+
+    ONE definition, here, for the same reason :func:`canonical_payload_sha256`
+    is one definition: two repos computing "the digest of the rows" two ways
+    can never compare their answers, and a comparison whose two sides tie to
+    incomparable digests is untied while looking tied.
+
+    Order-invariant, because a row SET has no order and two scorers that
+    iterated the same rows differently scored the same rows. Duplicates are
+    NOT collapsed: a row scored twice on one side and once on the other is a
+    genuine difference in what was compared.
+
+    An empty key set is refused. A digest over no rows is a constant, and two
+    comparisons carrying it would tie to each other and read as matched.
+    """
+    canonical = sorted(
+        json.dumps(k, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        for k in row_keys
+    )
+    if not canonical:
+        raise ServedContractError(
+            "a row-set digest over no rows identifies nothing, and two of them "
+            "would be equal to each other; pass the rows the figure was computed on"
+        )
+    return hashlib.sha256("\n".join(canonical).encode("utf-8")).hexdigest()
 
 
 def sha256_file(path: Path | str) -> str:
@@ -534,16 +628,45 @@ def verify_at_load(
 # ---------------------------------------------------------------------------
 # The challenger decision
 # ---------------------------------------------------------------------------
-def skill(candidate: float | None, reference: float | None) -> float | None:
-    """``1 - candidate/reference`` for a lower-is-better metric, or ``None``.
+def skill(
+    candidate: float | None,
+    reference: float | None,
+    *,
+    polarity: str | None = None,
+    domain: str = REAL,
+) -> float | None:
+    """Positive when the candidate beat the reference, in the DECLARED direction.
+
+    ``1 - candidate/reference`` for a lower-is-better metric;
+    ``candidate/reference - 1`` for a higher-is-better one. Both are positive
+    exactly when the candidate won, and neither can be derived from the other
+    without knowing which way the metric runs — which is why ``polarity`` is a
+    parameter and not a default.
 
     ``None`` — not zero, not a raised exception — whenever the quotient is not
-    a number about accuracy: either side missing, either side non-finite, or a
-    reference of zero or below. That last case is
-    ``torrent/.../champion_challenger.py:128`` inverted: there, a zero baseline
-    silently produced a deviation of ``0.0``, which cleared the tolerance and
-    PROMOTED. Here it is unmeasured, which is what chokepoint's counterpart
-    already concluded from the identical condition.
+    a number about accuracy:
+
+    * either side missing, or either side non-finite;
+    * a reference of zero or below. That case is
+      ``torrent/.../champion_challenger.py:128`` inverted: there, a zero
+      baseline silently produced a deviation of ``0.0``, which cleared the
+      tolerance and PROMOTED. Here it is unmeasured, which is what chokepoint's
+      counterpart already concluded from the identical condition. It stays a
+      refusal under ``HIGHER_IS_BETTER`` too: a bar at or below zero makes the
+      ratio say more about the divisor than about either model, and a gate that
+      guessed which side that favoured would be guessing;
+    * **a polarity that was not declared.** Until this parameter existed, this
+      function applied the lower-is-better formula to every metric name a
+      caller passed, so an r² of 0.10 against a bar of 0.90 returned ``0.8889``
+      and PROMOTED (measured at 8517341). Defaulting the other way would be the
+      same defect with the opposite sign, so the undeclared case is unmeasured;
+    * **a value the declared domain cannot contain** — see :func:`out_of_domain`.
+      A negative MAPE against a bar of 0.20 returned ``1.25`` and promoted
+      hardest of all, because the impossibility pushed the quotient furthest.
+      Impossible is not "unmeasured" in any interesting sense, but it is
+      certainly not a skill number, and the caller that needs to tell the two
+      apart gets a named refusal class from :func:`challenger_decision` rather
+      than from here.
     """
     if candidate is None or reference is None:
         return None
@@ -551,8 +674,16 @@ def skill(candidate: float | None, reference: float | None) -> float | None:
     reference = float(reference)
     if not math.isfinite(candidate) or not math.isfinite(reference):
         return None
+    if polarity not in POLARITIES:
+        return None
+    if domain not in DOMAINS:
+        return None
+    if out_of_domain(candidate, domain) or out_of_domain(reference, domain):
+        return None
     if reference <= 0.0:
         return None
+    if polarity == HIGHER_IS_BETTER:
+        return candidate / reference - 1.0
     return 1.0 - candidate / reference
 
 
@@ -566,6 +697,21 @@ class Comparison:
     on a subset produced a number about a different row set, and two numbers
     about different row sets sitting side by side look comparable without being
     so (``fray/src/serve/county_yield.py:700-711``).
+
+    ``row_matched`` USED TO BE A CALLER-SUPPLIED ``bool`` DEFAULTING TO ``True``
+    (M-06, 2026-08-31). That default is the defect: the gate's whole
+    row-set clause rested on an assertion the caller made for free, and every
+    comparison that never thought about row sets asserted the strongest
+    possible claim about them. Measured at 8517341, an ordinary
+    ``Comparison(bar, "mae", 80.0, 100.0, 500, arm="val")`` — no row evidence of
+    any kind — reached PASS.
+
+    It is now DERIVED from two digests, and there is no way to spell the
+    assertion. Both digests present and equal → ``True``; present and unequal →
+    ``False``; either absent → ``None``, which is *untied*: not matched, not
+    mismatched, not known. ``None`` is NA at the gate, not a pass. This is
+    fray's split-identity/E-043 pattern moved into the contract — every
+    comparison operand needs a tie, and the tie is content, not a promise.
     """
 
     reference: str
@@ -574,8 +720,25 @@ class Comparison:
     reference_value: float | None
     n_rows: int
     arm: str = ""
-    row_matched: bool = True
     unmeasured_reason: str = ""
+    #: Which direction this metric runs in, and what values it can take. Both
+    #: are DATA the caller declares, in the same shape :class:`ServeArms` makes
+    #: the arm policy data, and for the same reason: the fleet does not agree
+    #: on one answer and both answers are correct in their own repo. A
+    #: comparison that declares no polarity is not decided against a guess.
+    polarity: str = ""
+    domain: str = REAL
+    #: sha256 of the row identifiers each side's figure was computed over, from
+    #: :func:`row_set_digest`. Content, not a promise: the only two things that
+    #: can make these equal are the same rows on both sides.
+    candidate_row_digest: str = ""
+    reference_row_digest: str = ""
+    #: DERIVED in ``__post_init__``, never passed in. ``init=False`` is the
+    #: point: ``Comparison(..., row_matched=True)`` is a TypeError naming the
+    #: argument, so the assertion the gate used to rest on cannot be spelled at
+    #: all — not by a caller who forgot to think about rows, and not by one who
+    #: wants the answer to be True.
+    row_matched: bool | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
         if not self.reference or not self.metric:
@@ -585,10 +748,62 @@ class Comparison:
                 f"comparison against {self.reference!r} reports {self.n_rows} rows; a "
                 "negative row count is not a row count"
             )
+        if self.polarity and self.polarity not in POLARITIES:
+            raise ServedContractError(
+                f"comparison on {self.metric!r} declares polarity {self.polarity!r}; "
+                f"the declared polarities are {list(POLARITIES)}. A spelling this "
+                "contract does not recognise is not a declaration, and treating it as "
+                "one would restore the assumption this field exists to remove."
+            )
+        if self.domain not in DOMAINS:
+            raise ServedContractError(
+                f"comparison on {self.metric!r} declares domain {self.domain!r}; the "
+                f"declared domains are {list(DOMAINS)}"
+            )
+        for side, digest in (
+            ("candidate", self.candidate_row_digest),
+            ("reference", self.reference_row_digest),
+        ):
+            if not digest:
+                continue
+            if not _SHA256_HEX.fullmatch(digest):
+                raise ServedContractError(
+                    f"comparison on {self.metric!r} carries {side}_row_digest "
+                    f"{digest!r}, which is not a sha256. Two placeholders are equal "
+                    "to each other, so a tie written in anything but content is a "
+                    "tie that always holds. Use core.served.row_set_digest."
+                )
+        if self.candidate_row_digest and self.reference_row_digest:
+            derived: bool | None = (
+                self.candidate_row_digest == self.reference_row_digest
+            )
+        else:
+            derived = None
+        object.__setattr__(self, "row_matched", derived)
+
+    @property
+    def declared(self) -> bool:
+        """True when this comparison says which direction its metric runs in."""
+        return self.polarity in POLARITIES
+
+    @property
+    def impossible(self) -> tuple[str, ...]:
+        """Which operands hold a figure the declared domain cannot contain."""
+        offending: list[str] = []
+        if out_of_domain(self.candidate_value, self.domain):
+            offending.append("candidate")
+        if out_of_domain(self.reference_value, self.domain):
+            offending.append("reference")
+        return tuple(offending)
 
     @property
     def skill(self) -> float | None:
-        return skill(self.candidate_value, self.reference_value)
+        return skill(
+            self.candidate_value,
+            self.reference_value,
+            polarity=self.polarity or None,
+            domain=self.domain,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         measured = self.skill
@@ -598,9 +813,17 @@ class Comparison:
             "arm": self.arm,
             "candidate_value": self.candidate_value,
             "reference_value": self.reference_value,
+            "polarity": self.polarity or UNMEASURED,
+            "domain": self.domain,
             "skill": UNMEASURED if measured is None else measured,
             "n_rows": self.n_rows,
-            "row_matched": self.row_matched,
+            "candidate_row_digest": self.candidate_row_digest or UNMEASURED,
+            "reference_row_digest": self.reference_row_digest or UNMEASURED,
+            # UNMEASURED rather than null, and never False: "nobody tied the row
+            # sets" and "the row sets differ" are different facts, and a reader
+            # who cannot tell them apart will read the first as the second and
+            # go looking for a split that is not there.
+            "row_matched": UNMEASURED if self.row_matched is None else self.row_matched,
             "unmeasured_reason": self.unmeasured_reason,
         }
 
@@ -615,6 +838,19 @@ ARM_MISMATCH = "ARM_MISMATCH"
 UNMEASURED_SKILL = "UNMEASURED_SKILL"
 NO_SKILL = "NO_SKILL"
 CLEARS_BAR = "CLEARS_BAR"
+#: The figure cannot be the metric it is labelled as. Distinct from
+#: ``UNMEASURED_SKILL`` on purpose: "we could not measure it" sends someone to
+#: look at the harness, "this number is impossible" sends someone to look at
+#: the scorer, and a table that renders them identically answers neither.
+IMPOSSIBLE_MEASUREMENT = "IMPOSSIBLE_MEASUREMENT"
+#: Nobody said which direction the metric runs in, so nobody can say who won.
+POLARITY_UNDECLARED = "POLARITY_UNDECLARED"
+#: Nobody tied the two figures to the rows they were computed on. Kept apart
+#: from ``ROW_SET_MISMATCH`` on purpose: "the row sets differ" sends a reader
+#: to find the split, "nobody said" sends them to add the digests, and until
+#: 2026-08-31 the second condition silently reported the strongest form of the
+#: opposite (``row_matched: bool = True``).
+ROW_SET_UNTIED = "ROW_SET_UNTIED"
 
 
 @dataclass(frozen=True)
@@ -656,6 +892,22 @@ class ChallengerDecision:
     def __post_init__(self) -> None:
         if isinstance(self.status, str):
             object.__setattr__(self, "status", Status(self.status))
+        # FIRST, before any of the clauses below, because all of them are
+        # comprehensions over `self.metrics` and an empty tuple satisfies every
+        # one of them vacuously. Measured at 8517341:
+        # `ChallengerDecision(status=PASS, reason=..., metrics=(), skill={})`
+        # constructed, and `promotable` -- derived correctly, doing its job --
+        # returned True. `challenger_decision()` already refused this, but that
+        # refusal lives in the function and this type is public, so the
+        # function could simply be stepped around. A guard that only one path
+        # into an object performs is a guard on that path, not on the object.
+        if not self.metrics:
+            raise ServedContractError(
+                "a challenger decision declares no metric. Every clause that makes "
+                "a PASS mean something is a statement about the declared metrics, "
+                "so a decision over none of them passes every clause without "
+                "having been compared to anything."
+            )
         if self.status not in DECISION_STATUSES:
             raise ServedContractError(
                 f"a challenger decision is {[s.value for s in DECISION_STATUSES]}; "
@@ -672,6 +924,34 @@ class ChallengerDecision:
             raise ServedContractError(
                 f"decision declares metrics {list(self.metrics)} but reports no skill "
                 f"entry for {missing}; a metric with no entry is a metric nobody scored"
+            )
+        # Found by driving this class adversarially after the M-02 repair
+        # landed: a skill dict WIDER than the declared metrics constructed
+        # cleanly, and `skill_vs_recorded_bar` then carried a figure for a
+        # metric the decision never decided on. Downstream that number is
+        # quotable exactly like the ones that were decided, with nothing in the
+        # record marking it as an extra.
+        extra = sorted(set(self.skill) - set(self.metrics))
+        if extra:
+            raise ServedContractError(
+                f"decision declares metrics {list(self.metrics)} but reports skill "
+                f"for {extra} as well. A figure in the skill map that no clause of "
+                "this decision examined is a number nobody decided on, sitting where "
+                "readers take numbers to have been decided on."
+            )
+        # Same drive: `float('nan') <= 0.0` is False, so a PASS carrying a NaN
+        # skill satisfied the non-positive clause below and came out
+        # promotable. A non-finite skill is not a margin over the bar in either
+        # direction, on any status.
+        nonfinite = sorted(
+            m for m, v in self.skill.items()
+            if v is not None and not math.isfinite(float(v))
+        )
+        if nonfinite:
+            raise ServedContractError(
+                f"decision reports non-finite skill on {nonfinite}. A NaN is not a "
+                "margin over the bar and an infinity is not a bigger one; neither "
+                "compares to zero, which is the only question this verdict asks."
             )
         if self.status is Status.NA:
             reported = {k: v for k, v in self.skill.items() if v is not None}
@@ -718,7 +998,13 @@ class ChallengerDecision:
             "n_rows_compared": self.n_rows,
             "refusal_class": self.refusal_class,
             "reason": self.reason,
-            "evidence": dict(self.evidence),
+            # A DEEP copy. `dict(self.evidence)` is shallow, and the evidence
+            # this class carries is a list of comparison dicts one level down:
+            # driven adversarially, editing `to_dict()["evidence"]
+            # ["comparisons"][0]["skill"]` edited the decision's own record.
+            # A verdict hands out what it decided on; it does not hand out the
+            # thing it decided on.
+            "evidence": _deepcopy(dict(self.evidence)),
         }
 
 
@@ -793,6 +1079,59 @@ def challenger_decision(
             refusal_class=NOT_COMPARED,
         )
 
+    # Before asking how much was compared, ask whether the figures can be the
+    # metric they are labelled as, and whether anyone said which way that
+    # metric runs. Both questions are about the numbers themselves, and until
+    # they are settled every later lane is reasoning about arithmetic that may
+    # not mean anything. Measured at 8517341, with neither question asked: a
+    # MAPE of -0.05 against a bar of 0.20 PROMOTED on skill 1.25, and an r2 of
+    # 0.10 against a bar of 0.90 PROMOTED on skill 0.8889.
+    impossible = {
+        m: by_metric[m].impossible for m in metrics if by_metric[m].impossible
+    }
+    if impossible:
+        detail = "; ".join(
+            f"{m} {by_metric[m].domain} but "
+            + ", ".join(
+                f"{side} {getattr(by_metric[m], side + '_value')!r}"
+                for side in sides
+            )
+            for m, sides in impossible.items()
+        )
+        return ChallengerDecision(
+            status=Status.NA,
+            reason=(
+                f"the comparison against {recorded_bar!r} carries a figure its own "
+                f"declared domain cannot contain: {detail}. A number outside the "
+                "metric's domain is not a bad score; it is evidence that whatever "
+                "produced it was not computing the metric it labelled, and dividing "
+                "two of them yields a skill figure about nothing."
+            ),
+            recorded_bar=recorded_bar,
+            metrics=metrics,
+            skill=none_skill,
+            n_rows=min(by_metric[m].n_rows for m in metrics),
+            refusal_class=IMPOSSIBLE_MEASUREMENT,
+        )
+
+    undeclared = [m for m in metrics if not by_metric[m].declared]
+    if undeclared:
+        return ChallengerDecision(
+            status=Status.NA,
+            reason=(
+                f"the comparison against {recorded_bar!r} declares no polarity on "
+                f"{undeclared}, so which of the two values is the better one is "
+                f"unstated. Declare {LOWER_IS_BETTER!r} or {HIGHER_IS_BETTER!r} on the "
+                "comparison. This gate assumed lower-is-better until 2026-08-31 and "
+                "promoted a model that was worse on r2 by eight tenths."
+            ),
+            recorded_bar=recorded_bar,
+            metrics=metrics,
+            skill=none_skill,
+            n_rows=min(by_metric[m].n_rows for m in metrics),
+            refusal_class=POLARITY_UNDECLARED,
+        )
+
     n_rows = min(by_metric[m].n_rows for m in metrics)
     if n_rows <= 0:
         return ChallengerDecision(
@@ -808,7 +1147,28 @@ def challenger_decision(
             refusal_class=NO_ROWS,
         )
 
-    unmatched = [m for m in metrics if not by_metric[m].row_matched]
+    untied = [m for m in metrics if by_metric[m].row_matched is None]
+    if untied:
+        return ChallengerDecision(
+            status=Status.NA,
+            reason=(
+                f"the comparison against {recorded_bar!r} carries no row-set tie on "
+                f"{untied}: one or both sides did not say which rows its figure was "
+                "computed over, so whether the two numbers describe the same rows is "
+                "unknown. Until 2026-08-31 this contract took the caller's word for "
+                "it and defaulted the answer to True, which meant every comparison "
+                "that had never thought about row sets asserted the strongest "
+                "possible claim about them. Tie both sides with "
+                "core.served.row_set_digest."
+            ),
+            recorded_bar=recorded_bar,
+            metrics=metrics,
+            skill=none_skill,
+            n_rows=n_rows,
+            refusal_class=ROW_SET_UNTIED,
+        )
+
+    unmatched = [m for m in metrics if by_metric[m].row_matched is False]
     if unmatched:
         return ChallengerDecision(
             status=Status.NA,
