@@ -30,6 +30,9 @@ name = "REPLACE_ME"
 #   deterministic_run(seed)-> any repr-comparable result
 #   placebo_test()         -> {estimate, ci_low, ci_high, run_id}
 #   coverage()             -> {nominal, empirical, n, tol}
+#                             `nominal` is CROSS-CHECKED against the level
+#                             declared in [coverage] below, not trusted as the
+#                             standard; see that section.
 #   scaling_probe()        -> {0.01: metric, 0.10: metric, 0.25: metric}  (larger is better)
 #   hparam_sanity()        -> {lr_range, throughput_curve, winning_config, mlflow_run_id}
 #   efficiency()           -> {gpu_util, profiler_trace, dataloader_bound}
@@ -41,6 +44,20 @@ name = "REPLACE_ME"
 [manifest]
 # Alternative to a manifest() binding: a YAML file with a `sources:` list.
 # path = "config/manifest.yaml"
+
+# ── Nominal coverage (D3) ───────────────────────────────────────────────────
+# The level this repo's prediction intervals PROMISE, as data. D3's verdict is
+# `abs(empirical - nominal) > tol`, and both operands used to arrive in the
+# dict `coverage()` returns -- so a binding could set `nominal` equal to the
+# empirical coverage it had just measured and PASS on any coverage at all. Two
+# repos did exactly that in one tick (docs/ESCALATIONS.md E-M21), one of them
+# erasing a shortfall it had truthfully disclosed for its served model.
+#
+# So the level lives here, beside the binding, and `coverage()`'s own `nominal`
+# is adjudicated against it: disagreement is FAIL, absence is NA. Write the
+# probability, not the percentage.
+[coverage]
+# nominal = 0.90
 
 # ── Remote parity (R7) ──────────────────────────────────────────────────────
 # Populated once Loop 0 has been performed by the signatory. Region must be

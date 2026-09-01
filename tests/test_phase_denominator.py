@@ -193,9 +193,22 @@ def test_lost_check_exits_one_from_a_production_shaped_defect(
     real_spec = checks_pkg.get("R5")
 
     def mislabelling(repo: Repo, ctx: RunContext) -> CheckResult:
+        # The defect is CONSTRUCTED, not assigned in afterwards. This used to
+        # read `result.check_id = "R5_TYPO"`, which M-02 now refuses by name
+        # (`VerdictSealed`): a formed verdict is not editable. The refusal is
+        # correct and the test is unchanged in what it drives -- the docstring
+        # above already names the production shape as "a copy-paste inside a
+        # check module", and a copy-paste writes the wrong id at the call to
+        # the constructor, which is exactly what this now does. Every assertion
+        # below is byte-identical.
         result = real_spec.fn(repo, ctx)
-        result.check_id = "R5_TYPO"
-        return result
+        return CheckResult(
+            check_id="R5_TYPO",
+            phase=result.phase,
+            status=result.status,
+            reason=result.reason,
+            evidence=dict(result.evidence),
+        )
 
     monkeypatch.setitem(
         checks_pkg._REGISTRY,

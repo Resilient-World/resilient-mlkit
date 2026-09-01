@@ -37,6 +37,7 @@ the negative controls here are the ordinary finite cases that must stay silent.
 
 from __future__ import annotations
 
+import subprocess
 import textwrap
 
 from resilient_mlkit.checks import RunContext
@@ -53,14 +54,36 @@ from resilient_mlkit.core.result import Status
 _SERIAL = iter(range(10_000))
 
 
-def _run(tmp_path, check, binding: str, body: str):
-    """Resolve `binding` through the real `.mlkit/repo.toml` path, then run `check`."""
+def _run(tmp_path, check, binding: str, body: str, extra_toml: str = ""):
+    """Resolve `binding` through the real `.mlkit/repo.toml` path, then run `check`.
+
+    `extra_toml` carries the declarations a check reads as DATA rather than
+    through a binding -- D3's nominal coverage level is the first of them
+    (E-M21). It is appended verbatim so a fixture can also declare nothing.
+
+    The fixture is a git repo with that config COMMITTED, because D3 reads the
+    declared level from ``HEAD:.mlkit/repo.toml`` through ``core.artifact``
+    (E-M23). An uncommitted declaration is an NA before any finiteness guard
+    below could be reached, and this file exists to prove those guards fire.
+    Nothing about what these controls assert changed; the fixture became a repo.
+    """
     module = f"nf_bindings_{next(_SERIAL)}"
     (tmp_path / f"{module}.py").write_text(textwrap.dedent(body))
     (tmp_path / ".mlkit").mkdir(parents=True, exist_ok=True)
     (tmp_path / ".mlkit" / "repo.toml").write_text(
         f'[repo]\nname = "fixturerepo"\n\n[bindings]\n{binding} = "{module}:{binding}"\n'
+        + extra_toml
     )
+    for args in (
+        ("init", "-q"),
+        ("config", "user.email", "t@example.invalid"),
+        ("config", "user.name", "t"),
+        ("add", "-A"),
+        ("commit", "-qm", "fixture"),
+    ):
+        subprocess.run(
+            ["git", "-C", str(tmp_path), *args], check=True, capture_output=True
+        )
     repo = Repo(name="fixturerepo", path=tmp_path)
     try:
         return check(repo, RunContext(nonce="test-nonce", root=tmp_path, offline=True))
@@ -197,8 +220,22 @@ def _coverage(fields: str) -> str:
     """
 
 
-def _run_d3(tmp_path, fields: str):
-    return _run(tmp_path, d3_uncertainty_coverage, "coverage", _coverage(fields))
+def _run_d3(tmp_path, fields: str, *, declared_nominal: str = "0.90"):
+    """Every fixture here promises 90% intervals in `.mlkit/repo.toml`.
+
+    D3 reads the level from there rather than from the dict the binding returns
+    (E-M21), so an undeclared fixture would be NA before any of the finiteness
+    guards below could be reached -- and this file exists to prove those guards
+    fire. The declaration is the fixture's own honest promise; the NaNs it is
+    driven with are in the numbers the binding reports.
+    """
+    return _run(
+        tmp_path,
+        d3_uncertainty_coverage,
+        "coverage",
+        _coverage(fields),
+        extra_toml=f"\n[coverage]\nnominal = {declared_nominal}\n",
+    )
 
 
 def test_negative_control_finite_matching_coverage_is_untouched_by_the_guard(tmp_path):

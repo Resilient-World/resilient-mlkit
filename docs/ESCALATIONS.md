@@ -1257,6 +1257,610 @@ budget and its own control pair, and it is not taken here.
 
 **Status: the false positive CLOSED. The residual OPEN and unassigned.**
 
+## E-M20 — the served contract decided promotions on three things nobody had to state, and a verdict nobody could not edit
+
+**Raised:** 2026-08-31, round 8, G-SERVED train (M-01 → M-02 → M-03 → M-06), one branch.
+**Status: the four holes CLOSED. Four residuals OPEN and disclosed below, each pinned by a test that fails the day it closes.**
+
+### The four defects, driven at `8517341` before any repair
+
+Every drive below asserted `resilient_mlkit.core.served.__file__` /
+`resilient_mlkit.core.result.__file__` under the branch tree, so the numbers
+belong to this checkout and not to an installed wheel.
+
+| # | Drive | Result at `8517341` |
+|---|---|---|
+| 1 | `challenger_decision([Comparison(bar, "mape", -0.05, 0.20, 500, arm="val")], ...)` | **PASS**, `promotable=True`, `skill {'mape': 1.25}` |
+| 2 | `challenger_decision([Comparison(bar, "r2", 0.10, 0.90, 500, arm="val")], ...)` | **PASS**, `promotable=True`, `skill {'r2': 0.8888888888888888}` |
+| 3 | `ChallengerDecision(status=PASS, reason=..., recorded_bar=bar, metrics=(), skill={})` | constructed, `promotable=True` |
+| 4 | `r = CheckResult.failed(...); r.status = Status.PASS; r.evidence = {}` | both assignments succeeded; `to_dict()["status"] == 'PASS'` |
+| 5 | `Comparison(bar, "mae", 80.0, 100.0, 500, arm="val").row_matched` | `True`, with no row evidence of any kind; the decision **PASSed** |
+| 6 | `hasattr(core.result, "GateAggregate")` | `False` |
+
+Rows 1 and 2 are one root cause: `skill()` hard-coded `1 - candidate/reference`
+— the lower-is-better formula — and applied it to whatever metric name the
+caller passed, without asking which direction that metric runs in or what
+values it can take. A model worse on r² by eight tenths promoted. A MAPE that
+cannot exist promoted hardest of all, because the impossibility pushed the
+quotient furthest.
+
+Rows 3 and 4 are one shape: a guard placed at one point on the timeline, or on
+one path into an object, and absent everywhere else. `challenger_decision()`
+refused an empty metric set; the public verdict TYPE did not, and the function
+could simply be stepped around. `CheckResult.__post_init__` holds this
+package's most load-bearing invariants and held them exactly once, at
+construction, after which every field it guards was an ordinary mutable
+attribute. Neither guard was weak. Both were in the wrong place.
+
+Row 5 is the same shape once more, spelled as a field default:
+`row_matched: bool = True`. The gate's row-set clause was real and fired
+correctly — on a value the CALLER supplied. So it protected exactly the
+comparisons whose authors had already thought about row sets, and every
+comparison that had never thought about them made the strongest possible claim
+about them for free.
+
+Row 6 is an absence: mlkit had no aggregate verdict type, so the adopter that
+needed one wrote it. `resilient-fray/src/registry/promotion_gate.py` — mutable
+`GateResult` at `:401`, `GateResult(passed=True)` at `:851`, narrowed with
+`&=`. It starts at TRUE and is argued down; `passed` is a stored field and can
+be assigned; and `&=` collapses three statuses into two, so NA has to become
+one of them. That is rule 7's failure mode arriving one layer up.
+
+### What closed them
+
+* **M-01** — `LOWER_IS_BETTER` / `HIGHER_IS_BETTER`, `REAL` / `NONNEGATIVE`,
+  declared as DATA on the `Comparison` in the shape `ServeArms` already makes
+  the arm policy data. `skill()` takes a keyword-only `polarity` with **no
+  default** and computes `candidate/reference - 1` for higher-is-better. New
+  refusal classes `IMPOSSIBLE_MEASUREMENT` and `POLARITY_UNDECLARED`, kept
+  apart because one sends a reader to the scorer and the other to the binding.
+  **No name→polarity table**: that is E-038 (`core.metric_registry`)
+  re-introduced at the point that decides promotions.
+* **M-02** — `ChallengerDecision` refuses `metrics=()` as its FIRST clause, since
+  every later clause is a comprehension over it and an empty tuple satisfies
+  them all vacuously. `CheckResult` gains `VerdictSealed` and a `__setattr__`
+  that refuses every verdict field after construction, plus `SealedEvidence`,
+  a dict subclass refusing all seven mutating methods (a seal that refused only
+  `r.evidence = {}` is defeated by `r.evidence.clear()`). The three runner
+  stamps (`repo`, `git_sha`, `nonce`) stay writable once and refuse
+  re-stamping onto a different value. A SEAL, not a re-validation: re-validation
+  refuses only structurally illegal states, and a FAIL carrying evidence flipped
+  to a PASS carrying the same evidence re-validates cleanly.
+* **M-03** — `GateAggregate`, frozen, `passed` a property equal to
+  `all(status is PASS)`. No field to assign, no initial value to leave standing,
+  no accumulation step to skip. **NA is not PASS**, and neither are DEFERRED,
+  STALE or ESCALATED. Refuses an empty check set, a repeated check id, and a
+  bare bool posted in as a check.
+* **M-06** — `row_set_digest()` as the one definition of the tie;
+  `candidate_row_digest` / `reference_row_digest` refused unless empty or
+  64 hex; `row_matched` becomes `field(init=False)`, derived, with a third
+  state the old field could not hold — `None`, UNTIED, which is NA at the gate
+  under the new class `ROW_SET_UNTIED`. `Comparison(..., row_matched=True)` is
+  now a TypeError: the assertion cannot be spelled by anyone.
+
+Each of the four was committed fire-then-fix where the pin could be made to
+fail first, and every guard was mutated back out afterwards to prove the pins
+are alive (twelve mutations, all killing at least one pin). Gate: mlkit full
+pytest, **757 at `8517341` (re-measured on branch start) → 830**, nothing
+pre-existing lost or weakened.
+
+### Three further holes found by attacking the repairs, and closed in the same branch
+
+Driven against the branch *after* M-01/M-02/M-03/M-06 landed:
+
+* `ChallengerDecision(status=PASS, ..., skill={"m": float("nan")})` constructed
+  and reported `promotable=True` — `float('nan') <= 0.0` is `False`, so a NaN
+  skill satisfied the non-positive-skill clause. Non-finite skill is now
+  refused on every status.
+* a `skill` map WIDER than the declared metrics constructed cleanly, and
+  `skill_vs_recorded_bar` then carried a figure for a metric the decision never
+  examined, indistinguishable downstream from the ones it did. Refused.
+* `decision.to_dict()["evidence"]["comparisons"][0]["skill"] = 99` edited the
+  decision's own record: `dict(self.evidence)` is shallow and the comparisons
+  live one level down. The boundary now deep-copies.
+
+### RESIDUALS, OPEN
+
+1. **An undeclared domain buys no domain check.** `domain` defaults to `REAL`,
+   which claims nothing, so the negative-MAPE drive still reaches PASS when the
+   caller declares polarity and leaves the domain alone. This is deliberately
+   not `row_matched=True` in new clothes, and the difference is the direction of
+   the default: `row_matched=True` asserted the STRONGEST claim on the caller's
+   behalf, `domain=REAL` asserts the WEAKEST — the failure mode is an absent
+   check, not a fabricated pass. There is no safe default (NONNEGATIVE is wrong
+   for r², which legitimately goes negative). Making the domain mandatory as
+   polarity is, is a second contract break with its own adopter cost and is not
+   taken inside M-01. Pinned:
+   `test_residual_b_an_undeclared_domain_buys_no_domain_check`.
+2. **A declared polarity can be declared wrongly.** The contract checks that a
+   direction was stated and cannot check that it is the right one for that
+   metric; `mae` declared `higher_is_better` promotes a worse model. Closing it
+   needs the name table that is E-038. What changed is auditability: the
+   declaration travels in the decision's evidence, so a reader can see
+   `mae / higher_is_better` and object. Nobody could audit the assumption it
+   replaced, because it was never written down. Pinned:
+   `test_residual_c_a_declared_polarity_can_be_declared_wrongly`.
+3. **`n_rows` is still a caller assertion, untied to the digests.** M-06 tied the
+   row SETS, not the row COUNT: a digest over two rows alongside `n_rows=500`
+   passes, because the digest is opaque and carries no count. Closing it means
+   carrying a signed count beside the digest, a further design step with its own
+   adopter cost. Related and unclosable by any digest scheme: a caller who
+   computes ONE digest and puts it on both sides has tied the declared row sets
+   together without having scored the reference on them. The tie proves the two
+   sides name the same rows; it cannot prove the scoring happened. Pinned:
+   `test_residual_d_n_rows_is_still_a_caller_assertion_untied_to_the_digests`.
+4. **`__dict__` surgery defeats the seal, as it defeats every frozen dataclass
+   here.** `object.__setattr__(r, "status", PASS)`, `r.__dict__["status"] = PASS`
+   and `del r.__dict__["_sealed"]` followed by an ordinary assignment all land.
+   A two-signal seal that survived the `del` was written and MEASURED, and is
+   not here: it also read "the evidence mapping is sealed" as proof of
+   construction, and it broke the R2/T2 delegation at `checks/readiness.py:195`,
+   which builds a CheckResult from another result's evidence — the dataclass
+   `__init__` assigns `evidence` before `measured_at`, so the inherited seal was
+   live while the new object was still being built. Six tests red. Subtle
+   correctness inside a guard is its own defect class, so the single robust
+   signal stands and the limit is stated. It is a LOUD limit: nothing reaches
+   into `__dict__` by accident, and accident is what the seal exists to stop —
+   one ordinary assignment in a check module, which now refuses. Pinned:
+   `test_residual_e_dict_surgery_defeats_the_seal_as_it_defeats_frozen`.
+   Also open at one level down: nested evidence values stay mutable
+   (`r.evidence["curve"]["a"] = 9.9`). Deep-freezing arbitrary evidence changes
+   the type of every nested structure the eight repos store, a blast radius
+   this repair did not measure. No nested edit can change `status`, add or
+   remove a top-level evidence key, or turn an empty-evidence result into a
+   passing one. Pinned:
+   `test_residual_a_nested_evidence_value_is_still_mutable_in_place`.
+
+### FOR THE FLEET — this is a BREAKING contract change, and the break is the point
+
+M-01 and M-06 will move adopter rows. A comparison that declares no polarity is
+now NA; a comparison with no row-set tie is now NA. Those rows were passing on
+assertions nobody made deliberately, so the flip is the repair showing its work.
+
+**No number is written here.** How many rows move, at which of the ten adopters,
+is M-08's measurement — a dual-interpreter drive at each adopter's remote main,
+before-tag versus candidate-tag. Predicting it numerically would be exactly the
+fabrication M-08 exists to prevent (rule 2). The adopter-side repairs in our own
+two repos are M-07; colleague repins remain their owners' calls, and the three
+floating adopters (choco, triage, blackout, pinned on `branch=main`) inherit
+this on their next re-lock with no review step — flagged in M-09.
+
+
+
+---
+
+## E-M21 — the seal M-02 built read a flag the caller it was guarding against could set
+
+**Raised** 2026-08-31 by the adversarial verification of the G-SERVED train
+(PR #23, `943c0fdf1a6af7b6f2a2af272a5a7b5f00e46f44`). Fixed here, in
+`src/resilient_mlkit/core/result.py`. Not a write into another repo — recorded
+because E-M20 states this residual, and states it incompletely.
+
+### What E-M20 says
+
+M-02(b) ships a seal on `CheckResult` and discloses one residual, in
+`_is_sealed.__doc__` and pinned by
+`tests/test_result_sealed.py::test_residual_e_dict_surgery_defeats_the_seal_as_it_defeats_frozen`:
+
+> Both are `__dict__` surgery, which defeats this exactly as it defeats every
+> frozen dataclass in this package … That is a stated limit of Python, not a
+> hole this class can close, and it is a **LOUD** limit: nothing edits a verdict
+> that way by accident, and accident is what the seal exists to stop
+> (`result.status = Status.PASS`, one ordinary assignment, in a check module —
+> which now refuses).
+
+Three defeats are named: `object.__setattr__`, `r.__dict__["status"] = …`, and
+`del r.__dict__["_sealed"]`. All three name the machinery they subvert.
+
+### What was measured
+
+Driven at 943c0fd from a fresh worktree, with `core.result.__file__` asserted
+in the driver:
+
+```
+r = CheckResult.failed("R99", "phase-1", "a real failure")
+r._sealed = False           -> succeeded    ORDINARY assignment
+r.status = Status.PASS      -> succeeded    ORDINARY assignment
+r.evidence = {"forged": True} -> succeeded
+r.to_dict()["status"]       -> 'PASS'
+
+r2.evidence._sealed = False -> succeeded
+r2.evidence["forged"] = True -> succeeded
+```
+
+`CheckResult.__setattr__` refused `_VERDICT_FIELDS` and rate-limited
+`_STAMP_FIELDS`, then fell through to `object.__setattr__` for every other
+name — including `_sealed`, the one attribute whose value decides whether
+either clause runs at all. One layer down, `SealedEvidence` declared
+`__slots__ = ("_sealed",)` and never overrode `__setattr__`, so its slot was
+writable by the same syntax.
+
+This is **not** the disclosed residual. It is not `__dict__` surgery, it does
+not name the machinery it subverts, and it is strictly cheaper than either
+disclosed defeat: it is the same spelling as the accident the seal was built to
+stop, one line earlier.
+
+### Where it reaches
+
+M-03's `GateAggregate` derives `passed` from the results precisely so that a
+caller holding the object cannot make it disagree with the checks it holds.
+Measured, same drive:
+
+```
+agg = GateAggregate("promotion", (passing_R1, failing_R2))
+agg.passed, agg.blocking      -> False, ('R2',)
+failing_R2._sealed = False; failing_R2.status = Status.PASS
+agg.passed, agg.blocking      -> True, ()
+```
+
+The derivation is correct; it was reading forged inputs. A derived verdict is
+only as strong as the seal on what it derives from.
+
+### The repair
+
+`_SEAL_FLAG` is named once and refused by name in both places, before every
+other clause. It does **not** read the evidence mapping's seal, so it does not
+resurrect the R2/T2 ordering break at `checks/readiness.py:195` that the
+two-signal seal hit and that E-M20 records as the reason no second signal
+shipped. `seal()` and the copy hooks use `object.__setattr__` and are
+unaffected.
+
+Five pins in `tests/test_result_sealed.py` (three Control A, two Control B);
+four failed before the fix and all pass after. Check-not-dead, whole suite:
+removing the `CheckResult` clause → 3 failures; removing the `SealedEvidence`
+clause → 1 failure. Suite 830 → 835, nothing pre-existing lost.
+
+### What is still open, and is now the whole residual
+
+`test_residual_e_dict_surgery_defeats_the_seal_as_it_defeats_frozen` is
+unchanged and still green: all three `__dict__` paths still land. That is
+Python's boundary and every frozen dataclass in this package shares it —
+`core.served`'s own frozen types call `object.__setattr__` in their
+`__post_init__`. The residual list is now accurate rather than being the part
+of it somebody happened to try.
+
+Residual A (nested evidence values are mutable in place) is unchanged and
+unaffected.
+
+### The two E-M20 residuals this verification did NOT close
+
+Both re-driven at 943c0fd and confirmed as E-M20 states them; neither is
+touched here, and both are correctly disclosed:
+
+1. **An undeclared domain buys no domain check.** `domain` defaults to `REAL`,
+   which claims nothing, so the exact 8517341 defect reproduces whenever a
+   caller declares polarity and leaves domain alone:
+   `Comparison(bar, "mape", -0.05, 0.20, 500, polarity=LOWER_IS_BETTER, <tied>)`
+   → `PASS`, `promotable=True`, skill `1.25`. Declaring `domain=NONNEGATIVE`
+   refuses it by name. Making `domain` mandatory is a second contract break on
+   top of M-01's, and belongs with M-08's measured blast radius rather than
+   ahead of it.
+2. **`n_rows` is untied to the digests.** A comparison may carry a digest over
+   500 rows and report `n_rows=7`; `row_matched` is `True` and nothing
+   contradicts it. The row *sets* are tied; the row *count* is still a
+   caller's word.
+
+
+
+---
+
+## E-M21 — D3 compared a subject's coverage against a level the same subject supplied; the level is now DATA
+
+**Raised and repaired** 2026-08-31 on `fix/m-05-d3-nominal-is-data` (round-8
+item M-05), from `origin/main` `8517341`. The defect is CLOSED. Three residuals
+at the bottom are OPEN, and one of them is a change every adopter with a
+`coverage` binding must make before its D3 row is a verdict again.
+
+### The defect
+
+D3's verdict is `abs(empirical - nominal) > tol`. Until this branch, `nominal`,
+`empirical` and `n` were all read out of the single dict the `coverage`
+binding had just returned, and only `tol` was clamped by mlkit
+(`checks/decision.py:158-173` at `8517341`). Both operands of the subtraction
+came from the party the subtraction judges.
+
+Tick 13 measured what that buys, independently in two repos in one tick, and
+both were found by PRs that had carefully tied the OTHER operand:
+
+* **arabica** set `nominal` equal to the empirical `0.8879423328964613` it had
+  just measured, in both `coverage_for_d3` and `levels[alpha=0.1]`. D3 returned
+  PASS on evidence reading
+  `{'nominal': 0.8879423328964613, 'empirical': 0.8879423328964613, 'n': 1526,
+  'tol': 0.05}`, erasing a shortfall of `-0.012057667103538727` that the repo
+  had truthfully disclosed for its SERVED model of record — the exact outcome
+  the PR had been opened to prevent. The second leg of that same PR re-derived
+  the coverage from the rows, agreed to 1e-12, and raised nothing, because it
+  was checking the operand nobody had touched.
+* **surge** wrote a genuine `(nominal 0.95, qhat 0.32916248920222785, empirical
+  0.9414295014880952)` triple, from a real and different calibrated level, into
+  the level whose `alpha` field still said 0.1. Every individual number was
+  real. Only the pairing was a lie, and nothing compared the pairing. 17 of 18
+  mutation classes refused it; this was the 18th.
+
+The general form, which is why this entry exists rather than two repo-local
+ones: **when a verdict is a comparison, every operand needs a tie. Pinning
+`tol` is not pinning `nominal`, and pinning `alpha` is not either. A gate is
+only as tied as its loosest term.**
+
+Driven at `8517341` before the repair, in an interpreter asserting its own
+`resilient_mlkit.__file__`, through the real `.mlkit/repo.toml` resolution
+path:
+
+    repo.toml declares [coverage] nominal = 0.9
+    binding returns nominal == empirical == 0.8879423328964613, n=1526
+      -> PASS, evidence {'nominal': 0.8879423328964613, ...}
+
+    repo.toml declares nothing
+    same binding
+      -> PASS, same evidence
+
+The declared level on disk was not read at all.
+
+### The repair
+
+The level a set of prediction intervals promises is DATA now, declared in
+`.mlkit/repo.toml` beside the binding it judges:
+
+```toml
+[coverage]
+nominal = 0.90
+```
+
+and the binding's own `nominal` is a claim D3 ADJUDICATES rather than the
+standard it judges by. Same reason `core.served.ServeArms` holds the serve-arm
+policy as data: mlkit cannot know which level a product promises, and a check
+that asked the subject would be asking the party with the motive.
+
+Three verdicts, three different instructions:
+
+* reported disagrees with declared -> **FAIL `NOMINAL_SELF_DECLARED`**, naming
+  both operands and the gap.
+* no declaration -> **NA `NOMINAL_UNDECLARED`**. Falling back to the binding's
+  claim would be the old behaviour wearing a conditional, reachable by deleting
+  two lines of config.
+* they agree -> the ordinary coverage verdict, taken against the DECLARED
+  level.
+
+`NOMINAL_AGREEMENT_EPS = 1e-12` is a float-representation allowance and not a
+tolerance: `1 - 0.1` is not the literal `0.9` and a repo may compute it. The
+incident above missed by `1.2e-2`, ten orders of magnitude above the bar.
+
+Ordering, each with its own control: the E-M09/E-M10 non-finite refusals stay
+AHEAD of the declaration (a NaN disagrees with every level, so folding it in
+would replace "this coverage was never measured" with "this level was
+substituted"); `NOMINAL_SELF_DECLARED` fires BEFORE the `n < MIN_COVERAGE_N`
+NA (a substituted level is not a measurement gap and does not become less true
+on fewer rows); a declaration that is a bool, a string, non-finite, or outside
+`(0, 1]` is refused as a declaration, since `bool` is an `int` and
+`nominal = true` would otherwise arrive as a valid 1.0 promise nobody wrote.
+
+### What the controls measured
+
+    full suite   754 passed / 3 skipped at 8517341 (re-measured on branch start,
+                 NOT round-3's 757)  ->  766 passed / 3 skipped
+
+    CONTROL A    declared 0.90, binding reports nominal == empirical
+                 0.8879423328964613     PASS -> FAIL NOMINAL_SELF_DECLARED
+                 declaration absent      PASS -> NA   NOMINAL_UNDECLARED
+
+    CONTROL B    honest binding, 0.89 against a declared 0.90, n=5000
+                                                     PASS, unmoved
+                 NaN tol            FAIL "non-finite tol",       unmoved
+                 NaN empirical      FAIL "non-finite empirical", unmoved
+                 NaN reported nom.  FAIL "non-finite nominal",   unmoved
+                 n=40               NA   "too small to measure", unmoved
+                 0.68 vs 0.90       FAIL "do not mean what they say", unmoved
+
+    CONTROL C    seven mutations of the fix out of src/, each restoring
+                 decision.py byte-identical afterwards; all seven are now
+                 caught. The third was not, at first — see below.
+
+### The control that caught the author
+
+Mutating `abs(empirical - declared)` back to `abs(empirical - nominal)` left
+the suite GREEN, while the test meant to hold that line asserted in its own
+docstring that it distinguished the two. It did not, and could not: past the
+agreement gate the operands agree to within `NOMINAL_AGREEMENT_EPS`, so for any
+ordinary tolerance they are the same number. A label on a property nothing
+measured, written into the commit that closed one.
+
+They come apart in one reachable place. A binding may declare a tolerance
+STRICTER than mlkit's, with no floor, so a `tol` below the representation
+allowance makes the operand choice observable: reported `0.9000000000005001`
+against a declared `0.9` with `tol = 1e-13` PASSes against the declaration and
+FAILs against the copy. That is now the test, with both preconditions asserted
+in its body.
+
+### Residual 1 (OPEN, and it is every adopter's) — three live D3 rows go NA
+
+Read-only measurement over the eight adopters' remote mains, 2026-08-31, via
+the GitHub contents API — a fact about their configs, NOT a prediction of their
+verdicts, which is round-8 item M-08's drive to make:
+
+| repo | main | `coverage` binding | `[coverage] nominal` |
+|---|---|---|---|
+| choco | `fd44583` | absent | absent |
+| arabica | `5b40d70` | `mlkit_bindings:served_model_coverage` | **absent** |
+| fray | `41b496e` | absent | absent |
+| torrent | `373d935` | `mlkit_bindings:served_model_coverage` | **absent** |
+| chokepoint | `56854a4` | absent | absent |
+| surge | `997d5ed` | `mlkit_bindings:served_model_coverage` | **absent** |
+| triage | `806d4e0` | absent | absent |
+| blackout | `4ffe52d` | absent | absent |
+
+No adopter declares a level today, because until this branch there was nowhere
+to declare one. **arabica, torrent and surge** therefore move from a D3 verdict
+to NA `NOMINAL_UNDECLARED` when they take this version; the other five are
+already NA for want of a binding and do not move. The NA is the honest state —
+their level was never tied — and it is repaired by two lines of config each,
+not by a code change. `spine/mlkit/repo.toml` documents the section for the
+sync.
+
+### Residual 2 (OPEN) — a binding can still echo the declaration
+
+Nothing stops `coverage()` reading `.mlkit/repo.toml` and returning the level
+it finds there. The cross-check would pass. What that buys the subject is
+nothing: the pass mark is then the COMMITTED declaration, which is what the
+empirical figure is measured against either way, and the exploit that mattered
+— moving the mark to wherever the measurement landed — is dead. Recorded so the
+next reader does not mistake the cross-check for the protection. The protection
+is that the level is committed, reviewable and static.
+
+### Residual 3 (OPEN) — nothing ties the declaration to what is SOLD
+
+`[coverage] nominal = 0.90` is a promise made to mlkit. A repo could declare
+0.80 while its dashboard, its README or its customer-facing artifact says 90%.
+mlkit sees the config and cannot see the sales claim. This is the same class as
+`ServeArms` and it is not closable from inside the instrument; it needs the
+declared level to be the SAME literal the product's own serving path reads,
+which is an adopter-side change and is not proposed here.
+
+**Status: the defect CLOSED. Residual 1 is adopter work, enumerated above and
+attached to M-08's drive. Residuals 2 and 3 OPEN and unassigned.**
+
+**Note for the release entry:** D3 changes verdict on unchanged repo code, in
+both directions (PASS -> FAIL for a substituted level, PASS -> NA for an
+undeclared one). `CHANGELOG.md` is deliberately untouched here — its newest
+heading must equal `resilient_mlkit.__version__`, and the bump belongs to the
+tag — but by that file's own scale this is a MAJOR event and the entry that
+cuts the tag must name D3.
+
+
+
+---
+
+## E-M23 — M-05's declared level was the pass mark, read off the working tree; it is a committed read now
+
+**Raised and repaired** 2026-08-31 on `verify/m-05-declared-level-must-be-committed`
+(round-8 M-05 adversarial verification), from `fix/m-05-d3-nominal-is-data`
+`a48c975`. E-M21's defect stays closed. The bypass below is CLOSED. Two
+residuals are OPEN and neither is new.
+
+### The defect
+
+E-M21 moved D3's nominal level out of the dict the subject returns and into
+`.mlkit/repo.toml`, and staked the protection on a sentence in its own text:
+
+> The protection is that the level is committed, reviewable and static.
+
+Nothing enforced either half. `checks/decision.py` read the level with
+`repo.config()`, which parses the WORKING TREE, and it read it after
+`repo.resolve()` had already imported the subject's own module.
+
+Driven at `a48c975`, in an interpreter asserting its own
+`resilient_mlkit.__file__`, through the real `.mlkit/repo.toml` resolution
+path, in a real git repo:
+
+    HEAD:.mlkit/repo.toml   [coverage] nominal = 0.90
+    working tree, uncommitted, nominal = 0.8879423328964613
+    binding reports nominal == empirical == 0.8879423328964613, n=1526
+      -> PASS
+         evidence {'nominal': 0.8879423328964613,
+                   'declared_nominal': 0.8879423328964613,
+                   'reported_nominal': 0.8879423328964613, ...}
+         no allow-dirty marker
+         git status --porcelain: " M .mlkit/repo.toml"
+
+    [coverage] never committed at all, present only in the working tree
+      -> PASS, identical evidence
+
+    a binding whose MODULE BODY rewrites .mlkit/repo.toml before returning
+      -> PASS, identical evidence
+
+That is the tick-13 exploit — the level set equal to the empirical figure the
+binding just measured — restored intact by moving it one file across. The
+verdict row carries `repo.git_sha`, so it reads as a figure taken at a commit
+while its standard came from bytes on no ref.
+
+It is `docs/ESCALATIONS.md` E-M12's shape, one check after `checks/selection.py`
+was moved out of it. `core/artifact.py`'s own docstring names the precedent
+verbatim: `selection.py` "read `docs/selection.yaml` with `Path.read_text()`
+and S1-S4 emitted PASS from the working tree — the E-M12 shape itself, in the
+check pipeline of the tool that exists to refuse it." In one run, in one tree,
+S1 answered **NA** on a dirty register while D3 answered **PASS** on a dirty
+pass mark.
+
+The distinction that decides it: `repo.config()` is the right reader for what
+it was already asked for — which binding to import (`[bindings]`), which trees
+to walk (`[source]`), which region is declared (`[remote]`). Those say WHAT TO
+LOOK AT, and mlkit is about to look at the working tree anyway. `[coverage]
+nominal` says WHAT PASSES. That is the role `docs/selection.yaml` plays for
+S1-S4, and E-M12 is the entry about that role.
+
+### The repair
+
+The level is read through `core.artifact.load(repo, ".mlkit/repo.toml")` —
+`HEAD`'s blob, hashed, with the two-pass linked-worktree search and the
+committed-read refusals the module already owns. Rule 7: the reader was
+imported, not reimplemented. `core.artifact._parse` gained TOML beside JSON,
+JSONL and YAML — four lines, additive, no existing suffix's behaviour touched.
+
+Three outcomes:
+
+* committed and clean -> the ordinary E-M21 verdict, unchanged.
+* dirty, or on no ref at all -> **NA `NOMINAL_UNCOMMITTED`**, carrying
+  `core.artifact`'s own `NOT_COMMITTED` diagnosis naming the file and the blob.
+* `--allow-dirty` -> the working tree is read for diagnosis and the ref is
+  marked; the marker rides into `evidence` under `ALLOW_DIRTY_KEY`, and
+  `CheckResult.__post_init__` raises `UncommittedRead` rather than let it
+  become a PASS. A FAIL under the hatch renders and is refused downstream by
+  `portfolio.resolve`.
+
+Reading HEAD's blob is what closes the import-time write, and reordering is
+not: `repo.resolve()` imports the subject's module, so the subject's code runs
+before any read the check takes, however the check orders its own statements.
+
+### What the controls measured
+
+    full suite   757 at 8517341 -> 771 at a48c975 -> 777 here
+                 (+6 = exactly the new pins; zero pre-existing tests moved,
+                  zero removed — collected node ids diffed, not counted)
+
+    CONTROL A    uncommitted declaration substituting the empirical
+                                              PASS -> NA NOMINAL_UNCOMMITTED
+                 declaration only in the working tree
+                                              PASS -> NA NOMINAL_UNCOMMITTED
+                 binding writing the config from its module body
+                                              PASS -> NA (not the subject's number)
+                 binding writing malformed TOML mid-call
+                          BindingError ESCAPING the check -> NA, no traceback
+
+    CONTROL B    all ten E-M21 controls re-driven, evidence dicts compared
+                 field by field: A1 FAIL NOMINAL_SELF_DECLARED, A2 NA
+                 NOMINAL_UNDECLARED, honest PASS, the erased disclosure PASS,
+                 NaN tol / NaN empirical / NaN nominal FAIL with their own
+                 reasons, n=40 NA, 0.68-vs-0.90 FAIL, widened tol clamped —
+                 ALL UNMOVED. Committed-clean is the ordinary case and it is
+                 byte-identical.
+
+    CONTROL C    4 mutations, decision.py / artifact.py restored and sha256
+                 asserted byte-identical after each; 4/4 caught.
+
+### Residual 1 (OPEN, unchanged from E-M21 residual 1, now larger)
+
+No adopter declares a level, so arabica, torrent and surge still move to NA on
+adoption. They must now COMMIT the declaration, which is the same two lines and
+one `git add`. A repo running `mlkit check` on a dirty tree gets NA on D3 where
+it used to get a verdict; that is the same bargain S1-S4 already make.
+
+### Residual 2 (OPEN) — `empirical` and `n` are still the subject's alone
+
+Driven here and left open because it is not M-05's scope: with an honest
+committed 0.90, a binding returning `{"nominal": 0.90, "empirical": 0.90,
+"n": 1000000}` PASSes, and nothing ties either figure to a row set. E-M21 named
+the general form — "when a verdict is a comparison, every operand needs a tie"
+— and tied one of the three. The row-digest work in round-8 M-06 is the shape
+the remaining two need. **Unassigned.**
+
+**Status: the bypass CLOSED. E-M21's residuals 2 and 3 stand as written.
+Residual 2 above OPEN and unassigned.**
+
+*Numbering note: E-M21 is contended (mlkit PR #24 and PR #26 both took it) and
+E-M22 is taken by PR #25, all three still open at 2026-08-31. This entry took
+E-M23 to leave those alone; if the merge order makes E-M23 collide it is a
+heading rename and nothing else — no entry here is renumbered or rewritten.*
+
+
 ---
 
 ## E-M22 — E-M17 residual 4 is CLOSED: four more spellings of the same stamp now fold
@@ -1507,6 +2111,7 @@ PASSed. The two residuals above are OPEN and pinned.**
 
 **mlkit `pytest`: 757 at `8517341` (re-measured on branch start) → 794 on this
 branch.**
+
 
 ---
 

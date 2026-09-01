@@ -112,6 +112,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -436,7 +437,7 @@ def refuse_uncommitted(marked: bool, what: str) -> None:
 
 
 def _parse(data: bytes, relpath: str) -> Any:
-    """JSON, a list of records for ``.jsonl``, or a YAML document.
+    """JSON, a list of records for ``.jsonl``, a YAML document, or TOML.
 
     Takes BYTES rather than a path, because after committed reads the bytes are
     a git blob and there may be no file on disk carrying them. JSONL is here
@@ -449,12 +450,21 @@ def _parse(data: bytes, relpath: str) -> Any:
     emitted PASS from working-tree bytes with no committed-read discipline at
     all. ``yaml.safe_load`` only; the loader that executes tags is not a reader,
     it is an interpreter.
+
+    TOML is here for the same reason YAML is, one check later. D3's nominal
+    coverage level -- the pass mark its verdict is measured against -- is
+    declared in ``.mlkit/repo.toml``, and until this reader could parse TOML
+    that check read the level with ``repo.config()``, straight off the working
+    tree. Same shape, same escalation: a standard nobody committed is a
+    standard the reader it is quoted to cannot fetch.
     """
     text = data.decode("utf-8", errors="strict")
     if relpath.endswith(".jsonl"):
         return [json.loads(line) for line in text.splitlines() if line.strip()]
     if relpath.endswith((".yaml", ".yml")):
         return yaml.safe_load(text)
+    if relpath.endswith(".toml"):
+        return tomllib.loads(text)
     return json.loads(text)
 
 
