@@ -2234,3 +2234,90 @@ verification entry is an append.
 
 **Status: M-04 STANDS on its substance. One NA-lane over-fire found by driving
 and REPAIRED on this branch; two measured behaviours recorded OPEN above.**
+
+---
+
+## E-M24 — fray's unseen-year track resamples rows under a crop-year policy
+
+**Measured by** round-8 adjudication (`scratchpad/loop/adjudication.md` §2.1),
+re-read here on 2026-09-01. Not re-measured by mlkit: the figures below are
+quoted from that adjudication, which rebuilt the selected checkpoint's val
+predictions through fray's own builders with feature names asserted equal to
+the checkpoint's 26.
+
+`resilient-fray`'s holdout policy puts **whole crop years in one partition**, so
+the exchangeable unit is the crop year and VAL has five. The run's bootstrap
+resampled **1,365 rows** as if independent.
+
+| resampling unit | point | 95% CI | clears zero |
+|---|---:|---|---|
+| ROW — what the run reported | +22.811 | [+16.016, +29.646] | yes |
+| CROP-YEAR block (5 clusters) | +22.811 | **[−1.289, +41.704]** | **NO** |
+
+**No gate was edited.** fray's preregistration fixed the row bootstrap in
+advance and the run honoured it exactly; this is a specification defect found by
+adjudication, not a loosened threshold.
+
+`mlkit` now carries the instrument (`core.served.ResamplingDeclaration`, check
+`D6`), and D6 measures **NA** on fray because no `resampling_declaration`
+binding exists — driven 2026-09-01, along with the other seven repos.
+
+**Cannot be done from here**: declaring the binding is a write into
+`resilient-fray`, and its trainer is owned by open PR #78
+(`feat/f3-unseen-year-track`), which this branch does not touch.
+
+**Proposed**: on a branch taken FROM #78, add `resampling_declaration` to
+`.mlkit/repo.toml` returning `blocking_unit = "crop_year"` with the assignment
+built from `validation.yield_holdout.county_year_splits` — the same splitter
+`splits` already reports — and `unit = "crop_year"`. D6 will then FAIL if the
+trainer's bootstrap is ever pointed back at rows, and the trainer's own
+promotion condition can carry the interval into
+`core.served.Comparison(skill_interval_low=..., skill_interval_high=...,
+resampling=...)`, where `INTERVAL_COVERS_ZERO` is a FAIL rather than a footnote.
+
+---
+
+## E-M25 — chokepoint's corridor bootstrap is the fleet's correct convention and is undeclared
+
+`resilient-chokepoint` resamples corridors — 28 clusters, predictions held
+fixed — which is the convention the round-8 adjudication endorsed and asked the
+fleet to adopt. D6 measures **NA** there too (no binding), so the fleet's
+*correct* convention is as undeclared as the incorrect one.
+
+`ResamplingDeclaration` classifies chokepoint's shape as `UNIT_CROSSCUTS_ARMS`
+and does **not** refuse it: a corridor's rows appear in train, val and test, so
+the time-blocked split does not partition that axis and the policy's blocks say
+nothing about it.
+
+**Stated so it is not read as more than it is**: that classification records the
+convention, it does not certify it. A corridor bootstrap does not account for
+the temporal axis the split partitions, and mlkit makes no claim that it does.
+What the declaration does is put both numbers in the record side by side — the
+units resampled and the blocks in the arm that were not — which is precisely the
+disclosure whose absence made §2.1 a hand reconstruction.
+
+**Cannot be done from here**: a write into `resilient-chokepoint`, whose ladder
+runner is owned by open PR #101 (`run/foundation-full-val-ladder`).
+
+**Proposed**: branch from #101; `blocking_unit = "date"`, `unit = "corridor"`,
+`arm = "val"`, assignment from `daily_flow.build_flow_frame` / `split_frame`.
+
+---
+
+## E-M26 — README states the gating-check count as a second literal that nothing compares
+
+`portfolio.py`'s docstring records the rule ("a count is obtained by counting,
+never by remembering") and `tests/test_promotion_state.py` holds any count
+stated **in that file** against `len(gating_ids())`. `README.md` states the same
+count in prose and **no test reads it**. It said `27` while D6 was being added
+and would have gone on saying it.
+
+Found by adding a gating check, not by a check. Updated to `28` in the same
+commit and recorded here rather than fixed properly, because the honest fix —
+generating that sentence from `gating_ids()`, or extending the
+`test_version_declaration` style of doc/code agreement to the README — is a
+separate change and needs its own control pair. This entry is the standing note
+that the copy exists.
+
+**Can be done from here** (unlike E-M24/E-M25): it is a change inside mlkit.
+Left open deliberately, not blocked.

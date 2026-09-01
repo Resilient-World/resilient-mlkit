@@ -33,6 +33,21 @@ name = "REPLACE_ME"
 #                             `nominal` is CROSS-CHECKED against the level
 #                             declared in [coverage] below, not trusted as the
 #                             standard; see that section.
+#   resampling_declaration()
+#                          -> {procedure, draws, policy, blocking_unit, unit,
+#                              arm, assignment}
+#                             `assignment` is ONE MAPPING PER PANEL ROW naming
+#                             row_key, arm, block_key and unit_key -- the whole
+#                             panel, not the arm. mlkit derives every count,
+#                             digest, relation and verdict from it; a binding
+#                             that reported its own unit count would be
+#                             reporting the operand of its own verdict, which
+#                             is what [coverage] below exists to stop for D3.
+#                             D6 additionally ties the declared blocks to
+#                             splits() above -- a second declaration of the
+#                             same partition -- because block_key = row_key
+#                             describes a policy with no blocks, is perfectly
+#                             self-consistent, and is caught nowhere else.
 #   scaling_probe()        -> {0.01: metric, 0.10: metric, 0.25: metric}  (larger is better)
 #   hparam_sanity()        -> {lr_range, throughput_curve, winning_config, mlflow_run_id}
 #   efficiency()           -> {gpu_util, profiler_trace, dataloader_bound}

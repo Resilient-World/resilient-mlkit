@@ -103,10 +103,24 @@ the same name and different SHAs whose gates return opposite verdicts on a
 zero baseline. R12's exemption is an **import**, so adopting `core.served` is
 what clears it; renaming is not.
 
-`READY-TO-TRAIN` requires all 27 gating checks to pass. Six of them (S5, D1, D4, D5,
+D6 is the same argument applied to an interval. A promotion that rests on a
+resampling procedure has to declare the unit that procedure drew, and mlkit
+refuses a declaration that contradicts the holdout policy the same artifact
+declares — rows resampled inside an arm whose partitions are blocks, naming
+both. Round-8 adjudication measured what that is worth: on one identical set of
+1,365 rows, `[+16.016, +29.646]` under the unit the run resampled and
+`[-1.289, +41.704]` under the unit its own split implies.
+
+`READY-TO-TRAIN` requires all 28 gating checks to pass. Six of them (S5, D1, D4, D5,
 E4, E5) are human-only and always report `ESCALATED`, so **an agent cannot
 drive a repo to READY-TO-TRAIN**. That is deliberate: those six are legal and
 billing exposures, not code changes.
+
+*(That count was `27` until D6 joined the decision phase on 2026-09-01. It is a
+second copy of a number `checks.PHASE_ORDER` already holds, and unlike the copy
+in `portfolio.py` nothing in the suite compares it — found while adding D6, and
+recorded in `docs/ESCALATIONS.md` E-M26 rather than fixed here, because the fix
+is a doc-generation change with its own control pair.)*
 
 ## Installing it into a model repo
 

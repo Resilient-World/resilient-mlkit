@@ -226,7 +226,7 @@ def test_the_contract_does_not_claim_the_crosscutting_case_is_accounted_for() ->
     payload = d.to_dict()
     assert payload["relation"] == UNIT_CROSSCUTS_ARMS
     assert payload["refusal"] == UNMEASURED
-    assert set(("n_units_in_arm", "n_blocks_in_arm", "n_rows")) <= set(payload)
+    assert {"n_units_in_arm", "n_blocks_in_arm", "n_rows"} <= set(payload)
 
 
 # =========================================================================
@@ -441,11 +441,12 @@ def _val_row_digest(rows: list[RowUnit] | None = None) -> str:
 
 def _comparison(**overrides) -> Comparison:
     digest = _val_row_digest()
-    kwargs = dict(
-        reference=BAR, metric="mae", candidate_value=80.0, reference_value=100.0,
-        n_rows=1365, arm="val", polarity=LOWER_IS_BETTER,
-        candidate_row_digest=digest, reference_row_digest=digest,
-    )
+    kwargs = {
+        "reference": BAR, "metric": "mae",
+        "candidate_value": 80.0, "reference_value": 100.0,
+        "n_rows": 1365, "arm": "val", "polarity": LOWER_IS_BETTER,
+        "candidate_row_digest": digest, "reference_row_digest": digest,
+    }
     kwargs.update(overrides)
     return Comparison(**kwargs)  # type: ignore[arg-type]
 
