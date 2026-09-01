@@ -796,6 +796,22 @@ class ChallengerDecision:
     def __post_init__(self) -> None:
         if isinstance(self.status, str):
             object.__setattr__(self, "status", Status(self.status))
+        # FIRST, before any of the clauses below, because all of them are
+        # comprehensions over `self.metrics` and an empty tuple satisfies every
+        # one of them vacuously. Measured at 8517341:
+        # `ChallengerDecision(status=PASS, reason=..., metrics=(), skill={})`
+        # constructed, and `promotable` -- derived correctly, doing its job --
+        # returned True. `challenger_decision()` already refused this, but that
+        # refusal lives in the function and this type is public, so the
+        # function could simply be stepped around. A guard that only one path
+        # into an object performs is a guard on that path, not on the object.
+        if not self.metrics:
+            raise ServedContractError(
+                "a challenger decision declares no metric. Every clause that makes "
+                "a PASS mean something is a statement about the declared metrics, "
+                "so a decision over none of them passes every clause without "
+                "having been compared to anything."
+            )
         if self.status not in DECISION_STATUSES:
             raise ServedContractError(
                 f"a challenger decision is {[s.value for s in DECISION_STATUSES]}; "

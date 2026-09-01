@@ -217,11 +217,23 @@ def test_control_b_to_dict_hands_out_a_mutable_copy_of_the_evidence():
     assert r.evidence == {"n": 1}
 
 
-def test_control_b_a_copy_is_independent_and_writable():
-    """deepcopy is how a caller legitimately gets an editable version."""
+def test_control_b_a_result_can_still_be_copied_and_the_copy_is_sealed_too():
+    """deepcopy works, and does not launder the verdict.
+
+    `copy`'s generic reconstruction replays a dict subclass's items through
+    `__setitem__`, so the first draft of this seal made `deepcopy` raise on
+    every CheckResult in the package. Measured, and fixed at the root with
+    `__copy__`/`__deepcopy__` that rebuild and then re-seal -- rather than by
+    letting the clone come back writable, which would have made
+    `copy.deepcopy(r)` the one-line way around everything above.
+    """
     r = failing()
-    clone = copy.deepcopy(r)
-    assert clone.to_dict() == r.to_dict()
+    for clone in (copy.copy(r), copy.deepcopy(r)):
+        assert clone.to_dict() == r.to_dict()
+        with pytest.raises(VerdictSealed):
+            clone.status = Status.PASS
+        with pytest.raises(VerdictSealed):
+            clone.evidence["rows"] = 99
 
 
 def test_control_b_measured_wrapper_still_builds_over_a_sealed_result():

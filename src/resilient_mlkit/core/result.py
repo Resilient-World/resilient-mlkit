@@ -14,6 +14,7 @@ makes it unfalsifiable in exactly the way a fabricated one is -- see
 
 from __future__ import annotations
 
+import copy as _copy
 import datetime as _dt
 import re
 from dataclasses import dataclass, field
@@ -122,6 +123,137 @@ class UncommittedRead(FabricationError):
     """
 
 
+class VerdictSealed(FabricationError):
+    """Raised when a verdict that has already been decided is edited.
+
+    A subclass of ``FabricationError`` for the same reason ``UncommittedRead``
+    is: the output is a figure nobody measured. Here the figure is the verdict
+    itself.
+
+    ``__post_init__`` below holds this package's most load-bearing invariants,
+    and until 2026-08-31 it held them exactly once, at construction. Measured
+    at 8517341 with the module's own ``__file__`` asserted::
+
+        r = CheckResult.failed("R99", "phase-1", "a real failure")
+        r.status = Status.PASS      # succeeded
+        r.evidence = {}             # succeeded
+        r.to_dict()["status"]       # 'PASS'
+
+    The guard was not weak. It was in the wrong place on the timeline.
+
+    ``measurement.Measured`` met this defect from the other side
+    (``measurement.py:100,293``) and repaired it by RE-VALIDATING on
+    assignment. That is right there and wrong here: re-validation only refuses
+    states that are structurally illegal, so a FAIL carrying evidence flipped
+    to a PASS carrying the same evidence re-validates cleanly and is still a
+    forged verdict. A ``CheckResult`` is the record of one measurement that
+    already happened, so the answer is a seal, not a re-check.
+    """
+
+
+#: Fields that ARE the verdict. Sealed the moment construction finishes: there
+#: is no legitimate reason for any of them to change afterwards, and a
+#: re-measurement is a new CheckResult rather than an edit to an old one.
+_VERDICT_FIELDS = frozenset(
+    {"check_id", "phase", "status", "reason", "evidence", "measured_at"}
+)
+
+#: Fields the RUNNER applies after construction, because the check that formed
+#: the verdict does not know them -- ``cli.py:117-119`` and ``:134-136``. They
+#: are writable once, from unset to a value. Re-stamping an already-stamped
+#: result with a DIFFERENT value is refused: a result relabelled onto another
+#: repo or another SHA is a different claim about a different tree.
+_STAMP_FIELDS = frozenset({"repo", "git_sha", "nonce"})
+
+
+class SealedEvidence(dict):
+    """The evidence of a constructed result: readable, and closed to mutation.
+
+    A seal that refused only ``r.evidence = {}`` would be defeated by
+    ``r.evidence.clear()`` -- the same state, reached through a method call
+    ``__setattr__`` never sees. ``measurement.py`` states that residual as OPEN
+    for its own metrics dict; this closes it for ``CheckResult``.
+
+    It is a ``dict`` subclass rather than a ``MappingProxyType`` so that
+    ``isinstance(evidence, dict)``, ``json.dumps`` and ``dataclasses.asdict``
+    all keep working across the eight repos that read it.
+
+    The seal is one level deep, and that limit is deliberate and disclosed:
+    ``evidence["curve"][0.25] = 9`` edits a plain dict the caller put inside.
+    Deep-freezing arbitrary evidence would change the type of every nested
+    structure the fleet stores, which is a blast radius this repair did not
+    measure. What is closed is the verdict: no nested edit can change
+    ``status``, add or remove a top-level evidence key, or turn an
+    empty-evidence result into a passing one. Pinned by
+    ``tests/test_result_sealed.py::test_residual_a_nested_evidence_value_is_still_mutable_in_place``,
+    which fails the day the residual closes.
+    """
+
+    __slots__ = ("_sealed",)
+
+    def seal(self) -> SealedEvidence:
+        object.__setattr__(self, "_sealed", True)
+        return self
+
+    def _refuse(self, operation: str) -> None:
+        if getattr(self, "_sealed", False):
+            raise VerdictSealed(
+                f"refusing {operation}: this evidence belongs to a CheckResult "
+                "whose verdict has already been formed. A PASS rests on what was "
+                "measured, and editing the measurement afterwards leaves a record "
+                "that reads as though the edited figure is what the check saw. "
+                "Re-measure and build a new CheckResult."
+            )
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self._refuse(f"evidence[{key!r}] = {value!r}")
+        super().__setitem__(key, value)
+
+    def __delitem__(self, key: Any) -> None:
+        self._refuse(f"del evidence[{key!r}]")
+        super().__delitem__(key)
+
+    def clear(self) -> None:
+        self._refuse("evidence.clear()")
+        super().clear()
+
+    def pop(self, *args: Any) -> Any:
+        self._refuse("evidence.pop(...)")
+        return super().pop(*args)
+
+    def popitem(self) -> Any:
+        self._refuse("evidence.popitem()")
+        return super().popitem()
+
+    def setdefault(self, *args: Any) -> Any:
+        self._refuse("evidence.setdefault(...)")
+        return super().setdefault(*args)
+
+    def update(self, *args: Any, **kwargs: Any) -> None:
+        self._refuse("evidence.update(...)")
+        super().update(*args, **kwargs)
+
+    def __ior__(self, other: Any) -> SealedEvidence:
+        self._refuse("evidence |= ...")
+        return super().__ior__(other)  # type: ignore[return-value]
+
+    # `copy`'s generic reconstruction restores the ``_sealed`` slot BEFORE it
+    # replays the items, so a sealed instance refuses its own reconstruction
+    # and `copy.deepcopy(a_result)` raises. Both hooks below rebuild the
+    # mapping first and seal after, and the clone keeps the seal: a copy of a
+    # formed verdict is still a formed verdict, and a copy that could be edited
+    # would be the escape hatch this class exists to close.
+    def __copy__(self) -> SealedEvidence:
+        clone = SealedEvidence(dict(self))
+        return clone.seal() if getattr(self, "_sealed", False) else clone
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> SealedEvidence:
+        clone = SealedEvidence(
+            {k: _copy.deepcopy(v, memo) for k, v in self.items()}
+        )
+        return clone.seal() if getattr(self, "_sealed", False) else clone
+
+
 class CredentialRequired(RuntimeError):
     """Raised by a repo binding whose only remaining obstacle is a credential.
 
@@ -193,6 +325,43 @@ class CheckResult:
             self.measured_at = _dt.datetime.now(_dt.UTC).isoformat(
                 timespec="seconds"
             )
+        # Everything above is the verdict being formed. From here on it is a
+        # record of a measurement that happened, and a record that can be
+        # edited is a record of nothing.
+        if not isinstance(self.evidence, SealedEvidence):
+            self.evidence = SealedEvidence(self.evidence)
+        self.evidence.seal()
+        object.__setattr__(self, "_sealed", True)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Refuse every edit to a formed verdict; allow the runner's stamps once.
+
+        Not a re-validation. Re-validating would refuse only states that are
+        structurally illegal, and the forgery this closes is legal-looking: a
+        FAIL that carries evidence, flipped to a PASS carrying the same
+        evidence, satisfies every clause in ``__post_init__``. See
+        :class:`VerdictSealed`.
+        """
+        if self.__dict__.get("_sealed"):
+            if name in _VERDICT_FIELDS:
+                raise VerdictSealed(
+                    f"{self.__dict__.get('check_id', '?')}: refusing to assign "
+                    f"{name!r} on a {self.__dict__.get('status')} result that has "
+                    "already been formed. A verdict is the output of a "
+                    "measurement, not a field to be corrected afterwards; "
+                    "re-measure and build a new CheckResult."
+                )
+            if name in _STAMP_FIELDS:
+                current = self.__dict__.get(name, "")
+                if current and current != value:
+                    raise VerdictSealed(
+                        f"{self.__dict__.get('check_id', '?')}: refusing to "
+                        f"re-stamp {name!r} from {current!r} to {value!r}. This "
+                        "result was measured against one repo at one SHA; "
+                        "relabelling it onto another is a different claim about a "
+                        "tree nobody ran it on."
+                    )
+        object.__setattr__(self, name, value)
 
     # -- constructors -----------------------------------------------------
     # Named constructors exist so that call sites read as claims, and so that
@@ -276,7 +445,10 @@ class CheckResult:
             "phase": self.phase,
             "status": self.status.value,
             "reason": self.reason,
-            "evidence": self.evidence,
+            # A COPY. The record hands out what it measured; it does not hand
+            # out the thing it measured it into. A reader that edits its own
+            # dict has edited its own dict.
+            "evidence": dict(self.evidence),
             "repo": self.repo,
             "git_sha": self.git_sha,
             "nonce": self.nonce,
