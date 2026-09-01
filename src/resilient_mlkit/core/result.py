@@ -165,6 +165,13 @@ _VERDICT_FIELDS = frozenset(
 #: repo or another SHA is a different claim about a different tree.
 _STAMP_FIELDS = frozenset({"repo", "git_sha", "nonce"})
 
+#: The attribute that records whether construction finished. It is not a field
+#: of the verdict, but it decides whether the verdict's fields are guarded, so
+#: it is refused on the same terms (E-M21). Named once, here, because both
+#: :class:`SealedEvidence` and :class:`CheckResult` have to refuse it and two
+#: spellings of one attribute name is one of them silently not refusing.
+_SEAL_FLAG = "_sealed"
+
 
 class SealedEvidence(dict):
     """The evidence of a constructed result: readable, and closed to mutation.
@@ -194,6 +201,29 @@ class SealedEvidence(dict):
     def seal(self) -> SealedEvidence:
         object.__setattr__(self, "_sealed", True)
         return self
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Refuse ordinary assignment to the flag that decides the refusals.
+
+        E-M21. Every mutating method above asks ``_sealed`` whether to refuse,
+        and until 2026-08-31 nothing asked who was allowed to answer: this class
+        declares ``__slots__ = ("_sealed",)`` and inherited ``dict``'s
+        ``__setattr__``, so ``evidence._sealed = False`` re-opened the mapping
+        and ``evidence["forged"] = True`` then landed. A guard whose caller can
+        clear its own precondition is not a guard.
+
+        :meth:`seal` and the copy hooks use ``object.__setattr__``, so the
+        legitimate path is unaffected.
+        """
+        if name == _SEAL_FLAG and getattr(self, _SEAL_FLAG, False):
+            raise VerdictSealed(
+                "refusing to assign '_sealed' on the evidence of a CheckResult "
+                "whose verdict has already been formed. This flag is what every "
+                "refusal in this mapping reads; clearing it is not an edit to "
+                "the evidence, it is an edit to whether the evidence can be "
+                "edited. Re-measure and build a new CheckResult."
+            )
+        super().__setattr__(name, value)
 
     def _refuse(self, operation: str) -> None:
         if getattr(self, "_sealed", False):
@@ -356,6 +386,19 @@ class CheckResult:
         survives that ordering needs a second conjunct on ``measured_at``, and
         subtle correctness inside a guard is its own defect class.
 
+        E-M21 (verifier, 2026-08-31): the paragraph below USED TO SAY that the
+        only defeats were ``__dict__`` surgery, and that the ordinary-assignment
+        accident was closed. That was wrong and was measured wrong. ``_sealed``
+        is neither a verdict field nor a runner stamp, so ``r._sealed = False``
+        fell through ``__setattr__`` to ``object.__setattr__`` -- one ordinary
+        assignment, in the same syntax as the accident, and strictly cheaper
+        than either disclosed defeat -- after which ``r.status = Status.PASS``
+        landed. ``SealedEvidence`` had the same hole one layer down. Both are
+        now refused BY NAME, before any other clause, and the fix is one
+        attribute name rather than a second signal: it does not read the
+        evidence mapping's seal, so it does not resurrect the R2/T2 ordering
+        break described above.
+
         What the two-signal version bought was raising the price of one
         ``__dict__`` reach to two. Both are ``__dict__`` surgery, which defeats
         this exactly as it defeats every frozen dataclass in this package --
@@ -366,6 +409,11 @@ class CheckResult:
         (``result.status = Status.PASS``, one ordinary assignment, in a check
         module -- which now refuses). Disclosed and pinned in
         ``tests/test_result_sealed.py::test_residual_e_dict_surgery_defeats_the_seal_as_it_defeats_frozen``.
+        That pin is unchanged: all three ``__dict__`` paths still land, and
+        they are still the stated limit. What changed is that the list is now
+        accurate -- the E-M21 pins next to it hold the ordinary-assignment
+        spelling closed, so "``__dict__`` surgery" is the whole residual rather
+        than the part of it somebody happened to try.
         """
         return self.__dict__.get("_sealed") is True
 
@@ -379,6 +427,22 @@ class CheckResult:
         :class:`VerdictSealed`.
         """
         if self._is_sealed():
+            # E-M21, FIRST because it is the clause that keeps the other two
+            # running. `_sealed` is neither a verdict field nor a runner stamp,
+            # so it fell through to `object.__setattr__` and `r._sealed = False`
+            # -- one ordinary assignment, the exact syntax of the accident this
+            # seal exists to stop -- re-opened the object for `r.status =
+            # Status.PASS`. Strictly cheaper than either disclosed `__dict__`
+            # defeat, and it does not name the machinery it is subverting.
+            if name == _SEAL_FLAG:
+                raise VerdictSealed(
+                    f"{self.__dict__.get('check_id', '?')}: refusing to assign "
+                    f"'{_SEAL_FLAG}' on a {self.__dict__.get('status')} result "
+                    "that has already been formed. This flag is what the seal "
+                    "reads to decide whether to refuse; clearing it is not an "
+                    "edit to the verdict, it is an edit to whether the verdict "
+                    "can be edited. Re-measure and build a new CheckResult."
+                )
             if name in _VERDICT_FIELDS:
                 raise VerdictSealed(
                     f"{self.__dict__.get('check_id', '?')}: refusing to assign "

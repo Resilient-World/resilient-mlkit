@@ -1423,3 +1423,116 @@ fabrication M-08 exists to prevent (rule 2). The adopter-side repairs in our own
 two repos are M-07; colleague repins remain their owners' calls, and the three
 floating adopters (choco, triage, blackout, pinned on `branch=main`) inherit
 this on their next re-lock with no review step — flagged in M-09.
+
+---
+
+## E-M21 — the seal M-02 built read a flag the caller it was guarding against could set
+
+**Raised** 2026-08-31 by the adversarial verification of the G-SERVED train
+(PR #23, `943c0fdf1a6af7b6f2a2af272a5a7b5f00e46f44`). Fixed here, in
+`src/resilient_mlkit/core/result.py`. Not a write into another repo — recorded
+because E-M20 states this residual, and states it incompletely.
+
+### What E-M20 says
+
+M-02(b) ships a seal on `CheckResult` and discloses one residual, in
+`_is_sealed.__doc__` and pinned by
+`tests/test_result_sealed.py::test_residual_e_dict_surgery_defeats_the_seal_as_it_defeats_frozen`:
+
+> Both are `__dict__` surgery, which defeats this exactly as it defeats every
+> frozen dataclass in this package … That is a stated limit of Python, not a
+> hole this class can close, and it is a **LOUD** limit: nothing edits a verdict
+> that way by accident, and accident is what the seal exists to stop
+> (`result.status = Status.PASS`, one ordinary assignment, in a check module —
+> which now refuses).
+
+Three defeats are named: `object.__setattr__`, `r.__dict__["status"] = …`, and
+`del r.__dict__["_sealed"]`. All three name the machinery they subvert.
+
+### What was measured
+
+Driven at 943c0fd from a fresh worktree, with `core.result.__file__` asserted
+in the driver:
+
+```
+r = CheckResult.failed("R99", "phase-1", "a real failure")
+r._sealed = False           -> succeeded    ORDINARY assignment
+r.status = Status.PASS      -> succeeded    ORDINARY assignment
+r.evidence = {"forged": True} -> succeeded
+r.to_dict()["status"]       -> 'PASS'
+
+r2.evidence._sealed = False -> succeeded
+r2.evidence["forged"] = True -> succeeded
+```
+
+`CheckResult.__setattr__` refused `_VERDICT_FIELDS` and rate-limited
+`_STAMP_FIELDS`, then fell through to `object.__setattr__` for every other
+name — including `_sealed`, the one attribute whose value decides whether
+either clause runs at all. One layer down, `SealedEvidence` declared
+`__slots__ = ("_sealed",)` and never overrode `__setattr__`, so its slot was
+writable by the same syntax.
+
+This is **not** the disclosed residual. It is not `__dict__` surgery, it does
+not name the machinery it subverts, and it is strictly cheaper than either
+disclosed defeat: it is the same spelling as the accident the seal was built to
+stop, one line earlier.
+
+### Where it reaches
+
+M-03's `GateAggregate` derives `passed` from the results precisely so that a
+caller holding the object cannot make it disagree with the checks it holds.
+Measured, same drive:
+
+```
+agg = GateAggregate("promotion", (passing_R1, failing_R2))
+agg.passed, agg.blocking      -> False, ('R2',)
+failing_R2._sealed = False; failing_R2.status = Status.PASS
+agg.passed, agg.blocking      -> True, ()
+```
+
+The derivation is correct; it was reading forged inputs. A derived verdict is
+only as strong as the seal on what it derives from.
+
+### The repair
+
+`_SEAL_FLAG` is named once and refused by name in both places, before every
+other clause. It does **not** read the evidence mapping's seal, so it does not
+resurrect the R2/T2 ordering break at `checks/readiness.py:195` that the
+two-signal seal hit and that E-M20 records as the reason no second signal
+shipped. `seal()` and the copy hooks use `object.__setattr__` and are
+unaffected.
+
+Five pins in `tests/test_result_sealed.py` (three Control A, two Control B);
+four failed before the fix and all pass after. Check-not-dead, whole suite:
+removing the `CheckResult` clause → 3 failures; removing the `SealedEvidence`
+clause → 1 failure. Suite 830 → 835, nothing pre-existing lost.
+
+### What is still open, and is now the whole residual
+
+`test_residual_e_dict_surgery_defeats_the_seal_as_it_defeats_frozen` is
+unchanged and still green: all three `__dict__` paths still land. That is
+Python's boundary and every frozen dataclass in this package shares it —
+`core.served`'s own frozen types call `object.__setattr__` in their
+`__post_init__`. The residual list is now accurate rather than being the part
+of it somebody happened to try.
+
+Residual A (nested evidence values are mutable in place) is unchanged and
+unaffected.
+
+### The two E-M20 residuals this verification did NOT close
+
+Both re-driven at 943c0fd and confirmed as E-M20 states them; neither is
+touched here, and both are correctly disclosed:
+
+1. **An undeclared domain buys no domain check.** `domain` defaults to `REAL`,
+   which claims nothing, so the exact 8517341 defect reproduces whenever a
+   caller declares polarity and leaves domain alone:
+   `Comparison(bar, "mape", -0.05, 0.20, 500, polarity=LOWER_IS_BETTER, <tied>)`
+   → `PASS`, `promotable=True`, skill `1.25`. Declaring `domain=NONNEGATIVE`
+   refuses it by name. Making `domain` mandatory is a second contract break on
+   top of M-01's, and belongs with M-08's measured blast radius rather than
+   ahead of it.
+2. **`n_rows` is untied to the digests.** A comparison may carry a digest over
+   500 rows and report `n_rows=7`; `row_matched` is `True` and nothing
+   contradicts it. The row *sets* are tied; the row *count* is still a
+   caller's word.
