@@ -102,6 +102,25 @@ Specifically:
   the fleet's *correct* convention would have been made unadoptable, which is
   the R12 failure mode the original preregistration named, and the instruction
   was to withdraw the branch rather than argue with the control.
+* **chokepoint's REAL panel, not only the fixture.** The fixture above is built
+  in this repo, so on its own it proves the narrowing is safe for a shape mlkit
+  made up. Read from chokepoint's own committed artifact
+  `reports/benchmarks/corridor_pooling_val.json` (that repo at its current head,
+  read-only, nothing written and no arm opened):
+
+  | arm | rows | corridors |
+  |---|---:|---:|
+  | train | 40,712 | **28** |
+  | val | 11,704 | **28** |
+  | test | 14,756 | **28** |
+
+  All three arms carry 28 corridors, so the arm-local mass on the real panel is
+  empty and the carve-out still covers it. **Stated at exactly its strength:**
+  equal counts in three arms are not the same fact as the three corridor *sets*
+  being identical, and that artifact reports counts, not rosters. If a corridor
+  ever entered `val` without appearing in `train`, this branch would refuse
+  chokepoint's bootstrap, and the way to settle it is to read the rosters when
+  chokepoint wires the binding — not to assume it here.
 * **fray's repair is untouched:** `UNIT_IS_THE_BLOCK`, silent, 5 units over 5
   blocks.
 * **The label remutation still refuses by its own constant**, with
