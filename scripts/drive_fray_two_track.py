@@ -16,6 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 def main() -> int:
     fray_root = Path(sys.argv[1]).resolve()
     out_path = Path(sys.argv[2]).resolve()

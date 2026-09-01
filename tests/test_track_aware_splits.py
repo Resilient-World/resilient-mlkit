@@ -316,6 +316,8 @@ def test_r3_FIRES_when_ONE_track_is_below_the_holdout_floor(tmp_path: Path) -> N
     assert "track 'county_block'" in r3.reason
     assert "holdout too thin" in r3.reason
     assert f">= {MIN_HOLDOUT_GROUPS}" in r3.reason
+    # kept whole in the record, because the summary is bounded at MAX_REASON
+    assert r3.evidence["failures"] == [r3.reason]
     assert "crop_year" not in r3.reason.split("track 'county_block'")[1][:80]
 
 

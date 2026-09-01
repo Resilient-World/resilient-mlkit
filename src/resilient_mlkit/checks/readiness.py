@@ -512,7 +512,13 @@ def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
         "group_ids_shared_between_tracks": shared,
     }
     if failures:
-        return CheckResult.failed("R3", PHASE, "; ".join(failures), aggregate)
+        # The joined reason is bounded by MAX_REASON like every other reason, so
+        # a repo with several failing tracks can lose the tail of the sentence
+        # -- including WHICH track. Each failure is kept whole here: the summary
+        # is what truncates, never the record.
+        return CheckResult.failed(
+            "R3", PHASE, "; ".join(failures), {**aggregate, "failures": failures}
+        )
     return CheckResult.passed("R3", PHASE, aggregate)
 
 

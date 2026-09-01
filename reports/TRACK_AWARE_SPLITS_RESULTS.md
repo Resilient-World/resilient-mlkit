@@ -180,6 +180,15 @@ declaration. The test asserts the six messages are pairwise distinct.
 
 ## 4. What moved in the artifacts
 
+Both aggregate reasons — R3's over tracks and D6's over declarations — are
+bounded by `MAX_REASON = 400` like every other reason, so a repo with several
+failing tracks can lose the tail of the sentence, **including which track**.
+Each per-track failure is therefore kept whole in evidence: R3 under
+`failures`, D6 under `declarations[i].reason` and the untruncated
+`declarations[i].evidence.detail`. The summary is what truncates; the record is
+not. Asserted, not claimed: `test_r3_FIRES_when_ONE_track_is_below_the_holdout_floor`
+and `test_d6_the_worst_of_the_per_track_verdicts_is_the_verdict`.
+
 `ResamplingDeclaration.to_dict()` emits `track` **only when it is non-empty**,
 so no current adopter's evidence bytes change — that is what makes §2 a
 `shasum` rather than a reading. D6's evidence gains `tracks_in_splits`,
