@@ -114,13 +114,18 @@ from typing import Any
 from .result import Status
 
 __all__ = [
+    "DOMAIN_NONNEGATIVE",
+    "DOMAIN_REAL",
     "HASH_KEY",
+    "HIGHER_IS_BETTER",
+    "LOWER_IS_BETTER",
     "UNMEASURED",
     "ArtifactIntegrityError",
     "ChallengerDecision",
     "ClosedArm",
     "Comparison",
     "DataSource",
+    "ImpossibleMeasurement",
     "Measurement",
     "ProvenanceMismatch",
     "RecordedBar",
@@ -152,6 +157,33 @@ UNMEASURED = "NA"
 #: promotion.
 DECISION_STATUSES = (Status.PASS, Status.FAIL, Status.NA)
 
+#: Declared metric polarity — whether a SMALLER value of the metric is the
+#: better model. This is DATA the caller declares per metric, the same stance
+#: :class:`ServeArms` takes on the arm policy and E-M18 takes on the metric
+#: universe: the contract carries no vocabulary mapping names to directions,
+#: because a vocabulary is exactly the enumerate-what-you-expect guard the
+#: fleet keeps re-learning not to write. An UNDECLARED polarity is not
+#: lower-is-better by default; it is an unmeasurable comparison (see
+#: :func:`challenger_decision`, refusal class ``POLARITY_UNDECLARED``).
+#: Driven before this existed (2026-08-31, at 8517341): r2 0.10 vs a champion
+#: at 0.90 — a far worse model — PASSED with "skill" 1 - 0.10/0.90 = +0.8889,
+#: because the silent lower-is-better assumption inverted the metric.
+LOWER_IS_BETTER = "lower_is_better"
+HIGHER_IS_BETTER = "higher_is_better"
+_POLARITIES = ("", LOWER_IS_BETTER, HIGHER_IS_BETTER)
+
+#: Declared metric domain — the set of values a reading of this metric CAN
+#: take. Also caller-declared data, and deliberately coarse: the one boundary
+#: the fleet has been burned on is sign. ``mape``, ``rmse``, ``mae`` cannot be
+#: negative; a negative reading of one is not a bad model, it is a broken
+#: measuring apparatus, and folding it into a skill quotient turns the broken
+#: apparatus into a promotion (driven: mape -0.05 vs 0.20 → skill 1.25 →
+#: PASS). ``DOMAIN_REAL`` exists so a genuinely signed metric (a bias, a
+#: difference) can say so explicitly rather than by omission.
+DOMAIN_NONNEGATIVE = "nonnegative"
+DOMAIN_REAL = "real"
+_DOMAINS = ("", DOMAIN_NONNEGATIVE, DOMAIN_REAL)
+
 
 # ---------------------------------------------------------------------------
 # Refusals
@@ -170,6 +202,16 @@ class ProvenanceMismatch(ServedContractError):
 
 class ClosedArm(ServedContractError):
     """A serve request named an arm this product does not serve."""
+
+
+class ImpossibleMeasurement(ServedContractError):
+    """A value outside the metric's declared domain was offered as a reading.
+
+    Not an NA and not a FAIL: a negative mape is not "unmeasured" and it is
+    not "measured and lost" — it is evidence that whatever produced the number
+    is not measuring the metric it names. The one wrong thing to do with it is
+    arithmetic, so this raises before any quotient exists.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -534,8 +576,28 @@ def verify_at_load(
 # ---------------------------------------------------------------------------
 # The challenger decision
 # ---------------------------------------------------------------------------
-def skill(candidate: float | None, reference: float | None) -> float | None:
-    """``1 - candidate/reference`` for a lower-is-better metric, or ``None``.
+def skill(
+    candidate: float | None,
+    reference: float | None,
+    *,
+    polarity: str = "",
+    domain: str = "",
+) -> float | None:
+    """Signed skill under a DECLARED polarity, or ``None``, or a refusal.
+
+    * ``polarity=LOWER_IS_BETTER`` — ``1 - candidate/reference``, byte-for-byte
+      the formula this function has always computed, so every honest
+      lower-is-better figure in the fleet is unchanged by M-01.
+    * ``polarity=HIGHER_IS_BETTER`` — ``candidate/reference - 1``: positive
+      exactly when the candidate's larger value is the better one.
+    * ``polarity`` undeclared — ``None``. There is no silent lower-is-better
+      assumption left in this module. Before M-01 there was, and it promoted a
+      WORSE higher-is-better model (r2 0.10 vs 0.90 → "skill" +0.8889 → PASS).
+    * ``domain=DOMAIN_NONNEGATIVE`` with a finite negative operand — raises
+      :class:`ImpossibleMeasurement` (refusal class ``IMPOSSIBLE_MEASUREMENT``)
+      rather than computing anything. A negative reading of a nonnegative
+      metric is an instrument defect, and before M-01 it was a promotion:
+      mape -0.05 vs 0.20 → skill 1.25 → PASS (fray E-035 residual 3).
 
     ``None`` — not zero, not a raised exception — whenever the quotient is not
     a number about accuracy: either side missing, either side non-finite, or a
@@ -545,6 +607,25 @@ def skill(candidate: float | None, reference: float | None) -> float | None:
     PROMOTED. Here it is unmeasured, which is what chokepoint's counterpart
     already concluded from the identical condition.
     """
+    if polarity not in _POLARITIES:
+        raise ServedContractError(
+            f"polarity {polarity!r} is not one of {sorted(p for p in _POLARITIES if p)}; "
+            "a direction the contract cannot read is a direction nobody declared"
+        )
+    if domain not in _DOMAINS:
+        raise ServedContractError(
+            f"domain {domain!r} is not one of {sorted(d for d in _DOMAINS if d)}; "
+            "a domain the contract cannot read is a domain nobody declared"
+        )
+    if domain == DOMAIN_NONNEGATIVE:
+        for side, value in (("candidate", candidate), ("reference", reference)):
+            if value is not None and math.isfinite(float(value)) and float(value) < 0.0:
+                raise ImpossibleMeasurement(
+                    f"{side} value {value!r} is negative on a declared-nonnegative "
+                    f"metric (refusal class {IMPOSSIBLE_MEASUREMENT}); a negative "
+                    "reading of a nonnegative quantity is not a measurement of it, "
+                    "and the one wrong thing to do with one is arithmetic"
+                )
     if candidate is None or reference is None:
         return None
     candidate = float(candidate)
@@ -553,7 +634,11 @@ def skill(candidate: float | None, reference: float | None) -> float | None:
         return None
     if reference <= 0.0:
         return None
-    return 1.0 - candidate / reference
+    if polarity == LOWER_IS_BETTER:
+        return 1.0 - candidate / reference
+    if polarity == HIGHER_IS_BETTER:
+        return candidate / reference - 1.0
+    return None
 
 
 @dataclass(frozen=True)
@@ -576,6 +661,13 @@ class Comparison:
     arm: str = ""
     row_matched: bool = True
     unmeasured_reason: str = ""
+    #: Declared per metric, by the caller, as data. Undeclared is NOT
+    #: lower-is-better; it renders the decision NA (``POLARITY_UNDECLARED``).
+    polarity: str = ""
+    #: Declared domain of the metric's readings. ``DOMAIN_NONNEGATIVE`` makes
+    #: a finite negative operand refuse AT CONSTRUCTION, so an impossible
+    #: reading never exists as an object a gate could be handed.
+    domain: str = ""
 
     def __post_init__(self) -> None:
         if not self.reference or not self.metric:
@@ -585,10 +677,40 @@ class Comparison:
                 f"comparison against {self.reference!r} reports {self.n_rows} rows; a "
                 "negative row count is not a row count"
             )
+        if self.polarity not in _POLARITIES:
+            raise ServedContractError(
+                f"comparison in {self.metric!r} declares polarity {self.polarity!r}, "
+                f"which is not one of {sorted(p for p in _POLARITIES if p)}; a typo "
+                "here must refuse rather than silently become undeclared"
+            )
+        if self.domain not in _DOMAINS:
+            raise ServedContractError(
+                f"comparison in {self.metric!r} declares domain {self.domain!r}, "
+                f"which is not one of {sorted(d for d in _DOMAINS if d)}; a typo "
+                "here must refuse rather than silently become undeclared"
+            )
+        if self.domain == DOMAIN_NONNEGATIVE:
+            for side, value in (
+                ("candidate", self.candidate_value),
+                ("reference", self.reference_value),
+            ):
+                if value is not None and math.isfinite(float(value)) and float(value) < 0.0:
+                    raise ImpossibleMeasurement(
+                        f"comparison against {self.reference!r} in {self.metric!r} "
+                        f"carries {side} value {value!r} on a declared-nonnegative "
+                        f"metric (refusal class {IMPOSSIBLE_MEASUREMENT}); a negative "
+                        "reading of a nonnegative quantity is an instrument defect, "
+                        "not a candidate"
+                    )
 
     @property
     def skill(self) -> float | None:
-        return skill(self.candidate_value, self.reference_value)
+        return skill(
+            self.candidate_value,
+            self.reference_value,
+            polarity=self.polarity,
+            domain=self.domain,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         measured = self.skill
@@ -601,6 +723,8 @@ class Comparison:
             "skill": UNMEASURED if measured is None else measured,
             "n_rows": self.n_rows,
             "row_matched": self.row_matched,
+            "polarity": self.polarity,
+            "domain": self.domain,
             "unmeasured_reason": self.unmeasured_reason,
         }
 
@@ -612,6 +736,8 @@ NOT_COMPARED = "NOT_COMPARED"
 NO_ROWS = "NO_ROWS"
 ROW_SET_MISMATCH = "ROW_SET_MISMATCH"
 ARM_MISMATCH = "ARM_MISMATCH"
+POLARITY_UNDECLARED = "POLARITY_UNDECLARED"
+IMPOSSIBLE_MEASUREMENT = "IMPOSSIBLE_MEASUREMENT"
 UNMEASURED_SKILL = "UNMEASURED_SKILL"
 NO_SKILL = "NO_SKILL"
 CLEARS_BAR = "CLEARS_BAR"
@@ -735,7 +861,7 @@ def challenger_decision(
     Losing is a measurement, not an error, so this reports rather than raising —
     the shape all four implementations converged on independently.
 
-    Six refusals, in the order the questions have to be answered, and none of
+    Seven refusals, in the order the questions have to be answered, and none of
     them is a pass by default:
 
     1. the bar is **absent** from the comparisons — FAIL. Not being compared is
@@ -749,11 +875,19 @@ def challenger_decision(
        declared — NA. chokepoint's val-only refusal
        (``daily_flow_forecaster.py:527-570``): a challenger with a val margin
        has not been measured on the terms the champion was promoted on.
-    5. any declared metric's skill is **unmeasured** — NA.
-    6. any declared metric's skill is measured and **not strictly positive** —
+    5. any declared metric's **polarity is undeclared** — NA. Which direction
+       is better is data (M-01); assuming lower-is-better is how a worse
+       higher-is-better model came to promote at 8517341.
+    6. any declared metric's skill is **unmeasured** — NA.
+    7. any declared metric's skill is measured and **not strictly positive** —
        FAIL.
 
     Otherwise PASS.
+
+    (An operand outside a declared-nonnegative domain never reaches this
+    function: :class:`Comparison` refuses to construct on it, raising
+    :class:`ImpossibleMeasurement` — see refusal class
+    ``IMPOSSIBLE_MEASUREMENT``.)
     """
     metrics = tuple(metrics)
     if not metrics:
@@ -843,6 +977,24 @@ def challenger_decision(
                 n_rows=n_rows,
                 refusal_class=ARM_MISMATCH,
             )
+
+    undeclared_polarity = [m for m in metrics if not by_metric[m].polarity]
+    if undeclared_polarity:
+        return ChallengerDecision(
+            status=Status.NA,
+            reason=(
+                f"no polarity is declared for {undeclared_polarity} in the comparison "
+                f"against {recorded_bar!r}. Whether a smaller value is the better model "
+                "is data the caller must declare per metric; this gate will not assume "
+                "lower-is-better, because that assumption is exactly what promoted a "
+                "worse higher-is-better candidate."
+            ),
+            recorded_bar=recorded_bar,
+            metrics=metrics,
+            skill=none_skill,
+            n_rows=n_rows,
+            refusal_class=POLARITY_UNDECLARED,
+        )
 
     measured: dict[str, float | None] = {m: by_metric[m].skill for m in metrics}
     unmeasured = [m for m in metrics if measured[m] is None]

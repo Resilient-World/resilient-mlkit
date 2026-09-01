@@ -24,11 +24,16 @@ import pytest
 
 from resilient_mlkit.core.result import Status
 from resilient_mlkit.core.served import (
+    DOMAIN_NONNEGATIVE,
+    DOMAIN_REAL,
+    HIGHER_IS_BETTER,
+    LOWER_IS_BETTER,
     ArtifactIntegrityError,
     ChallengerDecision,
     ClosedArm,
     Comparison,
     DataSource,
+    ImpossibleMeasurement,
     Measurement,
     RecordedBar,
     ServeArms,
@@ -201,14 +206,19 @@ METRICS = ("mae", "rmse")
 
 
 def comparisons(candidate, reference, **kw):
+    """Honest comparisons: polarity declared, as the M-01 contract requires."""
+    n_rows = kw.pop("n_rows", 500)
+    arm = kw.pop("arm", "val")
+    polarity = kw.pop("polarity", LOWER_IS_BETTER)
     return [
         Comparison(
             reference=BAR,
             metric=metric,
             candidate_value=candidate,
             reference_value=reference,
-            n_rows=kw.pop("n_rows", 500),
-            arm=kw.pop("arm", "val"),
+            n_rows=n_rows,
+            arm=arm,
+            polarity=polarity,
             **kw,
         )
         for metric in METRICS
@@ -254,6 +264,7 @@ def test_challenger_positive_control_unmeasurable_comparison_is_na_not_fail():
                 reference_value=None,
                 n_rows=500,
                 arm="val",
+                polarity=LOWER_IS_BETTER,
                 unmeasured_reason="the bar could not be scored on these rows",
             )
             for metric in METRICS
@@ -278,7 +289,7 @@ def test_a_zero_reference_is_na_not_a_promotion():
     ``chokepoint/.../champion_challenger.py:209-218`` returns NA on the same
     condition. The contract takes chokepoint's answer.
     """
-    assert skill(0.0, 0.0) is None
+    assert skill(0.0, 0.0, polarity=LOWER_IS_BETTER) is None
     decision = challenger_decision(
         comparisons(0.0, 0.0), recorded_bar=BAR, metrics=METRICS
     )
@@ -296,6 +307,7 @@ def test_not_being_compared_is_a_fail_not_an_na():
                 candidate_value=80.0,
                 reference_value=100.0,
                 n_rows=500,
+                polarity=LOWER_IS_BETTER,
             )
         ],
         recorded_bar=BAR,
@@ -340,8 +352,8 @@ def test_evidence_from_the_wrong_arm_is_na_not_a_pass():
 def test_a_win_on_one_metric_and_a_loss_on_the_other_fails():
     decision = challenger_decision(
         [
-            Comparison(BAR, "mae", 80.0, 100.0, 500, arm="val"),
-            Comparison(BAR, "rmse", 120.0, 100.0, 500, arm="val"),
+            Comparison(BAR, "mae", 80.0, 100.0, 500, arm="val", polarity=LOWER_IS_BETTER),
+            Comparison(BAR, "rmse", 120.0, 100.0, 500, arm="val", polarity=LOWER_IS_BETTER),
         ],
         recorded_bar=BAR,
         metrics=METRICS,
@@ -527,46 +539,127 @@ def test_a_recorded_bar_must_name_a_metric():
 
 
 # ---------------------------------------------------------------------------
-# M-01 — metric polarity and domain (HOLE 1), DEFECT PINS
+# M-01 — metric polarity and domain (HOLE 1), the control pair
 #
-# These three tests record, executably, the behaviour the contract has TODAY
-# at 8517341, before the M-01 fix. No test in this suite recorded it; that is
-# the E-M17-residual discipline (pin the silence before repairing it). The fix
-# commit REWRITES each of these into the refusal it earns — a pin that
-# survives the fix unchanged means the fix did not land.
+# The previous commit pinned the defects executably (negative mape → PASS
+# skill 1.25; worse higher-is-better r2 → PASS skill +0.8889; polarity
+# nowhere declarable). This commit rewrites those pins into the refusals the
+# fix earns, plus the negative controls proving the honest paths did not move.
 # ---------------------------------------------------------------------------
-def test_m01_defect_pin_a_negative_mape_candidate_promotes():
-    """DEFECT (fray E-035 residual 3). mape is nonnegative by definition; a
-    candidate of -0.05 is an impossible reading. Today skill() folds it into
-    1 - (-0.05/0.20) = 1.25 and the decision PASSES on it."""
-    decision = challenger_decision(
-        [Comparison(BAR, "mape", -0.05, 0.20, 100, arm="val")],
-        recorded_bar=BAR,
-        metrics=("mape",),
-    )
-    assert decision.status is Status.PASS
-    assert decision.promotable is True
-    assert decision.skill["mape"] == pytest.approx(1.25)
+def test_m01_positive_control_a_negative_reading_of_a_nonnegative_metric_refuses():
+    """POSITIVE (was: PASS with skill 1.25). fray E-035 residual 3, closed.
+
+    A mape of -0.05 is an impossible reading, and it refuses BY NAME at the
+    earliest place it can exist — Comparison construction — so no gate is ever
+    handed the impossible object. The bare skill() function refuses the same
+    operands identically.
+    """
+    with pytest.raises(ImpossibleMeasurement, match="IMPOSSIBLE_MEASUREMENT"):
+        Comparison(
+            BAR, "mape", -0.05, 0.20, 100, arm="val",
+            polarity=LOWER_IS_BETTER, domain=DOMAIN_NONNEGATIVE,
+        )
+    with pytest.raises(ImpossibleMeasurement, match="negative"):
+        skill(-0.05, 0.20, polarity=LOWER_IS_BETTER, domain=DOMAIN_NONNEGATIVE)
+    with pytest.raises(ImpossibleMeasurement, match="reference"):
+        skill(0.05, -0.20, polarity=LOWER_IS_BETTER, domain=DOMAIN_NONNEGATIVE)
 
 
-def test_m01_defect_pin_a_worse_higher_is_better_candidate_promotes():
-    """DEFECT. r2 is higher-is-better; a candidate at 0.10 against a champion
-    at 0.90 is a much worse model. Today the contract silently assumes every
-    metric is lower-is-better, computes 1 - 0.10/0.90 = +0.8889, and PROMOTES
-    the worse model."""
+def test_m01_positive_control_undeclared_polarity_is_na_not_a_promotion():
+    """POSITIVE (was: PASS with skill +0.8889 on a WORSE model).
+
+    With no declared polarity the decision is NA POLARITY_UNDECLARED: not a
+    pass, not a fail, no skill number anyone downstream could quote.
+    """
     decision = challenger_decision(
         [Comparison(BAR, "r2", 0.10, 0.90, 100, arm="val")],
         recorded_bar=BAR,
         metrics=("r2",),
     )
+    assert decision.status is Status.NA
+    assert decision.promotable is False
+    assert decision.refusal_class == "POLARITY_UNDECLARED"
+    assert all(v is None for v in decision.skill.values())
+    assert "lower-is-better" in decision.reason
+
+
+def test_m01_positive_control_a_worse_higher_is_better_candidate_fails():
+    """POSITIVE. Declared higher-is-better, candidate worse: FAIL NO_SKILL,
+    with the correctly-signed skill 0.10/0.90 - 1 ≈ -0.8889 kept on record."""
+    decision = challenger_decision(
+        [Comparison(BAR, "r2", 0.10, 0.90, 100, arm="val", polarity=HIGHER_IS_BETTER)],
+        recorded_bar=BAR,
+        metrics=("r2",),
+    )
+    assert decision.status is Status.FAIL
+    assert decision.promotable is False
+    assert decision.refusal_class == "NO_SKILL"
+    assert decision.skill["r2"] == 0.10 / 0.90 - 1.0
+
+
+def test_m01_negative_control_a_better_higher_is_better_candidate_passes():
+    """NEGATIVE. The declared direction works in both directions: r2 0.95 vs
+    0.90 is a real improvement and promotes with skill 0.95/0.90 - 1."""
+    decision = challenger_decision(
+        [Comparison(BAR, "r2", 0.95, 0.90, 100, arm="val", polarity=HIGHER_IS_BETTER)],
+        recorded_bar=BAR,
+        metrics=("r2",),
+    )
     assert decision.status is Status.PASS
-    assert decision.promotable is True
-    assert decision.skill["r2"] == pytest.approx(1.0 - 0.10 / 0.90, rel=1e-12)
+    assert decision.skill["r2"] == 0.95 / 0.90 - 1.0
 
 
-def test_m01_defect_pin_polarity_is_nowhere_declarable():
-    """DEFECT. Neither Comparison nor challenger_decision accepts a polarity
-    or domain declaration, so no caller CAN say which direction is better."""
-    fields = {f.name for f in Comparison.__dataclass_fields__.values()}
-    assert "polarity" not in fields
-    assert "domain" not in fields
+def test_m01_negative_control_honest_lower_is_better_paths_are_bit_identical():
+    """NEGATIVE (control B). The declared lower-is-better path is the formula
+    the contract always computed: a worse candidate (0.25 vs 0.20) still
+    FAILs, a better one (0.15 vs 0.20) still promotes, and the winning skill
+    is bit-identical to 1 - 0.15/0.20 = 0.25."""
+    worse = challenger_decision(
+        [Comparison(BAR, "mape", 0.25, 0.20, 100, arm="val",
+                    polarity=LOWER_IS_BETTER, domain=DOMAIN_NONNEGATIVE)],
+        recorded_bar=BAR,
+        metrics=("mape",),
+    )
+    assert worse.status is Status.FAIL
+    assert worse.refusal_class == "NO_SKILL"
+    better = challenger_decision(
+        [Comparison(BAR, "mape", 0.15, 0.20, 100, arm="val",
+                    polarity=LOWER_IS_BETTER, domain=DOMAIN_NONNEGATIVE)],
+        recorded_bar=BAR,
+        metrics=("mape",),
+    )
+    assert better.status is Status.PASS
+    assert better.skill["mape"] == 1.0 - 0.15 / 0.20
+
+
+def test_m01_negative_control_nonpositive_reference_and_nonfinite_refusals_unmoved():
+    """NEGATIVE (control B). The pre-M-01 None cases are still None with a
+    declared polarity — for both polarities."""
+    for polarity in (LOWER_IS_BETTER, HIGHER_IS_BETTER):
+        assert skill(0.1, 0.0, polarity=polarity) is None
+        assert skill(0.1, None, polarity=polarity) is None
+        assert skill(None, 0.2, polarity=polarity) is None
+        assert skill(float("inf"), 0.2, polarity=polarity) is None
+        assert skill(0.1, float("nan"), polarity=polarity) is None
+
+
+def test_m01_negative_control_a_signed_metric_may_declare_domain_real():
+    """NEGATIVE. A genuinely signed metric (a bias) declares DOMAIN_REAL and a
+    negative candidate is a legitimate reading, not an impossible one."""
+    c = Comparison(
+        BAR, "bias", -0.5, 2.0, 100, arm="val",
+        polarity=LOWER_IS_BETTER, domain=DOMAIN_REAL,
+    )
+    assert c.skill == 1.0 - (-0.5) / 2.0
+
+
+def test_m01_a_polarity_or_domain_typo_refuses_rather_than_becoming_undeclared():
+    """A misspelled declaration must not silently degrade to 'undeclared'."""
+    with pytest.raises(ServedContractError, match="polarity 'lower'"):
+        Comparison(BAR, "mae", 1.0, 2.0, 10, polarity="lower")
+    with pytest.raises(ServedContractError, match="domain 'positive'"):
+        Comparison(BAR, "mae", 1.0, 2.0, 10, domain="positive")
+    with pytest.raises(ServedContractError, match="not one of"):
+        skill(1.0, 2.0, polarity="higher")
+    with pytest.raises(ServedContractError, match="not one of"):
+        skill(1.0, 2.0, polarity=LOWER_IS_BETTER, domain="nonneg")
