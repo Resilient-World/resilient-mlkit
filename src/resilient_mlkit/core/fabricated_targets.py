@@ -227,6 +227,33 @@ control with its honest twin beside it. Folding, never evaluation: an
 f-string whose placeholder cannot be resolved makes the value unreadable and
 the check silent.
 
+E-M17 RESIDUAL 4 IS CLOSED (M-04, 2026-08-31)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Four more spellings of that same value were measured SILENT at 8517341 while
+the plain literal fired: ``"_".join(["era5", "land"])``, ``"era5_%s" %
+"land"``, ``"era5_{}".format("land")``, and a module-level ``FEEDS =
+{"primary": "era5_land"}`` read back as ``FEEDS["primary"]``. All four now
+fold and reach the same adjudication, reported under the FOLDED value so a
+reader sees the claim rather than the spelling.
+
+The read-back is the ``SOURCE = "era5_land"`` hoist this module already
+closed, written with a subscript instead of a name; the same module dict was
+already resolved one level deep for ``**FEEDS`` spreads, so reading it through
+a spread and not through a subscript was reading the layout.
+
+The folds stay total functions of already-resolved STRINGS. ``"%d" % 5`` does
+not fold, because a numeric conversion is not something this module should be
+the place to invent; ``"_".join(parts)`` over an unresolved name does not
+fold; a dict that is not a module-level binding is not resolved at all. The
+module-dict hop is the ONE fold that follows a name across the tree rather
+than down it, so it carries a cycle guard -- ``A = {"x": A["x"]}`` is legal
+Python, and a scanner that raises reports nothing at all.
+
+Over-fire budget, MEASURED read-only before this shipped (2026-08-31, dual
+interpreter, each side asserting its own ``resilient_mlkit.__file__``): ten
+checkouts at their remote mains, 3394 Python files per side, R11 findings
+0 -> 0, NEW 0, GONE 0. Harness controls in ``reports/M04_FLEET_SWEEP.md``.
+
 The honesty rule is UNCHANGED and still runs first: a simulation token in any
 provenance field of the record ends the adjudication before either source rule
 is reached. That is what keeps torrent's ``v4_orchestrator`` note ("these
@@ -939,6 +966,12 @@ class _ModuleScanner:
         self._seen: set[tuple[int, str, str]] = set()
         self._module_dicts = self._collect_module_dicts()
         self._module_strings = self._collect_module_strings()
+        #: Cycle guard for the ONE fold that jumps across the tree instead of
+        #: down it. ``A = {"x": A["x"]}`` is legal Python and would otherwise
+        #: recurse until the interpreter gave out -- on a scanner that reads
+        #: whatever source a repo happens to contain, that is a crash, and a
+        #: crashed check reports nothing.
+        self._dict_resolving: set[tuple[str, str]] = set()
         self._class_string_cache: dict[int, dict[str, str]] = {}
         self._tainted_functions: dict[str, Origin] = {}
 
@@ -1031,6 +1064,28 @@ class _ModuleScanner:
             "source": "era5" + "_land"      # BinOp
             SOURCE = "era5_land"; "source": SOURCE
 
+        E-M17 residual 4 (M-04 Stage 1) added the four spellings that were
+        still readable to the parser and not to this method. Each is the same
+        constant-folding argument one syntax over:
+
+            "source": "_".join(["era5", "land"])
+            "source": "era5_%s" % "land"
+            "source": "era5_{}".format("land")
+            FEEDS = {"primary": "era5_land"}; "source": FEEDS["primary"]
+
+        All four were driven SILENT at 8517341 against a record whose only
+        data field is an ``rng.normal`` draw, while the plain literal fired.
+        The last one is the ``SOURCE = "era5_land"`` hoist already closed
+        above, written with a subscript instead of a name: the value is a
+        string constant in the module body either way, and reading one and
+        not the other is reading the layout.
+
+        FOLDING, NEVER EVALUATION, and the folds are total functions of
+        already-resolved STRINGS. ``%`` and ``.format`` are applied only when
+        the template and every operand have themselves been folded to strings,
+        and only inside a guard that returns ``None`` on any failure -- a
+        template this cannot apply is unreadable, not an error to report.
+
         A placeholder whose value this cannot resolve makes the whole
         expression unreadable and the rule silent, which is the quiet
         direction.
@@ -1066,6 +1121,124 @@ class _ModuleScanner:
             if left is None or right is None:
                 return None
             return left + right
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
+            return self._fold_percent(node)
+        if isinstance(node, ast.Subscript):
+            return self._module_dict_entry(node)
+        if isinstance(node, ast.Call):
+            return self._fold_string_method(node)
+        return None
+
+    #: Nothing this module reads is a real source label past this length, and
+    #: a fold is not a place to build a megabyte. ``"x" * n`` is not folded at
+    #: all; this bounds the ``%``/``.format`` width specifiers, which can.
+    _FOLD_LIMIT = 4096
+
+    def _bounded(self, text: str | None) -> str | None:
+        if text is None or len(text) > self._FOLD_LIMIT:
+            return None
+        return text
+
+    def _fold_percent(self, node: ast.BinOp) -> str | None:
+        """``"era5_%s" % "land"`` and ``"%s_%s" % ("era5", "land")``.
+
+        Only when the template AND every operand fold to strings. An int on
+        the right (``"%d" % 5``) leaves ``_string_of`` returning ``None`` for
+        that operand and the whole expression unreadable -- deliberately, so
+        this fold cannot be the place a numeric conversion gets invented.
+        """
+        template = self._string_of(node.left)
+        if template is None:
+            return None
+        if isinstance(node.right, (ast.Tuple, ast.List)):
+            operands = [self._string_of(e) for e in node.right.elts]
+            if any(o is None for o in operands):
+                return None
+            args: object = tuple(operands)
+        else:
+            single = self._string_of(node.right)
+            if single is None:
+                return None
+            args = (single,)
+        try:
+            return self._bounded(template % args)
+        except (TypeError, ValueError, KeyError, IndexError):
+            # A template these operands do not satisfy is unreadable, not a
+            # defect to report. Quiet direction.
+            return None
+
+    def _fold_string_method(self, node: ast.Call) -> str | None:
+        """``"_".join([...])`` and ``"era5_{}".format(...)``, constants only."""
+        func = node.func
+        if not isinstance(func, ast.Attribute):
+            return None
+        receiver = self._string_of(func.value)
+        if receiver is None:
+            return None
+        if func.attr == "join":
+            if len(node.args) != 1 or node.keywords:
+                return None
+            argument = node.args[0]
+            if not isinstance(argument, (ast.List, ast.Tuple, ast.Set)):
+                # ``sep.join(parts)`` over a name this cannot resolve is the
+                # unreadable case, not a fold.
+                return None
+            parts = [self._string_of(e) for e in argument.elts]
+            if any(p is None for p in parts):
+                return None
+            return self._bounded(receiver.join([p for p in parts if p is not None]))
+        if func.attr == "format":
+            positional = [self._string_of(a) for a in node.args]
+            if any(p is None for p in positional):
+                return None
+            if any(k.arg is None for k in node.keywords):
+                return None
+            keyword: dict[str, str] = {}
+            for k in node.keywords:
+                value = self._string_of(k.value)
+                if value is None or k.arg is None:
+                    return None
+                keyword[k.arg] = value
+            try:
+                return self._bounded(
+                    receiver.format(
+                        *[p for p in positional if p is not None], **keyword
+                    )
+                )
+            except (TypeError, ValueError, KeyError, IndexError, AttributeError):
+                return None
+        return None
+
+    def _module_dict_entry(self, node: ast.Subscript) -> str | None:
+        """``FEEDS["primary"]`` where the module body holds the dict literal.
+
+        The same hoist ``_collect_module_strings`` already closes for
+        ``SOURCE = "era5_land"``, and the same dict ``_record_from_dict``
+        already resolves one level deep for ``**FEEDS`` spreads. Reading it
+        through a spread and not through a subscript was reading the layout.
+
+        Module-level bindings only, and a CONSTANT STRING key only. A dynamic
+        key (``FEEDS[which]``) resolves to nothing and stays quiet.
+        """
+        holder = node.value
+        if not isinstance(holder, ast.Name):
+            return None
+        table = self._module_dicts.get(holder.id)
+        if table is None:
+            return None
+        slot = node.slice
+        if not (isinstance(slot, ast.Constant) and isinstance(slot.value, str)):
+            return None
+        marker = (holder.id, slot.value)
+        if marker in self._dict_resolving:
+            return None
+        self._dict_resolving.add(marker)
+        try:
+            for key, value in zip(table.keys, table.values):
+                if isinstance(key, ast.Constant) and key.value == slot.value:
+                    return self._string_of(value)
+        finally:
+            self._dict_resolving.discard(marker)
         return None
 
     def _strings_of(self, node: ast.AST | None) -> list[str]:

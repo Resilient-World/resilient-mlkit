@@ -945,19 +945,20 @@ both measured rather than argued:
    share; `coffee` is a part of five of arabica's forty entries.
 3. **A stamp applied outside the record's own scope** (`_stamp(row)`): the
    record arrives as a parameter, so it is not provably manufactured.
-4. **A source value the folder cannot read.** `_string_of` folds constants,
-   one Name hop, one Attribute hop off the enclosing class, `JoinedStr` and
-   `BinOp(+)`. Four other spellings of the SAME literal were measured SILENT
-   against this branch on the otherwise-firing `data_product=` positive
-   (adversarial verification 2026-08-29, driven against the branch worktree,
-   arabica's own allowlist as the registry):
-   `"_".join(["era5", "land"])`, `"era5_%s" % "land"`,
-   `"era5_{}".format("land")`, and a module-level `FEEDS = {"primary":
-   "era5_land"}` read back as `FEEDS["primary"]`. Silence on an expression the
-   folder cannot resolve is the module's stated and deliberate direction, so
-   this is a limit rather than a defect — but it is a limit, it is four more
-   spellings than the six the branch closed, and it is recorded here because
-   it was not.
+4. ~~**A source value the folder cannot read.**~~ **CLOSED 2026-08-31 by
+   M-04 — see E-M20 below.** `_string_of` folds constants, one Name hop, one
+   Attribute hop off the enclosing class, `JoinedStr` and `BinOp(+)`. Four
+   other spellings of the SAME literal were measured SILENT against this
+   branch on the otherwise-firing `data_product=` positive (adversarial
+   verification 2026-08-29, driven against the branch worktree, arabica's own
+   allowlist as the registry): `"_".join(["era5", "land"])`,
+   `"era5_%s" % "land"`, `"era5_{}".format("land")`, and a module-level
+   `FEEDS = {"primary": "era5_land"}` read back as `FEEDS["primary"]`.
+   Silence on an expression the folder cannot resolve is the module's stated
+   and deliberate direction, so this is a limit rather than a defect — but it
+   is a limit, it is four more spellings than the six the branch closed, and
+   it is recorded here because it was not. All four now fold; the residue
+   (a genuinely dynamic expression) is E-M20's OPEN half.
 
 ### Adversarial verification of this branch (2026-08-29)
 
@@ -1255,3 +1256,120 @@ is the value. That is a second, independent narrowing with its own over-fire
 budget and its own control pair, and it is not taken here.
 
 **Status: the false positive CLOSED. The residual OPEN and unassigned.**
+
+---
+
+## E-M20 — E-M17 residual 4 is CLOSED: four more spellings of the same stamp now fold
+
+**Raised and repaired** 2026-08-31 on
+`fix/m-04-em17-residual-4-unresolvable-expressions` (round-8 item M-04).
+Stage 0 and Stage 1 are CLOSED. Stage 2 is a separate design question and its
+status is recorded at the bottom of this entry.
+
+### What was broken
+
+`fabricated_targets._string_of` is R11's constant folder. It read constants,
+one module-`Name` hop, one `Attribute` hop off the enclosing class,
+`JoinedStr` and `BinOp(+)`. It did not read four other spellings of the SAME
+value, and the value-side source rule is therefore silent on all four while
+firing on the plain literal.
+
+Driven at `8517341` in a fresh clone, module binding asserted
+(`resilient_mlkit.core.fabricated_targets.__file__` printed and compared
+against the worktree path before any scan), one record whose only data field
+is `float(22.0 + rng.normal(0, 1.2))` and whose stamp field is the invented
+name `zq7lk`, against a registry holding `gee-era5-land-daily`:
+
+| stamp expression | findings at `8517341` |
+|---|---|
+| `"zq7lk": "era5_land"` | **1** — `CONTRADICTED_SOURCE` / `INPUT_FABRICATED`, matched on `allowlist:gee-era5-land-daily [ALLOWED] via era5+land` |
+| `"zq7lk": "_".join(["era5", "land"])` | **0** |
+| `"zq7lk": "era5_%s" % "land"` | **0** |
+| `"zq7lk": "era5_{}".format("land")` | **0** |
+| `FEEDS = {"primary": "era5_land"}` … `"zq7lk": FEEDS["primary"]` | **0** |
+
+Nothing in the suite recorded any of it. The silence was carried by the
+E-M17 prose alone, so it could have closed or regressed with everything
+green.
+
+### Stage 0 — the silence is pinned first (commit 1)
+
+`tests/test_fabricated_targets.py::test_residual_4_*` was added holding the
+four measured `0`s **and** the reference literal's `1` in the same table, so
+the fixture proves itself live: a table in which every row is silent is also
+what a broken fixture looks like. mlkit `pytest` re-measured at `8517341` on
+branch start — **757 passed** — and **762 passed** with the pins.
+
+### Stage 1 — the folds (commit 2)
+
+`_string_of` gained three arms, each a total function of already-resolved
+STRINGS:
+
+* `BinOp(Mod)` — `"era5_%s" % "land"` and `"%s_%s" % ("era5", "land")`;
+* `Call` on `str.join` / `str.format` with constant operands;
+* `Subscript` of a module-level dict literal with a constant string key.
+
+The last one is not a new idea: it is the `SOURCE = "era5_land"` hoist
+`_collect_module_strings` already closed, written with a subscript instead of
+a name, over a dict `_record_from_dict` already resolved one level deep for
+`**FEEDS` spreads. Reading it through a spread and not through a subscript
+was reading the layout, which is the defect E-M17 is an instance of.
+
+**This is one spelling more than the round-8 plan's Stage 1, and one fewer
+for its Stage 2.** The plan assigned the module-dict read-back to the Stage-2
+`UNREADABLE_STAMP` NA lane. That would have had this module report a value it
+demonstrably *can* resolve as unreadable — a false statement about its own
+reach, and strictly weaker than folding. The deviation is in the firing
+direction, it is recorded here rather than in a commit message, and Stage 2's
+territory is now the genuinely dynamic expression only.
+
+What deliberately does NOT fold, each pinned as a silent row in the same
+table: `"era5_%d" % 5` (a numeric conversion is not something this module
+should be the place to invent), `"_".join(parts)` and `"era5_{}".format(sfx)`
+over an unresolved name, `FEEDS[which]` with a dynamic key, and a dict that
+is not a module-level binding.
+
+The module-dict hop is the ONE fold that follows a name ACROSS the tree
+rather than down it, so it carries a cycle guard: `A = {"x": A["x"]}` and the
+mutual `A = {"x": B["y"]}; B = {"y": A["x"]}` are legal Python, and a scanner
+that raises `RecursionError` reports nothing at all — strictly worse than the
+silence it replaced.
+
+### Controls, with the commands that produced them
+
+**Control A (must fire).** The four `False` rows flipped to `True`; the run at
+the flip was **4 failed, 758 passed** — exactly those four rows and nothing
+else in the suite moved. Final suite on the branch: **777 passed**.
+
+**Control B (must stay silent).** In the same table: the honest twin of every
+new fold (`era5_land_shaped_synthetic_grid`, one string different), every
+unresolvable-operand spelling, the non-module-level dict, and separately
+`::test_residual_4_control_b_the_folds_do_not_reach_past_their_scope` —
+(a) residual 3's territory, `_stamp(row)` receiving the record as a parameter
+with the stamp written `"era5_{}".format("land")`, stays silent because
+`manufactured_of` still cannot prove the record was built in-process; (b) a
+manufactured record resolvably declaring `"provenance": "synthetic"` beside a
+folded product name stays silent, because the honesty rule still runs first.
+
+**Control C (the check is not dead).** With the three new dispatch arms
+deleted from `_string_of` and nothing else changed: **7 failed, 770 passed**,
+the seven being the six firing rows and the recursion control. With ONLY the
+cycle guard removed: `::test_residual_4_a_self_referential_module_dict_does_not_recurse`
+fails with `RecursionError: maximum recursion depth exceeded`, 19 of 20
+residual-4 tests still passing.
+
+**Over-fire budget, measured before this shipped.** Read-only dual-interpreter
+sweep, each side asserting its own `resilient_mlkit.__file__`, over ten
+`resilient-*` checkouts freshly cloned at their **remote mains** (local
+checkouts are stale — the local `resilient-blackout` `pyproject.toml` does not
+mention mlkit while its remote main does): **3394 Python files per side, R11
+findings 0 → 0, 0 new, 0 gone.** Harness control at the same rev on both
+sides: 0 deltas. Harness-not-dead control on a **copy** of the fray clone with
+the five spellings planted in one file: BEFORE **1** finding, AFTER **5** —
+so the fleet's `0 → 0` is a measured zero, not a harness that scans nothing.
+Full method, per-repo table and SHAs: `reports/M04_FLEET_SWEEP.md`.
+
+### Stage 2 — UNREADABLE_STAMP: status recorded below
+
+**Status: E-M17 residual 4 CLOSED for every constant spelling. Stage 2 status
+in the section appended below.**

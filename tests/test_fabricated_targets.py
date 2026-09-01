@@ -1743,35 +1743,42 @@ def test_attack_hoisting_the_stamp_into_a_constant_is_still_a_finding(registry):
 
 
 # ---------------------------------------------------------------------------
-# M-04 STAGE 0 — E-M17 residual 4, the four spellings NOTHING RECORDS TODAY
+# M-04 — E-M17 residual 4, the four spellings NOTHING RECORDED
 #
-# The residual was written down in the escalation and driven by hand; no test
-# held it, so the silence was carried by prose and could have closed or
-# regressed without anything going red. These four pins exist so the SILENCE
-# is a measured, committed fact before Stage 1 changes it, and so Stage 1's
-# flip is visible in a diff rather than asserted in a commit message.
+# STAGE 0 (commit 1) added this table with the four ``fires`` columns set to
+# the MEASURED silence at 8517341. The residual had been written down in the
+# escalation and driven by hand; no test held it, so the silence was carried
+# by prose and could have closed or regressed without anything going red.
 #
-# All four are the SAME three tokens as the plain literal that fires one test
+# STAGE 1 (commit 2) folded the four spellings in ``_string_of`` and flipped
+# those four columns to ``True`` -- the flip is the evidence, visible in the
+# diff, and the whole run at the flip commit was 4 failed / 758 passed:
+# exactly these four rows and no others.
+#
+# All four are the SAME two tokens as the plain literal that fires one test
 # above -- ``era5``, ``land`` -- written four other ways. The reference case
-# is included in the same table so the fixture itself is proved live: a table
-# where every row is silent is also what a broken fixture looks like.
+# is in the same table so the fixture itself is proved live: a table where
+# every row is silent is also what a broken fixture looks like.
+#
+# Every firing row is paired below with the honest twin that must stay quiet,
+# because a fold that reads all five spellings and cannot tell a fabrication
+# from a fixture has bought nothing.
 # ---------------------------------------------------------------------------
 
-RESIDUAL4_MODULE_DICT_READBACK = """
+RESIDUAL4_MODULE_DICT = """
     import numpy as np
 
-    FEEDS = {"primary": "era5_land"}
+    FEEDS = {{"primary": "{value}"}}
 
     def build(days=365, seed=0):
         rng = np.random.default_rng(seed)
         return [
-            {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": FEEDS["primary"]}
+            {{"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": FEEDS["primary"]}}
             for d in range(days)
         ]
 """
 
-#: (label, source, fires) -- ``fires`` is the MEASURED behaviour, not the
-#: desired one. Driven at 8517341 with the module binding asserted.
+#: (label, source, fires). ``fires`` is the MEASURED behaviour.
 RESIDUAL4_SPELLINGS = [
     (
         "reference literal",
@@ -1781,21 +1788,115 @@ RESIDUAL4_SPELLINGS = [
     (
         "str.join of constants",
         SPELLING_RECORD.format(stamp='"zq7lk": "_".join(["era5", "land"])'),
-        False,
+        True,
     ),
     (
         "percent format of constants",
         SPELLING_RECORD.format(stamp='"zq7lk": "era5_%s" % "land"'),
-        False,
+        True,
+    ),
+    (
+        "percent format, tuple operands",
+        SPELLING_RECORD.format(stamp='"zq7lk": "%s_%s" % ("era5", "land")'),
+        True,
     ),
     (
         "str.format of constants",
         SPELLING_RECORD.format(stamp='"zq7lk": "era5_{}".format("land")'),
-        False,
+        True,
+    ),
+    (
+        "str.format, keyword operand",
+        SPELLING_RECORD.format(stamp='"zq7lk": "era5_{p}".format(p="land")'),
+        True,
     ),
     (
         "module-dict read-back",
-        RESIDUAL4_MODULE_DICT_READBACK,
+        RESIDUAL4_MODULE_DICT.format(value="era5_land"),
+        True,
+    ),
+    # --- the honest twins, one string different in each -------------------
+    (
+        "honest twin, str.join",
+        SPELLING_RECORD.format(
+            stamp='"zq7lk": "_".join(["era5", "land", "shaped", "synthetic", "grid"])'
+        ),
+        False,
+    ),
+    (
+        "honest twin, percent format",
+        SPELLING_RECORD.format(
+            stamp='"zq7lk": "era5_%s" % "land_shaped_synthetic_grid"'
+        ),
+        False,
+    ),
+    (
+        "honest twin, str.format",
+        SPELLING_RECORD.format(
+            stamp='"zq7lk": "era5_{}".format("land_shaped_synthetic_grid")'
+        ),
+        False,
+    ),
+    (
+        "honest twin, module-dict read-back",
+        RESIDUAL4_MODULE_DICT.format(value="era5_land_shaped_synthetic_grid"),
+        False,
+    ),
+    # --- and the unresolvable operands, which stay unreadable -------------
+    (
+        "unresolvable join operand",
+        SPELLING_RECORD.format(stamp='"zq7lk": "_".join(["era5", suffix])'),
+        False,
+    ),
+    (
+        "unresolvable join argument",
+        SPELLING_RECORD.format(stamp='"zq7lk": "_".join(parts)'),
+        False,
+    ),
+    (
+        "unresolvable percent operand",
+        SPELLING_RECORD.format(stamp='"zq7lk": "era5_%s" % suffix'),
+        False,
+    ),
+    (
+        "unresolvable format operand",
+        SPELLING_RECORD.format(stamp='"zq7lk": "era5_{}".format(suffix)'),
+        False,
+    ),
+    (
+        "non-string percent operand",
+        SPELLING_RECORD.format(stamp='"zq7lk": "era5_%d" % 5'),
+        False,
+    ),
+    (
+        "dynamic dict key",
+        """
+    import numpy as np
+
+    FEEDS = {"primary": "era5_land"}
+
+    def build(days=365, seed=0, which="primary"):
+        rng = np.random.default_rng(seed)
+        return [
+            {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": FEEDS[which]}
+            for d in range(days)
+        ]
+""",
+        False,
+    ),
+    (
+        "dict that is not module-level",
+        """
+    import numpy as np
+
+    def build(days=365, seed=0):
+        feeds = {"primary": "era5_land"}
+        rng = np.random.default_rng(seed)
+        return [
+            {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": feeds["primary"]}
+            for d in range(days)
+        ]
+""",
         False,
     ),
 ]
@@ -1808,21 +1909,22 @@ RESIDUAL4_SPELLINGS = [
         for case in RESIDUAL4_SPELLINGS
     ],
 )
-def test_residual_4_the_unfolded_spellings_are_still_silent(
+def test_residual_4_the_folded_spellings_and_their_honest_twins(
     label, source, fires, registry
 ):
-    """RESIDUAL, pinned so the day it closes is visible.
+    """E-M17 residual 4, both halves.
 
-    E-M17 residual 4. ``_string_of`` folds ``+``, f-strings, module names and
-    class attributes; it does not fold ``str.join``, ``%``-format,
-    ``str.format`` or a constant-key read-back of a module dict. Each is the
-    hoist argument VERIFY-R11-A4 already won for numeric constants and that
+    ``_string_of`` folded ``+``, f-strings, module names and class
+    attributes; it did not fold ``str.join``, ``%``-format, ``str.format`` or
+    a constant-key read-back of a module dict. Each is the hoist argument
+    VERIFY-R11-A4 already won for numeric constants, and that
     ``test_attack_hoisting_the_stamp_into_a_constant_is_still_a_finding``
     already won for ``SOURCE = "era5_land"``, one syntax over.
 
-    This test asserts the CURRENT behaviour on purpose, firing row included.
-    When Stage 1 folds these, the ``False`` rows flip to ``True`` in this
-    table and E-M17 gets updated -- the silence is not to be re-pinned.
+    The silent rows are the price and the proof: an operand this module
+    cannot resolve leaves the whole expression unreadable, a dict that is not
+    a module-level binding is not resolved at all, and the honest twins --
+    the same fold, one string different -- stay quiet.
     """
     assert_bound_to_this_worktree()
     findings = ft.scan_source(
@@ -1831,13 +1933,158 @@ def test_residual_4_the_unfolded_spellings_are_still_silent(
     if fires:
         assert len(findings) == 1, (label, [f.render() for f in findings])
         assert findings[0].rule == ft.CONTRADICTED_SOURCE
-        assert findings[0].claim_value == "era5_land"
-    else:
-        assert findings == [], (
-            f"{label}: E-M17 residual 4 has moved. Update the escalation and "
-            "this table rather than re-pinning the silence: "
-            f"{[f.render() for f in findings]}"
+        assert findings[0].claim_value == "era5_land", (
+            f"{label}: the FOLDED value is what gets reported, so a reader "
+            "sees the claim rather than the spelling.\n" + findings[0].render()
         )
+        assert findings[0].matched_on.startswith("allowlist:gee-era5-land-daily")
+    else:
+        assert findings == [], (label, [f.render() for f in findings])
+
+
+def test_residual_4_a_self_referential_module_dict_does_not_recurse(registry):
+    """ATTACK on the one fold that jumps ACROSS the tree instead of down it.
+
+    ``A = {"x": A["x"]}`` is legal Python. Every other branch of
+    ``_string_of`` walks into a subtree and terminates on the tree's own
+    depth; the module-dict read-back follows a name back to a module-level
+    binding that can point at itself. Without the cycle guard this recurses
+    until the interpreter gives out, and a scanner that raises reports
+    nothing at all -- strictly worse than the silence it replaced.
+
+    Two shapes: the direct self-reference and a two-dict cycle.
+    """
+    assert_bound_to_this_worktree()
+    direct = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            A = {"x": A["x"]}
+
+            def build(days=365, seed=0):
+                rng = np.random.default_rng(seed)
+                return [
+                    {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": A["x"]}
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert direct == [], [f.render() for f in direct]
+
+    mutual = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            A = {"x": B["y"]}
+            B = {"y": A["x"]}
+
+            def build(days=365, seed=0):
+                rng = np.random.default_rng(seed)
+                return [
+                    {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": A["x"]}
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert mutual == [], [f.render() for f in mutual]
+
+    # The guard is scoped to the cycle, not to the fold: a second, honest
+    # read of the SAME key later in the file still resolves.
+    twice = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            FEEDS = {"primary": "era5_land"}
+
+            def build(days=365, seed=0):
+                rng = np.random.default_rng(seed)
+                return [
+                    {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": FEEDS["primary"]}
+                    for d in range(days)
+                ]
+
+            def build_again(days=365, seed=1):
+                rng = np.random.default_rng(seed)
+                return [
+                    {"t2m": float(22.0 + rng.normal(0, 1.2)), "zq7lk": FEEDS["primary"]}
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert len(twice) == 2, [f.render() for f in twice]
+    assert {f.claim_value for f in twice} == {"era5_land"}
+
+
+def test_residual_4_control_b_the_folds_do_not_reach_past_their_scope(registry):
+    """CONTROL B. The two records the folds must leave exactly where they were.
+
+    (a) Residual 3's territory: the record arrives as a PARAMETER, so
+    ``manufactured_of`` cannot prove it was built in-process and
+    CONTRADICTED_SOURCE stays quiet -- folding the stamp's spelling does not
+    change that, and must not.
+
+    (b) The honesty rule: a record that resolvably declares
+    ``"provenance": "synthetic"`` beside a folded product name ends the
+    adjudication before either source rule is reached. A fold that made the
+    product name readable and then ignored the declaration beside it would be
+    the exact over-fire that stops this class of rule shipping.
+    """
+    assert_bound_to_this_worktree()
+    parameter_arriving = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def _stamp(row):
+                row["zq7lk"] = "era5_{}".format("land")
+                return row
+
+            def build(days=365, seed=0):
+                rng = np.random.default_rng(seed)
+                return [
+                    _stamp({"t2m": float(22.0 + rng.normal(0, 1.2))})
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert parameter_arriving == [], [f.render() for f in parameter_arriving]
+
+    declared_synthetic = ft.scan_source(
+        textwrap.dedent(
+            """
+            import numpy as np
+
+            def build(days=365, seed=0):
+                rng = np.random.default_rng(seed)
+                return [
+                    {
+                        "t2m": float(22.0 + rng.normal(0, 1.2)),
+                        "zq7lk": "_".join(["era5", "land"]),
+                        "provenance": "synthetic",
+                    }
+                    for d in range(days)
+                ]
+            """
+        ),
+        "src/loaders/grid.py",
+        registry,
+    )
+    assert declared_synthetic == [], [f.render() for f in declared_synthetic]
 
 
 def test_attack_a_malformed_registry_is_reported_not_treated_as_empty(tmp_path):
