@@ -39,6 +39,7 @@ from ..core import (
     environment,
     fabricated_targets,
     fabrication,
+    identity,
     metric_registry,
     policy,
     report,
@@ -651,6 +652,9 @@ def _write_r10_report(
         "",
         f"- run nonce: `{ctx.nonce}`",
         f"- git SHA: `{repo.git_sha}`",
+        # Which mlkit measured this (E-M24). Every verdict below was
+        # reached by the build this line names, and by no other.
+        *identity.header_lines(),
         f"- trees walked: {', '.join(f'`{t}`' for t in trees)} ({files} file(s))",
         f"- findings: {len(findings)}",
         "",
@@ -849,6 +853,9 @@ def _write_r11_report(
         "",
         f"- run nonce: `{ctx.nonce}`",
         f"- git SHA: `{repo.git_sha}`",
+        # Which mlkit measured this (E-M24). Every verdict below was
+        # reached by the build this line names, and by no other.
+        *identity.header_lines(),
         (f"- files walked: {files} (every `.py` in the repo, excluding vendored "
          "directories and `tests/`)"),
         # Broken out, because the two numbers mean different things and a
@@ -1031,6 +1038,9 @@ def _write_r12_report(
         "",
         f"- run nonce: `{ctx.nonce}`",
         f"- git SHA: `{repo.git_sha}`",
+        # Which mlkit measured this (E-M24). Every verdict below was
+        # reached by the build this line names, and by no other.
+        *identity.header_lines(),
         (f"- files walked: {files} (every `.py` in the repo, excluding vendored "
          "directories and `tests/`)"),
         f"- contract: `{served_reimplementation.CONTRACT_MODULE}`",
@@ -1097,6 +1107,9 @@ def r8_report(repo: Repo, ctx: RunContext) -> CheckResult:
         "",
         f"- run nonce: `{ctx.nonce}`",
         f"- git SHA: `{repo.git_sha}`",
+        # Which mlkit measured this (E-M24). Every verdict below was
+        # reached by the build this line names, and by no other.
+        *identity.header_lines(),
         f"- branch: `{repo.branch}`",
         "",
         "| check | status | detail |",
