@@ -119,7 +119,7 @@ billing exposures, not code changes.
 *(That count was `27` until D6 joined the decision phase on 2026-09-01. It is a
 second copy of a number `checks.PHASE_ORDER` already holds, and unlike the copy
 in `portfolio.py` nothing in the suite compares it — found while adding D6, and
-recorded in `docs/ESCALATIONS.md` E-M26 rather than fixed here, because the fix
+recorded in `docs/ESCALATIONS.md` E-M32 rather than fixed here, because the fix
 is a doc-generation change with its own control pair.)*
 
 ## Installing it into a model repo

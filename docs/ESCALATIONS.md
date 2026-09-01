@@ -2237,7 +2237,18 @@ and REPAIRED on this branch; two measured behaviours recorded OPEN above.**
 
 ---
 
-## E-M24 — fray's unseen-year track resamples rows under a crop-year policy
+<!--
+NUMBERING NOTE. These three were first written as E-M24/25/26 and renumbered to
+30/31/32 before this branch was reviewed, because open PR #31
+(`fix/build-identity-e-054`) had already taken E-M24 on a branch that had not
+reached `main` when this file was appended to. Two entries wearing one id is
+exactly the collision this file exists to make findable, and the gap 27-29 is
+left deliberately for the other branches in flight rather than closed up. Both
+branches APPEND at EOF, so the merge is a textual conflict at the tail and not a
+semantic one; resolve it by keeping both blocks.
+-->
+
+## E-M30 — fray's unseen-year track resamples rows under a crop-year policy
 
 **Measured by** round-8 adjudication (`scratchpad/loop/adjudication.md` §2.1),
 re-read here on 2026-09-01. Not re-measured by mlkit: the figures below are
@@ -2277,7 +2288,7 @@ resampling=...)`, where `INTERVAL_COVERS_ZERO` is a FAIL rather than a footnote.
 
 ---
 
-## E-M25 — chokepoint's corridor bootstrap is the fleet's correct convention and is undeclared
+## E-M31 — chokepoint's corridor bootstrap is the fleet's correct convention and is undeclared
 
 `resilient-chokepoint` resamples corridors — 28 clusters, predictions held
 fixed — which is the convention the round-8 adjudication endorsed and asked the
@@ -2304,7 +2315,7 @@ runner is owned by open PR #101 (`run/foundation-full-val-ladder`).
 
 ---
 
-## E-M26 — README states the gating-check count as a second literal that nothing compares
+## E-M32 — README states the gating-check count as a second literal that nothing compares
 
 `portfolio.py`'s docstring records the rule ("a count is obtained by counting,
 never by remembering") and `tests/test_promotion_state.py` holds any count
@@ -2319,5 +2330,5 @@ generating that sentence from `gating_ids()`, or extending the
 separate change and needs its own control pair. This entry is the standing note
 that the copy exists.
 
-**Can be done from here** (unlike E-M24/E-M25): it is a change inside mlkit.
+**Can be done from here** (unlike E-M30/E-M31): it is a change inside mlkit.
 Left open deliberately, not blocked.

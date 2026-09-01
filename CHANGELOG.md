@@ -88,7 +88,7 @@ about `canonical_payload_sha256` or a served-model artifact's own hash changes;
 every committed `artifact_sha256` in the fleet is unaffected.
 
 **Adoption is a write into other repos and is not done here** — see
-`docs/ESCALATIONS.md` E-M24 and E-M25.
+`docs/ESCALATIONS.md` E-M30 and E-M31.
 
 ### R10 `absence adjudicated as a pass` fired on honest NA-reporting guards (E-M19)
 

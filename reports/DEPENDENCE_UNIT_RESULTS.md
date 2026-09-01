@@ -232,11 +232,11 @@ Four honest limits, none of them papered over.
 
 ## Residuals left open, with reasons
 
-* **Adoption in fray and chokepoint** — `docs/ESCALATIONS.md` E-M24 and E-M25.
+* **Adoption in fray and chokepoint** — `docs/ESCALATIONS.md` E-M30 and E-M31.
   Both are writes into other repos, and both repos' relevant files are owned by
   open, unmerged evidence PRs (fray #78, chokepoint #101). This branch touches
   no file either of them touches.
-* **README's second copy of the gating count** — E-M26. Updated to 28 here;
+* **README's second copy of the gating count** — E-M32. Updated to 28 here;
   the honest fix (generate it, or hold it against `gating_ids()` in a test) is a
   separate change with its own control pair.
 * **No R12 clause for the new surface.** A re-implementation scanner for
