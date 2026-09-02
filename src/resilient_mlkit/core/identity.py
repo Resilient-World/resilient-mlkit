@@ -473,6 +473,49 @@ def one_tree_or_reason(root: Path) -> str:
     )
 
 
+def running_code_is_covered_or_reason(root: Path) -> str:
+    """``""`` when the file THIS module was loaded from is one of the hashed files.
+
+    The digest deliberately excludes ``*.pyc`` and ``__pycache__``, because
+    bytecode moves for reasons that are not source changes. That exclusion has
+    a boundary, and the boundary was open: in a **sourceless install** — the
+    ``.py`` files compiled to ``.pyc`` in place and removed, which Python still
+    imports — every excluded file is also every executing file, and the digest
+    falls through to whatever non-Python data the package ships.
+
+    Measured on this tree, 2026-09-01: two package trees differing only in
+    ``checks/readiness.py``, compiled sourceless, both digest ``py.typed``
+    alone and both stamp ``0.5.0+src.5b9327f66528``. A real R10 report written
+    by the first verified ``MATCH`` against the second. That is the E-M24
+    defect itself — two builds with different gate source reporting one
+    identity — reappearing inside the fix for it, and it contradicts this
+    module's own stated invariant that the digest "never degrades into a
+    plausible-looking string".
+
+    The tie is the tightest one available and needs no new list of what counts
+    as code: the file ``core/identity.py`` was **actually loaded from** must be
+    one of the files that went into the digest. Under any install form that
+    ships source it is. Under a sourceless install it is not, and then this is
+    a REFUSAL — the stamp becomes ``+src.unknown`` and every comparison over it
+    is INDETERMINATE, which is the honest answer to "which build is this?" when
+    the digest covers none of the code that is running.
+    """
+    me = Path(__file__).resolve()
+    try:
+        files = shipped_files(root)
+    except OSError as exc:
+        return f"could not walk {root}: {exc}"
+    if any(p.resolve() == me for p in files):
+        return ""
+    return (
+        f"the file this module was loaded from (`{me}`) is not among the "
+        f"{len(files)} file(s) the digest would cover under {root}; the running "
+        "code is excluded from its own identity (a sourceless/bytecode-only "
+        "install), so the digest would name an identity while describing none "
+        "of the code that ran"
+    )
+
+
 @functools.lru_cache(maxsize=1)
 def build_identity() -> BuildIdentity:
     """The identity of the mlkit running in this interpreter.
@@ -484,8 +527,9 @@ def build_identity() -> BuildIdentity:
 
     root = package_root()
     split = one_tree_or_reason(root)
-    if split:
-        sha, files, unavailable = None, 0, split
+    uncovered = "" if split else running_code_is_covered_or_reason(root)
+    if split or uncovered:
+        sha, files, unavailable = None, 0, (split or uncovered)
     else:
         sha, files, unavailable = digest_tree(root)
     commit, url, vcs_reason = _vcs_of_installed_dist(root)

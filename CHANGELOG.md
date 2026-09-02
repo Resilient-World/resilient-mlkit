@@ -70,6 +70,50 @@ before this exists verify `UNSTAMPED`, which is an absence and not a mismatch:
 the fact is not recoverable from the file, only from re-running the phase.
 Design note: `docs/BUILD_IDENTITY.md`.
 
+### The two builds E-M24 could still fail to tell apart (E-M25)
+
+Adversarial verification of the section above drove two ways an mlkit build
+still went unnamed. Both are closed; both carry a fires/silent pair and a
+revert that kills a named test.
+
+**A digest that covered none of the running code.** The digest excludes
+`__pycache__` and `*.pyc` — bytecode moves for reasons that are not source
+changes. In a *sourceless* install (`.py` compiled to `.pyc` in place and
+removed, which CPython still imports) that exclusion excludes every executing
+file and the digest falls through to whatever data the package ships. Measured
+2026-09-01 on two copies of `src/resilient_mlkit` differing only in
+`checks/readiness.py`: both digested `py.typed` alone, `files=1`, both stamped
+`0.5.0+src.5b9327f66528`, and a real R10 report written by the first verified
+**`MATCH`** against the second — the E-M24 defect inside the fix for it.
+`core/identity.py` now requires that the file `core/identity.py` was *actually
+loaded from* be one of the files hashed; where it is not, the build declines to
+name an identity (`+src.unknown`, every comparison `INDETERMINATE`) instead of
+naming a plausible one. Re-driven after the repair: `files=0`, `known False`,
+both trees. **A source-shipping install is unaffected**, including the
+existing rule that stray bytecode does not move the digest.
+
+**The one readiness table that is composed rather than measured.**
+`mlkit check --portfolio` renders R1–R12 out of `.mlkit/results/*.json` and
+exits on it. The store recorded the repo's git SHA and nothing about mlkit, and
+`store.load` staled only on the SHA. Measured 2026-09-01: 27 PASSes written by
+`0.5.0+src.b1686b22efc6` were read back at an unchanged repo SHA by
+`0.5.0+src.48480b572359` and rendered `R(9-12,1-8) PPPPPPPPPPPP` /
+`READY-TO-TRAIN` at exit 0, with nothing naming either build. `save()` now
+records `mlkit_build`, and `load()` stales a PASS whose stored build is absent,
+unknown, or different — the same rule, and the same PASS/ESCALATED-only scope,
+as the existing git-SHA rule, so a FAIL from another build is still reported
+rather than hidden. Re-driven after the repair: 27 `S`, `IN-PROGRESS`, exit 3;
+the same store read by the build that wrote it still resolves `READY-TO-TRAIN`.
+`render_portfolio` also emits the E-M24 header lines, so the table names the
+build that rendered it.
+
+**This one does move verdicts, and says so.** A stored PASS carrying no
+`mlkit_build` — which is every results file written before this — reads STALE
+until the phase is re-run. That is the same treatment a result with no git SHA
+has always had, for the same reason: it cannot be tied to anything. The
+portfolio legend now reads `S=stale(repo SHA or mlkit build moved)`, because
+`SHA moved` would send a reader looking at the wrong thing.
+
 ### R10 `absence adjudicated as a pass` fired on honest NA-reporting guards (E-M19)
 
 **R10 changes verdict on unchanged repo code in one repo**, in the direction
