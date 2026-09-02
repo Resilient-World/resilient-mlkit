@@ -88,8 +88,27 @@ D3's nominal level, for the same reason:
   look steep. At least three rungs, strictly increasing, each in `(0, 1]`.
 * **No threshold moved.** `FLATNESS_EPSILON`, the D2 power bar and its strict
   boundary, and every non-finite refusal and its ordering are untouched. No test
-  that existed on `main` was edited; `tests/test_declared_hard_stops.py` adds 39
-  controls and the suite goes 909 → 948.
+  that existed on `main` was edited; `tests/test_declared_hard_stops.py` adds 45
+  controls and `tests/test_spine_seed_is_adoptable.py` adds 4, so the suite goes
+  **909 → 958**. *(The 39/948 first written here was typed before the three
+  `indicts = "below"` controls and the two F811-renamed duplicates were counted;
+  both figures are now `grep -c '^def test_'` and `pytest -q`, re-measured, and
+  the earlier pair is withdrawn rather than quietly overwritten — a count nobody
+  re-ran is the same defect class as a restated benchmark figure.)*
+* **The seed file was refusing the adopter, and that was found by driving it.**
+  `spine/mlkit/repo.toml` shipped `[placebo]` and `[scaling]` as live tables
+  with every key commented out. `read_fraction_ladder` refuses a `[scaling]`
+  with no `fractions` — deliberately — so a repo that adopted the seed verbatim
+  and bound `scaling_probe` got `E1 FAIL SCALING_MALFORMED: [scaling] fractions
+  is absent` on a curve E1 never read: a FAIL ON CONTRACT, the exact failure
+  mode this whole entry exists to remove, reintroduced by its own template. The
+  empty `[placebo]` was wrong in the same direction and milder — `declared` is
+  True for an empty table, so `placebo_declared_in` rode in the evidence of a
+  repo that had declared nothing. Both headers are commented out now, and
+  `tests/test_spine_seed_is_adoptable.py` drives the real seed bytes through D2
+  and E1 and requires them to agree with a minimal config, with both halves
+  computed rather than typed, plus two check-not-dead controls that re-arm each
+  header. No check, threshold or existing test moved.
 
 `evidence["gain_10_to_25"]` is now emitted **only** when the ladder really is
 `(0.10, 0.25)`; `gain_top_two`, `from_fraction` and `to_fraction` are always

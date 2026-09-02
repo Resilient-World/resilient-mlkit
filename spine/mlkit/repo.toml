@@ -92,7 +92,13 @@ name = "REPLACE_ME"
 #     `reference_effect`, whatever the null is.
 # The section is read from HEAD, not from the working tree. An uncommitted
 # declaration is NA, not a silent default.
-[placebo]
+#
+# THE HEADER IS COMMENTED OUT ON PURPOSE. An adopter who wants mlkit's default
+# halt region declares NOTHING -- not an empty section. A bare `[placebo]` with
+# every key commented is read as a declaration that was made (it lands in the
+# evidence as `placebo_declared_in`), and its `[scaling]` twin below is refused
+# outright. Uncomment the header and the keys together, or neither.
+# [placebo]
 # estimand   = "skill against the persistence floor, lb/ac"
 # null_value = 0.0
 # indicts    = "above"      # "either" (default) | "above" | "below"
@@ -118,7 +124,16 @@ name = "REPLACE_ME"
 # At least three rungs, strictly increasing, each in (0, 1]. Read from HEAD.
 #
 # The 1% flatness threshold itself is mlkit's and is NOT declarable.
-[scaling]
+#
+# THE HEADER IS COMMENTED OUT ON PURPOSE, and here it is not cosmetic. A bare
+# `[scaling]` with `fractions` commented out is a DECLARATION THAT DECLARES
+# NOTHING, and `read_fraction_ladder` refuses it by design --
+# `SCALING_MALFORMED: [scaling] fractions is absent` -- so a repo that adopted
+# this seed verbatim and bound `scaling_probe` would have had E1 FAIL ON
+# CONTRACT with a curve that was never read. That is the exact failure mode
+# this section exists to remove. Uncomment the header and `fractions` together,
+# or neither. `tests/test_spine_seed_is_adoptable.py` drives this file itself.
+# [scaling]
 # fractions = [0.01, 0.10, 0.25]
 
 # ── Remote parity (R7) ──────────────────────────────────────────────────────
