@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 
-from ..core import artifact
+from ..core import artifact, coverage_evidence
 from ..core.repo import BindingError, Repo
 from ..core.result import ALLOW_DIRTY_KEY, CheckResult, CredentialRequired
 from . import RunContext, check
@@ -212,6 +212,43 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
     the level now comes from ``HEAD:.mlkit/repo.toml`` or the row is NA
     ``NOMINAL_UNCOMMITTED``; ``--allow-dirty`` reads the working tree for
     diagnosis and structurally cannot reach a PASS.
+
+    **And the other two operands are recounted, not accepted** (E-M23 residual
+    2). Tying ``nominal`` left ``empirical`` and ``n`` where tick 13 found
+    them: with an honest committed ``0.90``, a binding returning
+    ``{"nominal": 0.90, "empirical": 0.90, "n": 1000000}`` PASSed, over a row
+    set nobody named. The evidence now carries the operands those two figures
+    were computed from, and ``core.coverage_evidence`` recounts them::
+
+        [coverage]
+        nominal = 0.90                     # committed, as above
+
+        {"nominal": 0.90, "empirical": 0.89, "n": 5000,
+         "row_set_digest": "<core.served.row_set_digest over the keys below>",
+         "rows":   [{"row_id": "...", "covered": True}, ...]}   # or
+         "groups": [{"group_id": "...", "n": 500, "covered": 447}, ...]}
+
+    ``n`` is the row count (or the sum of the group counts), ``empirical`` is
+    ``covered / n``, and both are re-derived here; the digest is
+    ``core.served``'s one spelling of that name, so a coverage claim and a
+    challenger comparison can be held against each other. Four named outcomes,
+    and the NA/FAIL split is E-M21's own distinction between a gap an adopter
+    fills and a claim that was checked and lost:
+
+    * no operands, or no digest -> NA ``COVERAGE_UNTIED``, naming what is
+      missing.
+    * operands that cannot be recounted -> FAIL ``COVERAGE_ROWS_MALFORMED``.
+    * a digest that is not the digest of the keys handed over -> FAIL
+      ``COVERAGE_ROW_SET_MISMATCH``.
+    * a reported ``empirical`` or ``n`` that is not what the operands
+      re-derive to -> FAIL ``COVERAGE_SELF_REPORTED``, naming the re-derived
+      figure.
+
+    What this does NOT establish is written down in
+    ``core.coverage_evidence``'s own docstring and in
+    ``reports/D3_COVERAGE_TIE_PREREGISTRATION.md``: the row set is still the
+    subject's, and the group form ties the figures to a declared partition
+    rather than to individual rows.
     """
     try:
         fn = repo.resolve("coverage")
@@ -377,6 +414,72 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
             "person, not a tolerance",
             evidence,
         )
+
+    # -- the third and fourth operands ------------------------------------
+    #
+    # E-M21 named the general form -- "when a verdict is a comparison, every
+    # operand needs a tie" -- and tied one of the three. `empirical` and `n`
+    # arrived, until here, exactly as tick 13 found them: two scalars the
+    # subject asserts over a row set nobody names. E-M23 residual 2 recorded
+    # what that buys, driven at `a48c975`: against an HONEST committed 0.90, a
+    # binding returning `{"nominal": 0.90, "empirical": 0.90, "n": 1000000}`
+    # PASSed, and nothing in this check could tell it from a measurement.
+    #
+    # `core.coverage_evidence.derive` recounts the figures from the operands
+    # they were computed on and names the rows in `core.served`'s one spelling
+    # of that name. Absent operands are NA and contradicted ones are FAIL,
+    # which is E-M21's own distinction between a gap an adopter fills and a
+    # claim that was checked and lost.
+    #
+    # Placement is deliberate on both sides. It runs AFTER the whole committed-
+    # `nominal` block, because a substituted pass mark is a FAIL and must not
+    # be downgraded to an untied-evidence NA -- the same reasoning that already
+    # puts NOMINAL_SELF_DECLARED before the small-holdout NA. It runs BEFORE
+    # the two verdicts below, because those are the verdicts: taking them on
+    # `empirical` and `n` as reported, having just established that the rows
+    # say something else, would be quoting the figure the subject preferred.
+    try:
+        derived = coverage_evidence.derive(out)
+    except coverage_evidence.CoverageUntied as untied:
+        return CheckResult.na(
+            "D3", PHASE,
+            f"{untied.marker}: {untied.detail}",
+            evidence,
+        )
+    except coverage_evidence.CoverageRefused as refused:
+        return CheckResult.failed(
+            "D3", PHASE,
+            f"{refused.marker}: {refused.detail}",
+            evidence,
+        )
+    evidence[coverage_evidence.DIGEST_KEY] = derived.digest
+    evidence["tie_unit"] = derived.unit
+    evidence["derived_covered"] = derived.covered
+    evidence["derived_n"] = derived.n
+    evidence["derived_empirical"] = derived.empirical
+    mismatch = coverage_evidence.disagreement(
+        derived, reported_empirical=empirical, reported_n=n
+    )
+    if mismatch is not None:
+        return CheckResult.failed(
+            "D3", PHASE,
+            f"{coverage_evidence.SELF_REPORTED}: {mismatch}",
+            evidence,
+        )
+    # The two verdicts below are taken on the DERIVED figures, not the reported
+    # ones. Past the gate above they agree -- exactly for `n`, to within
+    # EMPIRICAL_AGREEMENT_EPS for `empirical` -- so mutating this back leaves
+    # the suite green; that is a property of agreement and not a licence, and
+    # `tests/test_d3_coverage_tie.py` pins the one place they come apart.
+    #
+    # Unlike `nominal` above, `empirical` in the evidence is NOT overwritten.
+    # The declared level is a DIFFERENT SOURCE and rightly displaces the
+    # subject's copy. The derived coverage has the same source as the reported
+    # one -- the subject's own operands -- so overwriting would buy no
+    # independence and would quietly redefine the field E-M21's own control
+    # reads as "the shortfall the exploit erased, still disclosed". The
+    # recount is reported beside it, under its own name.
+    n, empirical = derived.n, derived.empirical
 
     if n < MIN_COVERAGE_N:
         return CheckResult.na(
