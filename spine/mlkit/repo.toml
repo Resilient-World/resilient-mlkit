@@ -25,6 +25,23 @@ name = "REPLACE_ME"
 #   manifest()             -> [source_id, ...] currently in the pipeline
 #   checkpoint_provenance()-> {name: {uri, sha256, licence_url}}
 #   splits()               -> {"train": [group_id], "val": [...], "test": [...]}
+#                             OR, for a repo with MORE THAN ONE holdout policy
+#                             over one panel:
+#                               {"tracks": {"<track>": {"train": [...],
+#                                                       "val": [...],
+#                                                       "test": [...]}, ...}}
+#                             `tracks` must be the mapping's ONLY key -- a
+#                             value carrying both shapes has declared two
+#                             different things and is refused rather than
+#                             resolved by preference. R3 applies EVERY clause
+#                             it applies to one partition to EACH track, at
+#                             the same holdout floor, and the worst verdict
+#                             wins. resilient-fray is the case: unseen COUNTY
+#                             (groups = 0.5 deg spatial blocks) and unseen
+#                             future YEAR (groups = crop years) are two
+#                             partitions of one county-year panel, and with
+#                             one flat binding only one of them could be
+#                             declared or judged.
 #   metric_known_answer()  -> [{name, computed, expected, tol}]
 #   provenance()           -> {"train": {"real": n, "synthetic": n, ...}, "val": ..., "test": ...}
 #   deterministic_run(seed)-> any repr-comparable result

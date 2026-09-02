@@ -250,24 +250,150 @@ def normalise_splits(raw: Any) -> dict[str, set[str]]:
     return {str(k): set(map(str, v)) for k, v in mapping.items()}
 
 
-@check("R3", PHASE, "BLOCKED_SPLITS — train/val/test share no group")
-def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
-    try:
-        fn = repo.resolve("splits")
-    except BindingError as exc:
-        return CheckResult.na("R3", PHASE, str(exc))
-    try:
-        splits = normalise_splits(fn())
-    except SplitsUnreadable as exc:
-        return CheckResult.failed("R3", PHASE, exc.reason, exc.evidence)
-    except CredentialRequired:
-        raise
-    except Exception as exc:  # noqa: BLE001
-        return CheckResult.failed("R3", PHASE, f"splits raised {type(exc).__name__}: {exc}")
+#: The reserved key that — **alone**, as a mapping's only key — makes a
+#: ``splits`` return value a per-track one. See
+#: :func:`normalise_tracked_splits`.
+TRACKS_KEY = "tracks"
 
+#: The internal name of the single, unnamed track a FLAT ``splits`` describes.
+#: Empty on purpose: a repo with one holdout policy names no track, and the
+#: empty string is the one name it cannot accidentally collide with, because
+#: :func:`normalise_tracked_splits` refuses a blank track name.
+SINGLE_TRACK = ""
+
+#: A mapping carrying ``tracks`` AND flat split keys. Which of the two shapes
+#: it is cannot be decided, and deciding it by preference would silently drop
+#: one of the two partitions a repo just declared.
+TRACKS_MIXED_WITH_FLAT = "TRACKS_MIXED_WITH_FLAT"
+
+#: The ``tracks`` envelope is present and its contents are not
+#: ``{name: {split: [group id]}}``.
+TRACKS_MALFORMED = "TRACKS_MALFORMED"
+
+#: Two declared tracks whose train, val AND test group sets are all equal. That
+#: is one partition wearing two names; see :func:`r3_blocked_splits`.
+TRACKS_ARE_THE_SAME_PARTITION = "TRACKS_ARE_THE_SAME_PARTITION"
+
+
+def normalise_tracked_splits(raw: Any) -> dict[str, dict[str, set[str]]]:
+    """``{track: {split: {group id, …}}}`` from a ``splits`` binding.
+
+    TWO ADMISSIBLE SHAPES, and the one that already exists is unchanged.
+
+    * **Flat** — ``{"train": [...], "val": [...], "test": [...]}`` — is
+      returned as ``{SINGLE_TRACK: normalise_splits(raw)}``. Every existing
+      adopter takes this path and nothing about its parsing, its verdicts or
+      its evidence moves.
+    * **Tracked** — ``{"tracks": {name: {"train": [...], …}, …}}`` — is the
+      new one, for a repo with more than one holdout policy over one panel.
+
+    WHY THIS SHAPE EXISTS. ``resilient-fray`` runs two holdout policies over
+    one county-year panel and says so in its own source
+    (``src/validation/yield_holdout.py``): ``county_label_splits`` measures
+    generalisation to an unseen COUNTY, ``county_year_splits`` to an unseen
+    future YEAR. Two partitions, two grouping vocabularies (0.5° spatial block
+    ids; crop years). With one ``splits`` binding only one of them could be
+    declared, so D6 compared the crop-year track's blocks against block ids and
+    landed on ``BLOCKS_CONTRADICT_SPLITS`` — the dependence-unit contract was
+    structurally unadoptable by the repo whose row bootstrap motivated it.
+
+    DISCRIMINATION IS BY THE RESERVED KEY, NEVER BY SHAPE. ``{"train": {"a":
+    1}}`` is a flat splits whose train group ids are that dict's keys, and a
+    reader that guessed "the values are mappings, so this is tracked" would
+    silently reinterpret it as a track called ``train``. So the envelope is
+    recognised only when ``tracks`` is the mapping's ONLY key, and a mapping
+    carrying both is refused by name rather than resolved by preference.
+
+    EACH TRACK IS PARSED BY :func:`normalise_splits`. Rule 7 inside one
+    package: the character-splitting defect that parser exists to refuse (a
+    ``str`` iterated into one group per letter) has to be refused inside every
+    track by the same code, or the second copy is the one nobody remembers to
+    fix.
+
+    Structural only. Whether two tracks are really two partitions, and whether
+    each clears the holdout floor, is R3's verdict to give and lives there.
+    """
+    mapping = dict(raw)
+    if TRACKS_KEY not in mapping:
+        return {SINGLE_TRACK: normalise_splits(mapping)}
+
+    others = sorted(str(k) for k in mapping if k != TRACKS_KEY)
+    if others:
+        raise SplitsUnreadable(
+            f"{TRACKS_MIXED_WITH_FLAT}: splits carries the reserved key "
+            f"{TRACKS_KEY!r} AND {others}. `{{{TRACKS_KEY}: ...}}` declares "
+            "per-track partitions and a flat mapping declares one; a value "
+            "carrying both has declared two different things and mlkit will "
+            "not pick which one counts",
+            {"tracks_mixed_with": others},
+        )
+
+    try:
+        tracks = dict(mapping[TRACKS_KEY])
+    except (TypeError, ValueError) as exc:
+        raise SplitsUnreadable(
+            f"{TRACKS_MALFORMED}: splits[{TRACKS_KEY!r}] is a "
+            f"{type(mapping[TRACKS_KEY]).__name__} and must be a mapping of "
+            f"track name to {{split: [group id]}} ({exc})",
+            {"tracks_type": type(mapping[TRACKS_KEY]).__name__},
+        ) from exc
+
+    if not tracks:
+        raise SplitsUnreadable(
+            f"{TRACKS_MALFORMED}: splits declares the {TRACKS_KEY!r} envelope "
+            "and no track inside it. A repo with no track has no partition, "
+            "and an empty envelope reads in a table exactly like a repo that "
+            "has not wired splits at all",
+            {"n_tracks": 0},
+        )
+
+    out: dict[str, dict[str, set[str]]] = {}
+    for name, value in tracks.items():
+        track = str(name)
+        if not track.strip():
+            raise SplitsUnreadable(
+                f"{TRACKS_MALFORMED}: a track name is blank ({name!r}); an "
+                "unnamed track cannot be named by the declaration that has to "
+                "point at it",
+                {"blank_track_name": repr(name)},
+            )
+        if track in out:
+            raise SplitsUnreadable(
+                f"{TRACKS_MALFORMED}: two tracks are both named {track!r} once "
+                "written down; a declaration naming it points at either, and "
+                "mlkit will not choose",
+                {"duplicate_track_name": track},
+            )
+        try:
+            inner = dict(value)
+        except (TypeError, ValueError) as exc:
+            raise SplitsUnreadable(
+                f"{TRACKS_MALFORMED}: track {track!r} is a "
+                f"{type(value).__name__} and must be a mapping "
+                f"{{split: [group id]}} ({exc})",
+                {"malformed_track": track, "track_type": type(value).__name__},
+            ) from exc
+        try:
+            out[track] = normalise_splits(inner)
+        except SplitsUnreadable as exc:
+            raise SplitsUnreadable(
+                f"track {track!r}: {exc.reason}",
+                {**exc.evidence, "malformed_track": track},
+            ) from exc
+    return out
+
+
+def _judge_one_partition(splits: dict[str, set[str]]) -> tuple[str, dict[str, Any]]:
+    """R3's clauses over ONE partition: ``("", evidence)`` when they all clear.
+
+    Every clause, in the order and the words R3 used before tracks existed, and
+    with the same ``MIN_HOLDOUT_GROUPS``. Extracted so that a tracked ``splits``
+    is judged by exactly this code once per track rather than by a second
+    reading of the same rules.
+    """
     missing = [s for s in ("train", "val", "test") if s not in splits]
     if missing:
-        return CheckResult.failed("R3", PHASE, "splits missing: " + ", ".join(missing))
+        return "splits missing: " + ", ".join(missing), {}
 
     overlaps: dict[str, int] = {}
     names = ["train", "val", "test"]
@@ -279,14 +405,13 @@ def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
 
     evidence = {f"n_{k}": len(v) for k, v in splits.items()}
     if overlaps:
-        return CheckResult.failed(
-            "R3", PHASE,
+        return (
             "groups appear in more than one split: "
             + ", ".join(f"{k}={v}" for k, v in overlaps.items()),
             {**evidence, "overlaps": overlaps},
         )
     if any(len(splits[s]) == 0 for s in names):
-        return CheckResult.failed("R3", PHASE, "a split is empty", evidence)
+        return "a split is empty", evidence
 
     # Disjointness alone is not a blocked split. A holdout containing ONE group
     # is trivially disjoint and measures nothing: it cannot separate "this model
@@ -296,14 +421,106 @@ def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
     # narrowing, the thing CLAUDE.md rule 6 forbids, arriving as a green check.
     thin = {s: len(splits[s]) for s in ("val", "test") if len(splits[s]) < MIN_HOLDOUT_GROUPS}
     if thin:
-        return CheckResult.failed(
-            "R3", PHASE,
+        return (
             "holdout too thin to be a blocked split: "
             + ", ".join(f"{k} has {v} group(s), need >= {MIN_HOLDOUT_GROUPS}" for k, v in thin.items())
             + "; a single-group holdout is disjoint but uninformative",
             {**evidence, "min_holdout_groups": MIN_HOLDOUT_GROUPS},
         )
-    return CheckResult.passed("R3", PHASE, evidence)
+    return "", evidence
+
+
+@check("R3", PHASE, "BLOCKED_SPLITS — train/val/test share no group")
+def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
+    """Every clause, over every declared track.
+
+    A repo that declares one partition is judged exactly as it was before
+    tracks existed — same reasons, same evidence keys, same thresholds. A repo
+    that declares several is judged by the SAME clauses once per track, and the
+    verdict is the worst of them. No clause is relaxed for any track and no
+    threshold moves; a second track is more to clear, never less.
+
+    ONE CLAUSE IS NEW AND ONLY EXISTS UNDER TRACKS.
+    ``TRACKS_ARE_THE_SAME_PARTITION``: two tracks whose train, val and test
+    group sets are all equal are one partition under two names. Two real
+    grouping vocabularies do not collide on all three arms by accident, and
+    the cheap way to make a per-track judgement vacuous is to declare the
+    second track as a copy of the first.
+
+    WHAT THIS DOES NOT DO, said here rather than left to be assumed. mlkit does
+    NOT compare group ids across tracks for leakage. Two tracks are two
+    vocabularies — fray's are spatial block ids and crop years, both integers,
+    and an equal integer between them means nothing. A "group X is train here
+    and test there" refusal would be a category error dressed as rigour. The
+    count of stringified ids two tracks happen to share is recorded in evidence
+    under ``group_ids_shared_between_tracks`` and is interpreted nowhere.
+    """
+    try:
+        fn = repo.resolve("splits")
+    except BindingError as exc:
+        return CheckResult.na("R3", PHASE, str(exc))
+    try:
+        tracks = normalise_tracked_splits(fn())
+    except SplitsUnreadable as exc:
+        return CheckResult.failed("R3", PHASE, exc.reason, exc.evidence)
+    except CredentialRequired:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        return CheckResult.failed("R3", PHASE, f"splits raised {type(exc).__name__}: {exc}")
+
+    if list(tracks) == [SINGLE_TRACK]:
+        reason, evidence = _judge_one_partition(tracks[SINGLE_TRACK])
+        if reason:
+            return CheckResult.failed("R3", PHASE, reason, evidence)
+        return CheckResult.passed("R3", PHASE, evidence)
+
+    ordered = sorted(tracks)
+    per_track: dict[str, dict[str, Any]] = {}
+    failures: list[str] = []
+    for name in ordered:
+        reason, evidence = _judge_one_partition(tracks[name])
+        per_track[name] = evidence
+        if reason:
+            failures.append(f"track {name!r}: {reason}")
+
+    shared: dict[str, int] = {}
+    same: list[str] = []
+    for i, a in enumerate(ordered):
+        for b in ordered[i + 1:]:
+            ids_a = set().union(*tracks[a].values()) if tracks[a] else set()
+            ids_b = set().union(*tracks[b].values()) if tracks[b] else set()
+            shared[f"{a}&{b}"] = len(ids_a & ids_b)
+            if all(
+                tracks[a].get(s, set()) == tracks[b].get(s, set())
+                for s in ("train", "val", "test")
+            ):
+                same.append(f"{a}&{b}")
+    if same:
+        failures.append(
+            f"{TRACKS_ARE_THE_SAME_PARTITION}: {', '.join(same)} declare the "
+            "same train, val and test group sets. That is one partition under "
+            "two names, so a per-track verdict on either says nothing the other "
+            "did not; declare one track, or declare the partition that differs"
+        )
+
+    aggregate: dict[str, Any] = {
+        "n_tracks": len(ordered),
+        "tracks": ordered,
+        "per_track": per_track,
+        # RECORDED, INTERPRETED NOWHERE. See this function's docstring: two
+        # tracks are two grouping vocabularies and an equal id across them is
+        # not evidence of anything.
+        "group_ids_shared_between_tracks": shared,
+    }
+    if failures:
+        # The joined reason is bounded by MAX_REASON like every other reason, so
+        # a repo with several failing tracks can lose the tail of the sentence
+        # -- including WHICH track. Each failure is kept whole here: the summary
+        # is what truncates, never the record.
+        return CheckResult.failed(
+            "R3", PHASE, "; ".join(failures), {**aggregate, "failures": failures}
+        )
+    return CheckResult.passed("R3", PHASE, aggregate)
 
 
 @check("R4", PHASE, "METRIC_KNOWN_ANSWER — metrics reproduce analytic values")

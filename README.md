@@ -144,6 +144,16 @@ both. Round-8 adjudication measured what that is worth: on one identical set of
 1,365 rows, `[+16.016, +29.646]` under the unit the run resampled and
 `[-1.289, +41.704]` under the unit its own split implies.
 
+A repo may run more than one holdout policy over one panel — `resilient-fray`
+runs two, unseen COUNTY and unseen future YEAR, over the same county-year rows.
+`splits` may therefore return `{"tracks": {name: {train, val, test}}}` instead
+of one flat partition; R3 applies every clause to every track, and a
+declaration says which `track` it was taken under so that D6 judges it against
+that partition and no other. A declaration that names none, in a repo that
+declares several, is `TRACK_UNDECLARED` — mlkit will not pick the track whose
+blocks happen to match. A repo with one policy declares no track and nothing
+about its verdicts, reasons or evidence changes.
+
 `READY-TO-TRAIN` requires all 28 gating checks to pass. Six of them (S5, D1, D4, D5,
 E4, E5) are human-only and always report `ESCALATED`, so **an agent cannot
 drive a repo to READY-TO-TRAIN**. That is deliberate: those six are legal and

@@ -221,6 +221,55 @@ crosscuts *every* arm remains refusal-free even when it is finer than the
 policy's blocks inside the arm. chokepoint's endorsed bootstrap has that exact
 shape, and nothing measured in this round tells the two apart.
 
+#### Amendment: `splits` may declare PER-TRACK partitions, and D6 judges each track against its own
+
+Written on `feat/track-aware-splits-contract`, branched from this same
+`feat/dependence-unit-contract` head. **This is what "adoption is more than a
+`repo.toml` line" turned out to mean**, and it was measured rather than
+argued: `resilient-fray` runs TWO holdout policies over ONE county-year panel —
+`county_label_splits` (unseen COUNTY, groups = 0.5° spatial block ids) and
+`county_year_splits` (unseen future YEAR, groups = crop years) — and the repo's
+own source says so. With one `splits` key holding one partition, D6 compared
+the crop-year declaration's five blocks against the county track's **133**
+groups and returned `BLOCKS_CONTRADICT_SPLITS`, for a partition the
+declaration was never taken under. The reverse was equally true. **There was no
+wiring of `splits` under which both of fray's tracks could be judged**, so the
+contract above was structurally unadoptable by the repo whose row bootstrap
+motivated it.
+
+* `checks.readiness.normalise_tracked_splits`: `splits` may return
+  `{"tracks": {name: {train, val, test}}}`. The envelope is recognised only
+  when `tracks` is the mapping's **only** key — never by "the values look
+  nested", because `{"train": {"a": 1}}` is a flat splits whose group ids are
+  that dict's keys. A mapping carrying both shapes is refused by name.
+* `R3` runs **every existing clause on every track**, through the same
+  `_judge_one_partition` code, at the same `MIN_HOLDOUT_GROUPS`. One clause is
+  new and exists only under tracks: `TRACKS_ARE_THE_SAME_PARTITION`.
+* `ResamplingDeclaration` gains a seventh **declared** field, `track` — a
+  pointer into another binding, which is why it is declared rather than
+  derived. `to_dict()` emits it only when set.
+* `resampling_declaration` may return a **sequence** of declarations, one per
+  track; the worst verdict is D6's. New refusals: `TRACK_UNDECLARED`,
+  `TRACK_NOT_IN_SPLITS`, `DUPLICATE_TRACK_DECLARATION`.
+
+**No verdict moves for a single-track adopter, and this one is a byte
+comparison rather than a reading.** Every check in this package that reads
+`splits` (grepped: R3 and D6, and no third) was driven at both shas against the
+REAL split membership `resilient-torrent` (211/71/70 basins) and
+`resilient-chokepoint` (20/4/4 corridors) publish from their own
+`mlkit_bindings:splits`, in six cases covering the block unit, the row unit and
+an absent binding. The two result files hash to the same sha256
+(`28e0db98fc879445cf0c7d88456bd2acdb46b2867b7bc6ed678ff6762342f3ef`). Suite:
+977 passed at the base commit, 1,017 at this one, 0 failed.
+
+**What is NOT closed, named rather than left to be found.**
+`UNIT_CROSSCUTS_ARMS` still silences `DEPENDENCE_UNIT_TOO_FINE`
+unconditionally, so a COUNTY unit on fray's crop-year track — a county
+contributes rows to all three arms there — is judged PASS at this head. That
+ladder belongs to a separate item and this branch does not touch it; the
+outcome was pre-registered as expected before it was measured. See
+`docs/ESCALATIONS.md` E-M34.
+
 ### R10 `absence adjudicated as a pass` fired on honest NA-reporting guards (E-M19)
 
 **R10 changes verdict on unchanged repo code in one repo**, in the direction

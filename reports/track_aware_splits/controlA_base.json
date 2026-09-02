@@ -1,0 +1,170 @@
+{
+  "cases": [
+    {
+      "D6": {
+        "evidence": {
+          "arm": "val",
+          "block_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2",
+          "blocking_unit": "crop_year",
+          "detail": "",
+          "draws": 4000,
+          "n_blocks_declared": 5,
+          "n_blocks_in_arm": 5,
+          "n_groups_in_splits": 133,
+          "n_rows": 1365,
+          "n_rows_panel": 43383,
+          "n_units_in_arm": 5,
+          "only_in_declaration": [
+            "2016",
+            "2017",
+            "2018",
+            "2019",
+            "2020"
+          ],
+          "only_in_splits": [
+            "51999959",
+            "51999961",
+            "54999969",
+            "57999976",
+            "58999983",
+            "58999985",
+            "58999992",
+            "59999984",
+            "59999985",
+            "59999986",
+            "59999990",
+            "59999995",
+            "60000002",
+            "60999984",
+            "60999987",
+            "60999996",
+            "61000003",
+            "61000004",
+            "61000008",
+            "61000014"
+          ],
+          "policy": "county_year_splits",
+          "procedure": "bootstrap",
+          "refusal": "NA",
+          "relation": "UNIT_IS_THE_BLOCK",
+          "row_digest": "f09e58c91f79cbcbb7fe209a95011e8a2a95f636ff507bddfec586fb634a4ace",
+          "unit": "crop_year",
+          "unit_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2"
+        },
+        "reason": "BLOCKS_CONTRADICT_SPLITS: the declaration says arm 'val' holds 5 'crop_year' block(s) and `splits` says it holds 133 group(s). Only in the declaration: ['2016', '2017', '2018', '2019', '2020']. Only in splits: ['51999959', '51999961', '54999969', '57999976', '58999983']. The unit an interval was resampled over is judged against the partition, so the two have to be the same partition.",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {
+          "n_test": 133,
+          "n_train": 399,
+          "n_val": 133
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "A1_flat_county_splits__crop_year_declaration"
+    },
+    {
+      "D6": {
+        "evidence": {},
+        "reason": "resampling_declaration raised ValueError: dictionary update sequence element #0 has length 8; 2 is required",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {},
+        "reason": "splits missing: train, val, test",
+        "status": "FAIL"
+      },
+      "case": "A2_tracked_splits__both_tracks_declared"
+    },
+    {
+      "D6": {
+        "evidence": {},
+        "reason": "resampling_declaration raised ValueError: dictionary update sequence element #0 has length 8; 2 is required",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {},
+        "reason": "splits missing: train, val, test",
+        "status": "FAIL"
+      },
+      "case": "A3_crop_year_track__unit_row"
+    },
+    {
+      "D6": {
+        "evidence": {},
+        "reason": "resampling_declaration raised ValueError: dictionary update sequence element #0 has length 8; 2 is required",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {},
+        "reason": "splits missing: train, val, test",
+        "status": "FAIL"
+      },
+      "case": "A3_crop_year_track__unit_county"
+    },
+    {
+      "D6": {
+        "evidence": {
+          "arm": "val",
+          "block_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2",
+          "blocking_unit": "crop_year",
+          "detail": "",
+          "draws": 4000,
+          "n_blocks_in_arm": 5,
+          "n_rows": 1365,
+          "n_rows_panel": 43383,
+          "n_units_in_arm": 5,
+          "policy": "county_year_splits",
+          "procedure": "bootstrap",
+          "refusal": "NA",
+          "relation": "UNIT_IS_THE_BLOCK",
+          "row_digest": "f09e58c91f79cbcbb7fe209a95011e8a2a95f636ff507bddfec586fb634a4ace",
+          "splits_arms": [
+            "tracks"
+          ],
+          "unit": "crop_year",
+          "unit_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2"
+        },
+        "reason": "the declaration was taken on arm 'val' and `splits` declares ['tracks']; a resampling on an arm the split does not have is a resampling of rows nobody held out",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {},
+        "reason": "splits missing: train, val, test",
+        "status": "FAIL"
+      },
+      "case": "A4_tracked_splits__declaration_names_no_track"
+    },
+    {
+      "D6": {
+        "evidence": {},
+        "reason": "resampling_declaration raised ValueError: dictionary update sequence element #0 has length 8; 2 is required",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {},
+        "reason": "splits missing: train, val, test",
+        "status": "FAIL"
+      },
+      "case": "A5_tracked_splits__one_track_declared"
+    }
+  ],
+  "fray_root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/wt-fray-throwaway",
+  "mlkit_decision_module": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/wt-mlkit-base/src/resilient_mlkit/checks/decision.py",
+  "panel": {
+    "n_groups_county_track": {
+      "test": 133,
+      "train": 399,
+      "val": 133
+    },
+    "n_groups_year_track": {
+      "test": 5,
+      "train": 96,
+      "val": 5
+    },
+    "n_rows_county_track": 43383,
+    "n_rows_year_track": 43383
+  }
+}

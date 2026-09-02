@@ -12,15 +12,20 @@ can invalidate a model before a single GPU-hour is bought.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from ..core import artifact
 from ..core.repo import BindingError, Repo
-from ..core.result import ALLOW_DIRTY_KEY, CheckResult, CredentialRequired
+from ..core.result import ALLOW_DIRTY_KEY, CheckResult, CredentialRequired, Status
 from ..core.served import ResamplingDeclaration, RowUnit, ServedContractError
 from . import RunContext, check
-from .readiness import SplitsUnreadable, normalise_splits
+from .readiness import (
+    SINGLE_TRACK,
+    TRACKS_KEY,
+    SplitsUnreadable,
+    normalise_tracked_splits,
+)
 
 PHASE = "decision"
 
@@ -421,6 +426,31 @@ DECLARED_FIELDS = ("procedure", "draws", "policy", "blocking_unit", "unit", "arm
 #: The four things a row of the assignment has to say.
 ROW_FIELDS = ("row_key", "arm", "block_key", "unit_key")
 
+#: Optional, and the seventh DECLARED field: which of the repo's holdout
+#: policies this declaration was taken under, by the name ``splits`` gives it.
+#: Absent means "this repo has one, unnamed, partition".
+TRACK_FIELD = "track"
+
+#: ``splits`` declares several tracks and the declaration names none. mlkit
+#: could pick the track whose blocks happen to match and report PASS; that is a
+#: check selecting the operand of its own verdict, so it refuses instead.
+TRACK_UNDECLARED = "TRACK_UNDECLARED"
+
+#: The declaration names a track ``splits`` does not declare -- including the
+#: case where ``splits`` declares no tracks at all.
+TRACK_NOT_IN_SPLITS = "TRACK_NOT_IN_SPLITS"
+
+#: Two declarations in one return value naming one track. Two intervals over
+#: one partition are two answers to one question, and nothing here can say
+#: which of them the repo promoted on.
+DUPLICATE_TRACK_DECLARATION = "DUPLICATE_TRACK_DECLARATION"
+
+#: What the binding may return: one declaration, or a sequence of them.
+DECLARATION_SHAPE = (
+    f"one mapping {{{', '.join(DECLARED_FIELDS)}[, {TRACK_FIELD}], assignment}}, "
+    "or a sequence of them -- one per track"
+)
+
 
 def _row_units(raw: Any) -> list[RowUnit]:
     """``RowUnit``s from a binding's assignment, refusing anything unnamed."""
@@ -447,60 +477,40 @@ def _row_units(raw: Any) -> list[RowUnit]:
     return units
 
 
-@check("D6", PHASE, "RESAMPLING_UNIT — the unit resampled vs the holdout policy")
-def d6_resampling_unit(repo: Repo, ctx: RunContext) -> CheckResult:
-    """The dependence unit an interval rests on, checked against the split.
+def _tracks_once(repo: Repo, cache: dict[str, Any]) -> tuple[Any, tuple[str, str, dict[str, Any]] | None]:
+    """``splits`` resolved and parsed AT MOST ONCE per D6 run.
 
-    THE FINDING. Round-8 adjudication, measured in ``resilient-fray``: the
-    repo's holdout policy puts whole crop years in one partition, so the
-    exchangeable unit is the crop year and VAL has five of them. The run's
-    bootstrap resampled 1,365 ROWS as if independent. On one identical set of
-    rows the interval moves from ``[+16.016, +29.646]`` — clears zero — to
-    ``[-1.289, +41.704]`` — does not. ``resilient-chokepoint`` resamples its
-    dependence unit (corridor block). fray resampled rows. **Nothing in mlkit
-    required consistency, and nothing required the choice to be stated.**
-
-    So D6 asks two questions and passes only when both are answered:
-
-    1. **Does the declaration contradict itself?** mlkit builds the
-       :class:`~resilient_mlkit.core.served.ResamplingDeclaration` here, from
-       the assignment the binding returns, and derives the counts, the digests,
-       the relation and the refusal. A unit that stays inside the deciding arm
-       and splits one of the policy's blocks is
-       ``DEPENDENCE_UNIT_TOO_FINE`` → FAIL.
-    2. **Are the declared blocks the repo's actual partition?** The declaration
-       alone cannot answer this, and the gap is real: a binding that sets
-       ``block_key = row_key`` describes a policy with no blocks at all, which
-       is perfectly self-consistent and silent. So the blocks are tied to the
-       ``splits`` binding — a SECOND declaration of the same partition, which
-       R3 already reads and judges. Disagreement is FAIL; an absent or
-       unreadable ``splits`` is NA, because a verdict resting on an untied
-       operand is the one thing three ticks of this loop have paid for.
-
-    NA, not PASS, is the answer for a repo that has not wired the binding, in
-    the same way D2 and D3 answer NA without theirs. That is visible in the
-    fleet table and is never a pass.
+    Returns ``(tracks, None)`` or ``(None, (kind, text, extra_evidence))``. The
+    three failure kinds are the three NA outcomes D6 already gave for an
+    untied operand; they are returned rather than raised so that a run over
+    several declarations reports the same NA on each of them from one read of
+    the binding, instead of importing and calling it once per track.
     """
+    if "v" in cache:
+        return cache["v"]
     try:
-        fn = repo.resolve(RESAMPLING_BINDING)
+        splits_fn = repo.resolve("splits")
     except BindingError as exc:
-        return CheckResult.na(
-            "D6", PHASE,
-            f"{exc}; an interval or a promotion that rests on a resampling procedure "
-            "must declare the unit that procedure drew. Declare "
-            f"`{RESAMPLING_BINDING}` returning "
-            f"{{{', '.join(DECLARED_FIELDS)}, assignment}}, where `assignment` is "
-            f"one mapping per panel row naming {list(ROW_FIELDS)}.",
-        )
+        cache["v"] = (None, ("binding", str(exc), {}))
+        return cache["v"]
     try:
-        out = dict(fn())
+        tracks = normalise_tracked_splits(splits_fn())
+    except SplitsUnreadable as exc:
+        cache["v"] = (None, ("unreadable", exc.reason, dict(exc.evidence)))
+        return cache["v"]
     except CredentialRequired:
         raise
     except Exception as exc:  # noqa: BLE001
-        return CheckResult.failed(
-            "D6", PHASE, f"{RESAMPLING_BINDING} raised {type(exc).__name__}: {exc}"
-        )
+        cache["v"] = (None, ("raised", f"splits raised {type(exc).__name__}: {exc}", {}))
+        return cache["v"]
+    cache["v"] = (tracks, None)
+    return cache["v"]
 
+
+def _judge_declaration(
+    out: Mapping[str, Any], repo: Repo, cache: dict[str, Any]
+) -> CheckResult:
+    """ONE resampling declaration, judged. See :func:`d6_resampling_unit`."""
     missing = [f for f in (*DECLARED_FIELDS, "assignment") if f not in out]
     if missing:
         return CheckResult.failed(
@@ -520,6 +530,12 @@ def d6_resampling_unit(repo: Repo, ctx: RunContext) -> CheckResult:
             unit=str(out["unit"]),
             arm=str(out["arm"]),
             assignment=_row_units(out["assignment"]),
+            # NOT coerced either, and for the same reason one level up: `str()`
+            # here would turn a track named `None` or `12` into a name that
+            # `splits` can never produce, and the mismatch would read as
+            # TRACK_NOT_IN_SPLITS instead of as the type error it is. The
+            # declaration refuses a non-string by name.
+            track=out.get(TRACK_FIELD, ""),
         )
     except ServedContractError as exc:
         return CheckResult.failed(
@@ -544,37 +560,73 @@ def d6_resampling_unit(repo: Repo, ctx: RunContext) -> CheckResult:
     # Everything above reasons about ONE declaration, and a declaration
     # compared only to itself is not compared. `splits` is the repo's other
     # statement of the same partition, and R3 already adjudicates it.
-    try:
-        splits_fn = repo.resolve("splits")
-    except BindingError as exc:
-        return CheckResult.na(
+    tracks, err = _tracks_once(repo, cache)
+    if err is not None:
+        kind, text, extra = err
+        if kind == "binding":
+            return CheckResult.na(
+                "D6", PHASE,
+                f"BLOCKS_UNTIED: the declaration is self-consistent ({declaration.relation}"
+                f", {declaration.n_units_in_arm} {declaration.unit!r} unit(s) over "
+                f"{declaration.n_blocks_in_arm} {declaration.blocking_unit!r} block(s) in "
+                f"arm {declaration.arm!r}) and its blocks are tied to nothing outside it "
+                f"-- {text}. A binding that reports `block_key = row_key` describes a "
+                "policy with no blocks, passes clause 1 in silence, and is caught only "
+                "here. Declare `splits` (R3 reads the same one).",
+                evidence,
+            )
+        if kind == "unreadable":
+            return CheckResult.na(
+                "D6", PHASE,
+                f"BLOCKS_UNTIED: the declared blocks cannot be tied to `splits` -- "
+                f"{text}",
+                {**evidence, **extra},
+            )
+        return CheckResult.na("D6", PHASE, f"BLOCKS_UNTIED: {text}", evidence)
+
+    # -- which partition is this declaration's? -----------------------------
+    #
+    # A repo with one holdout policy declares no track and lands on the
+    # SINGLE_TRACK key, which is where every adopter before tracks existed
+    # lands; nothing below it moves. A repo with several declares them, and the
+    # declaration has to say which one it was taken under -- mlkit will not
+    # pick the track whose blocks happen to match.
+    named = sorted(t for t in tracks if t != SINGLE_TRACK)
+    is_tracked = list(tracks) != [SINGLE_TRACK]
+    if is_tracked and not declaration.track:
+        return CheckResult.failed(
             "D6", PHASE,
-            f"BLOCKS_UNTIED: the declaration is self-consistent ({declaration.relation}"
-            f", {declaration.n_units_in_arm} {declaration.unit!r} unit(s) over "
-            f"{declaration.n_blocks_in_arm} {declaration.blocking_unit!r} block(s) in "
-            f"arm {declaration.arm!r}) and its blocks are tied to nothing outside it "
-            f"-- {exc}. A binding that reports `block_key = row_key` describes a "
-            "policy with no blocks, passes clause 1 in silence, and is caught only "
-            "here. Declare `splits` (R3 reads the same one).",
-            evidence,
+            f"{TRACK_UNDECLARED}: `splits` declares {len(named)} tracks "
+            f"({named}) and this declaration names none. Two holdout policies "
+            "over one panel are two different partitions, so 'the blocks agree "
+            "with splits' has no meaning until the declaration says WHICH "
+            "splits. mlkit will not choose the track whose blocks happen to "
+            f"match: declare `{TRACK_FIELD}`.",
+            {**evidence, "tracks_in_splits": named},
         )
-    try:
-        splits = normalise_splits(splits_fn())
-    except SplitsUnreadable as exc:
-        return CheckResult.na(
+    if declaration.track and not is_tracked:
+        return CheckResult.failed(
             "D6", PHASE,
-            f"BLOCKS_UNTIED: the declared blocks cannot be tied to `splits` -- "
-            f"{exc.reason}",
-            {**evidence, **exc.evidence},
+            f"{TRACK_NOT_IN_SPLITS}: the declaration was taken on track "
+            f"{declaration.track!r} and `splits` declares no tracks at all -- it "
+            f"returned one flat partition. Return "
+            f"{{{TRACKS_KEY!r}: {{{declaration.track!r}: {{train, val, test}}, ...}}}} "
+            "from `splits`, or drop the track from the declaration; a track "
+            "named on one side only is tied to nothing.",
+            {**evidence, "tracks_in_splits": []},
         )
-    except CredentialRequired:
-        raise
-    except Exception as exc:  # noqa: BLE001
-        return CheckResult.na(
+    if declaration.track and declaration.track not in tracks:
+        return CheckResult.failed(
             "D6", PHASE,
-            f"BLOCKS_UNTIED: splits raised {type(exc).__name__}: {exc}",
-            evidence,
+            f"{TRACK_NOT_IN_SPLITS}: the declaration was taken on track "
+            f"{declaration.track!r} and `splits` declares {named}; an interval "
+            "judged against a partition nobody published is judged against "
+            "nothing.",
+            {**evidence, "tracks_in_splits": named},
         )
+    track_key = declaration.track if is_tracked else SINGLE_TRACK
+    splits = tracks[track_key]
+    tied_to = f"splits.{TRACKS_KEY}.{track_key}" if is_tracked else "splits"
 
     if declaration.arm not in splits:
         return CheckResult.failed(
@@ -610,8 +662,197 @@ def d6_resampling_unit(repo: Repo, ctx: RunContext) -> CheckResult:
         )
 
     return CheckResult.passed(
-        "D6", PHASE, {**evidence, "blocks_tied_to": "splits", "n_groups_in_splits": len(from_splits)}
+        "D6", PHASE, {**evidence, "blocks_tied_to": tied_to, "n_groups_in_splits": len(from_splits)}
     )
+
+
+@check("D6", PHASE, "RESAMPLING_UNIT — the unit resampled vs the holdout policy")
+def d6_resampling_unit(repo: Repo, ctx: RunContext) -> CheckResult:
+    """The dependence unit an interval rests on, checked against the split.
+
+    THE FINDING. Round-8 adjudication, measured in ``resilient-fray``: the
+    repo's holdout policy puts whole crop years in one partition, so the
+    exchangeable unit is the crop year and VAL has five of them. The run's
+    bootstrap resampled 1,365 ROWS as if independent. On one identical set of
+    rows the interval moves from ``[+16.016, +29.646]`` — clears zero — to
+    ``[-1.289, +41.704]`` — does not. ``resilient-chokepoint`` resamples its
+    dependence unit (corridor block). fray resampled rows. **Nothing in mlkit
+    required consistency, and nothing required the choice to be stated.**
+
+    So D6 asks two questions and passes only when both are answered:
+
+    1. **Does the declaration contradict itself?** mlkit builds the
+       :class:`~resilient_mlkit.core.served.ResamplingDeclaration` here, from
+       the assignment the binding returns, and derives the counts, the digests,
+       the relation and the refusal. A unit that stays inside the deciding arm
+       and splits one of the policy's blocks is
+       ``DEPENDENCE_UNIT_TOO_FINE`` → FAIL.
+    2. **Are the declared blocks the repo's actual partition?** The declaration
+       alone cannot answer this, and the gap is real: a binding that sets
+       ``block_key = row_key`` describes a policy with no blocks at all, which
+       is perfectly self-consistent and silent. So the blocks are tied to the
+       ``splits`` binding — a SECOND declaration of the same partition, which
+       R3 already reads and judges. Disagreement is FAIL; an absent or
+       unreadable ``splits`` is NA, because a verdict resting on an untied
+       operand is the one thing three ticks of this loop have paid for.
+
+    NA, not PASS, is the answer for a repo that has not wired the binding, in
+    the same way D2 and D3 answer NA without theirs. That is visible in the
+    fleet table and is never a pass.
+
+    TWO TRACKS OVER ONE PANEL. ``resilient-fray`` runs two holdout policies
+    over one county-year panel — unseen COUNTY and unseen future YEAR — and
+    while ``splits`` could publish only one partition, no wiring existed under
+    which both tracks could be judged: the crop-year declaration's blocks were
+    compared against spatial block ids and landed on
+    ``BLOCKS_CONTRADICT_SPLITS`` for a partition it was never taken under. So
+    ``splits`` may now publish per-track partitions
+    (:func:`~resilient_mlkit.checks.readiness.normalise_tracked_splits`), the
+    declaration may name its ``track``, and the binding may return a SEQUENCE
+    of declarations — one per track — whose worst verdict is D6's. A repo with
+    one partition declares no track and every word above still describes it,
+    byte for byte.
+    """
+    try:
+        fn = repo.resolve(RESAMPLING_BINDING)
+    except BindingError as exc:
+        # LEFT EXACTLY AS IT WAS, deliberately. `redact` bounds every reason at
+        # MAX_REASON = 400 characters and this one already spends 397 of them,
+        # so naming the optional `track` and the sequence shape here would
+        # TRUNCATE the sentence that tells an adopter what to declare -- a
+        # message that stops mid-word is worse guidance than one that is merely
+        # incomplete. The new shape is documented where there is room for it:
+        # `spine/mlkit/repo.toml` (which this very sentence points the reader
+        # at), :data:`DECLARATION_SHAPE`, and this function's docstring.
+        return CheckResult.na(
+            "D6", PHASE,
+            f"{exc}; an interval or a promotion that rests on a resampling procedure "
+            "must declare the unit that procedure drew. Declare "
+            f"`{RESAMPLING_BINDING}` returning "
+            f"{{{', '.join(DECLARED_FIELDS)}, assignment}}, where `assignment` is "
+            f"one mapping per panel row naming {list(ROW_FIELDS)}.",
+        )
+    try:
+        raw = fn()
+    except CredentialRequired:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        return CheckResult.failed(
+            "D6", PHASE, f"{RESAMPLING_BINDING} raised {type(exc).__name__}: {exc}"
+        )
+
+    cache: dict[str, Any] = {}
+
+    # ONE declaration -- the shape every adopter has today. Judged and
+    # returned directly, so its status, reason and evidence are the bytes it
+    # produced before tracks existed.
+    if isinstance(raw, Mapping):
+        return _judge_declaration(dict(raw), repo, cache)
+
+    # A SEQUENCE of declarations -- one per track. Refused by type rather than
+    # coerced: `dict()` accepts a list of pairs, so a bare sequence used to be
+    # silently reassembled into "a declaration" whose fields came from
+    # wherever the pairs happened to land.
+    if isinstance(raw, str | bytes) or not isinstance(raw, Iterable):
+        return CheckResult.failed(
+            "D6", PHASE,
+            f"{RESAMPLING_BINDING} returned a {type(raw).__name__}; it must return "
+            f"{DECLARATION_SHAPE}",
+        )
+    entries = list(raw)
+    if not entries:
+        return CheckResult.failed(
+            "D6", PHASE,
+            f"{RESAMPLING_BINDING} returned an empty sequence; a repo that declares "
+            "no resampling at all leaves the binding undeclared and is NA, which is "
+            "visible in the fleet table. An empty sequence is a wired binding that "
+            "measured nothing, and it would read as a run with no findings.",
+        )
+    bad = [i for i, e in enumerate(entries) if not isinstance(e, Mapping)]
+    if bad:
+        return CheckResult.failed(
+            "D6", PHASE,
+            f"{RESAMPLING_BINDING}[{bad[0]}] is a {type(entries[bad[0]]).__name__}; "
+            f"every entry must be a mapping {{{', '.join(DECLARED_FIELDS)}"
+            f"[, {TRACK_FIELD}], assignment}}",
+        )
+    entries = [dict(e) for e in entries]
+
+    # Two declarations naming one track are two intervals over one partition.
+    # Checked BEFORE any of them is judged, because otherwise the aggregate
+    # below would report the worst of two answers to one question as though it
+    # were one answer.
+    # Compared by repr, not by value: a track key is whatever the binding put
+    # there, an unhashable one (a list) would raise in a set, and two entries
+    # that both name nothing collide on `""` exactly as two that both name
+    # `"crop_year"` do.
+    names = [e.get(TRACK_FIELD, "") for e in entries]
+    seen: set[str] = set()
+    duplicated: list[str] = []
+    for n in names:
+        key = repr(n)
+        if key in seen and key not in duplicated:
+            duplicated.append(key)
+        seen.add(key)
+    duplicated.sort()
+    if duplicated:
+        return CheckResult.failed(
+            "D6", PHASE,
+            f"{DUPLICATE_TRACK_DECLARATION}: {len(entries)} declarations and "
+            f"track(s) {duplicated} named more than once. Two intervals over one "
+            "partition are two answers to one question, and nothing here can say "
+            "which one the repo promoted on.",
+            {"n_declarations": len(entries), "declared_tracks": [repr(n) for n in names]},
+        )
+
+    results = [_judge_declaration(e, repo, cache) for e in entries]
+    per_declaration = [
+        {
+            "track": str(name),
+            "status": r.status.value,
+            "reason": r.reason,
+            "evidence": r.evidence,
+        }
+        for name, r in zip(names, results, strict=True)
+    ]
+    evidence: dict[str, Any] = {
+        "n_declarations": len(entries),
+        "declarations": per_declaration,
+    }
+
+    tracks, err = _tracks_once(repo, cache)
+    if err is None:
+        in_splits = sorted(t for t in tracks if t != SINGLE_TRACK)
+        evidence["tracks_in_splits"] = in_splits
+        # RECORDED, NOT REFUSED, and the prereg says so in advance: mlkit
+        # cannot know whether a track produced an interval at all, so a track
+        # nobody declared a resampling for is a gap in what D6 judged rather
+        # than a defect it found. Naming it is the whole point -- an unjudged
+        # track that appeared nowhere would be exactly the silence this branch
+        # exists to end.
+        evidence["tracks_without_declaration"] = [
+            t for t in in_splits if t not in {str(n) for n in names}
+        ]
+
+    # The joined reason is bounded by MAX_REASON like every other reason, so a
+    # repo with several failing tracks can lose the tail of the sentence. Each
+    # per-declaration reason is kept WHOLE in evidence["declarations"] above --
+    # the summary is what truncates, never the record.
+    fails = [(n, r) for n, r in zip(names, results, strict=True) if r.status is Status.FAIL]
+    if fails:
+        return CheckResult.failed(
+            "D6", PHASE,
+            "; ".join(f"track {str(n)!r}: {r.reason}" for n, r in fails),
+            evidence,
+        )
+    nas = [(n, r) for n, r in zip(names, results, strict=True) if r.status is Status.NA]
+    if nas:
+        return CheckResult.na(
+            "D6", PHASE,
+            "; ".join(f"track {str(n)!r}: {r.reason}" for n, r in nas),
+            evidence,
+        )
+    return CheckResult.passed("D6", PHASE, evidence)
 
 
 @check("D4", PHASE, "SENSITIVITY — human sign-off", human_only=True)

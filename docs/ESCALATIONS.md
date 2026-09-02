@@ -2712,3 +2712,44 @@ which is disclosure, not a verdict.
 for the axis a blocked split partitions. That needs a measurement in an adopter
 repo, on an arm nobody has spent, and a signatory decision about what standard
 the fleet holds. Proposed as the next question rather than answered.
+
+---
+
+## E-M34 — `UNIT_CROSSCUTS_ARMS` silences `DEPENDENCE_UNIT_TOO_FINE`, and a county unit on a crop-year track walks through it
+
+Recorded from `feat/track-aware-splits-contract`, and **pre-registered as an
+expected outcome before it was measured**
+(`reports/TRACK_AWARE_SPLITS_PREREGISTRATION.md` §6) rather than discovered
+afterwards.
+
+`ResamplingDeclaration`'s ladder asks `elif not crosscutting and split_blocks:`
+before it will say `DEPENDENCE_UNIT_TOO_FINE`. So a unit whose keys appear in
+more than one arm is EXEMPT from the refusal — unconditionally, and however
+finely it splits the deciding arm's blocks.
+
+Driven on the real `resilient-fray` panel, crop-year track, arm `val`
+(`reports/TRACK_AWARE_SPLITS_RESULTS.md`, case
+`A3_crop_year_track__unit_county`):
+
+| declared unit | derived relation | units in arm | blocks in arm | D6 |
+|---|---|---:|---:|---|
+| `crop_year` | `UNIT_IS_THE_BLOCK` | 5 | 5 | PASS |
+| `row` | `UNIT_FINER_THAN_BLOCK` | 1,365 | 5 | **FAIL** `DEPENDENCE_UNIT_TOO_FINE` |
+| `county` | `UNIT_CROSSCUTS_ARMS` | **344** | 5 | **PASS** |
+
+344 counties drawn as exchangeable replicates inside an arm the policy says
+holds five dependent blocks, and the check is silent — for the same reason the
+row bootstrap was wrong, on the same rows, under the same policy. The exemption
+was written for `resilient-chokepoint`'s corridor, which is the fleet's correct
+convention and must stay adoptable; the defect is that it is **existential and
+unconditional** rather than a statement about the deciding arm.
+
+**Not fixed here, deliberately.** That ladder lives in
+`core.served.ResamplingDeclaration.__post_init__` and is another item's target
+(the sota-w1 verifier raised it against PR #32). Two parallel edits to one
+ladder is how a refusal ends up with two definitions, which is the rule-7
+failure mode this package exists to refuse. This branch adds nothing to that
+ladder and removes nothing from it.
+
+**Can be done from here**: it is a change inside mlkit. Left open on purpose,
+serialized behind the item that owns it.
