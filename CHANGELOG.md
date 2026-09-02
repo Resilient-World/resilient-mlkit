@@ -524,6 +524,16 @@ Suite 909 → 948 (+39, the new controls file; collected node ids diffed against
 main, zero removed). Every registered check driven over three repos in two
 interpreters produced records with the same sha256 either side.
 
+**Merge note, because a verdict change in the wrong entry is a verdict change
+nobody reads.** This section is written under `v0.5.0` because that is the
+newest heading on the `main` it branched from. mlkit PR #40 (loop item I2-M2)
+adds a `v0.6.0` heading above it; the two branches merge CLEANLY and the merged
+suite is green (964 passed / 3 skipped, measured), and git has no way to notice
+that this section then describes the release *below* the one that carries it.
+**Whoever merges the two must move this section under the newest heading** — a
+block move, no text change. It is called out here as well as in the PR body
+because the file is where the person resolving the conflict is looking.
+
 ## v0.4.0 — 2026-08-28
 
 Not yet tagged. The heading is written at the version the code declares, not
