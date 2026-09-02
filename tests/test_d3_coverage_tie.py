@@ -570,3 +570,37 @@ def test_derive_refuses_a_numpy_style_indicator_by_name():
         coverage_evidence.derive(payload)
     assert excinfo.value.marker == coverage_evidence.MALFORMED
     assert "truthiness" in excinfo.value.detail
+
+
+# -- the one place the reported and derived figures come apart ------------
+
+
+def test_the_coverage_verdict_is_taken_on_the_derived_empirical(tmp_path):
+    """FIRES only if the final comparison reads the RECOUNTED figure.
+
+    Found by mutation, and it is the same hole `test_the_final_comparison_
+    uses_the_declared_level_not_the_reported_copy` was written for one operand
+    earlier: past the tie the reported and derived figures agree to within
+    `EMPIRICAL_AGREEMENT_EPS`, so for any ordinary tolerance the two readings
+    are the same comparison and rewriting one back leaves the suite green.
+
+    They come apart in exactly one place -- a binding declaring a tolerance
+    BELOW the representation allowance, which D3 permits because a subject may
+    ask for something stricter than mlkit and never looser. Here the rows say
+    0.90 exactly, the binding reports 0.90 + 5e-13 (inside the allowance, so
+    the tie is silent), and `tol` is 1e-13. On the derived figure the gap is 0
+    and this PASSes; on the reported one it is 5e-13 and it FAILs.
+
+    The `n` half of the same assignment is NOT observable and no test here
+    pretends otherwise: `n` must match the recount EXACTLY to get past the tie,
+    so the two are the same integer by construction.
+    """
+    payload = tied_rows(5000, 4500)
+    payload["empirical"] = 0.90 + 5e-13
+    payload["tol"] = 1e-13
+    result = run_d3(tmp_path, payload)
+    assert result.status is Status.PASS
+    assert result.evidence["tol"] == 1e-13
+    # Both figures are on the record, and they are not the same figure.
+    assert result.evidence["empirical"] == 0.90 + 5e-13
+    assert result.evidence["derived_empirical"] == 0.90
