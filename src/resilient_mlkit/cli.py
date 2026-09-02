@@ -20,6 +20,7 @@ from pathlib import Path
 from . import __version__
 from . import checks as checks_pkg
 from .checks import PHASES, RunContext, for_phase, phase_ids
+from .core import identity as identity_mod
 from .core import nonce as nonce_mod
 from .core import policy, store
 from .core.repo import PORTFOLIO, Repo, discover, find_root
@@ -374,6 +375,12 @@ def cmd_fleet(args: argparse.Namespace) -> int:
         "run_nonce": run_nonce,
         "root": str(root),
         "mlkit_git_sha": _self_sha(),
+        # E-M24. `mlkit_version` cannot tell two builds apart -- fray's c65b2e7
+        # and main's 6921e9a both declare "0.5.0" with 9 source files different
+        # between them -- and `mlkit_git_sha` is empty in the adopter case,
+        # because site-packages is not a git worktree. This one is measured off
+        # the tree that ran, so it is present and it moves.
+        "mlkit_build": identity_mod.build_identity().to_dict(),
         "repos_read": {
             name: {"git_sha": r.git_sha, "branch": r.branch, "dirty": r.is_dirty}
             for name, r in sorted(repos.items())
@@ -487,6 +494,10 @@ def _render_fleet_markdown(
         f"- generated: `{payload['generated_at_utc']}`",
         f"- run nonce: `{payload['run_nonce']}`",
         f"- mlkit: `{payload['mlkit_version']}` at `{payload['mlkit_git_sha'] or 'NA (not a git worktree)'}`",
+        # E-M24: the line above is the one that cannot distinguish two builds
+        # -- the version is equal across them and the sha is empty wherever
+        # mlkit is installed rather than checked out. These two can.
+        *identity_mod.header_lines(),
         (
             f"- rows: **{stats['rows']}**, cells measured: "
             f"**{stats['cells_measured']}**, "
@@ -623,6 +634,8 @@ def cmd_spine(args: argparse.Namespace) -> int:
         "run_nonce": run_nonce,
         "spine_root": str(spine_root),
         "mlkit_git_sha": _self_sha(),
+        # E-M24; see the note on the same key in the fleet payload above.
+        "mlkit_build": identity_mod.build_identity().to_dict(),
         "canonical_files": [dest for _, dest in spine_mod.CANONICAL_FILES],
         "repos": {
             r.name: {"git_sha": r.git_sha, "branch": r.branch, "dirty": r.is_dirty}
@@ -675,6 +688,8 @@ def _render_spine_markdown(payload: dict, drifts: list, repos: list) -> str:
             f"- spine: `{payload['spine_root']}` at mlkit "
             f"`{payload['mlkit_git_sha'] or 'NA (not a git worktree)'}`"
         ),
+        # E-M24; see the note in _render_fleet_markdown.
+        *identity_mod.header_lines(),
         f"- canonical files compared per repo: **{len(payload['canonical_files'])}**",
         "- verdicts: " + ", ".join(f"**{k}** {v}" for k, v in sorted(counts.items())),
         "",
@@ -887,6 +902,50 @@ def cmd_allowlist(args: argparse.Namespace) -> int:
     return rc
 
 
+#: Exit code for `mlkit identity --verify` when a report names a DIFFERENT
+#: build than the one installed. Distinct from 1 so a caller can tell "some
+#: report is not MATCH" from "a report was written by another mlkit", which
+#: are different problems with different fixes.
+IDENTITY_MISMATCH_EXIT = 3
+
+
+def cmd_identity(args: argparse.Namespace) -> int:
+    """Print this build's identity, or check reports against it (E-M24).
+
+    With no paths this answers "which mlkit is this?" -- the question
+    `--version` cannot answer, because two builds 40 commits and 9 source files
+    apart both answer it "0.5.0".
+
+    With `--verify PATH...` it answers the adopter's question: was this report
+    written by the mlkit installed here? Every verdict except MATCH is
+    non-zero, and the three that are neither MATCH nor MISMATCH keep their own
+    names in the output rather than being flattened into "failed" -- an
+    unstamped report and a report from another build need different actions.
+    """
+    ident = identity_mod.build_identity()
+
+    if not args.verify:
+        if args.json:
+            print(json.dumps(ident.to_dict(), indent=1))
+            return 0
+        print(f"mlkit {ident.stamp}")
+        for line in ident.header_lines():
+            print(line)
+        return 0 if ident.known else 1
+
+    results = [identity_mod.verify_report(p) for p in args.verify]
+    if args.json:
+        print(json.dumps([r.to_dict() for r in results], indent=1))
+    else:
+        print(f"installed: {ident.stamp}")
+        for r in results:
+            print(f"{r.verdict:14s} {r.path}")
+            print(f"               {r.reason}")
+    if any(r.verdict == identity_mod.MISMATCH for r in results):
+        return IDENTITY_MISMATCH_EXIT
+    return 0 if all(r.ok for r in results) else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mlkit",
@@ -966,6 +1025,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     common(p_env)
     p_env.set_defaults(func=cmd_env)
+
+    p_ident = sub.add_parser(
+        "identity",
+        help="print which mlkit build this is, or check a report was written by it",
+        description=(
+            "`--version` says 0.5.0 for two builds 40 commits apart whose "
+            "readiness and promotion source differ (E-M24). This says which "
+            "one you have, and whether a report was written by it."
+        ),
+    )
+    p_ident.add_argument(
+        "--verify", nargs="+", metavar="REPORT",
+        help=(
+            "report file(s) to check against the installed build. Exit 0 only "
+            f"if every one MATCHes; {IDENTITY_MISMATCH_EXIT} if any names a "
+            "different build; 1 otherwise (UNSTAMPED, CONFLICTING, "
+            "INDETERMINATE)"
+        ),
+    )
+    p_ident.add_argument("--json", action="store_true", help="machine-readable output")
+    p_ident.set_defaults(func=cmd_identity)
 
     p_allow = sub.add_parser("allowlist", help="verify allowlist structure and signature")
     common(p_allow)

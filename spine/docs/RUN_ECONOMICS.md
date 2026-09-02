@@ -16,15 +16,44 @@ Every probe is capped at the credit and wall-clock limits declared per repo.
 Runs at 1%, 10% and 25% of the data, as Processing Jobs or short Training Jobs,
 all logged to MLflow.
 
-> **HARD STOP.** If the curve is flat between 10% and 25%, halt immediately and
-> say so. The full run buys nothing: the bottleneck is labels, not compute.
+> **HARD STOP.** If the curve is flat across the top step of the ladder, halt
+> immediately and say so. The full run buys nothing: the bottleneck is labels,
+> not compute.
 >
 > This is the check most worth running first, because the money it saves is the
 > money you were about to spend.
 
-`mlkit` treats a gain of ≤1% from the 10% point to the 25% point as flat.
+`mlkit` treats a **relative** gain of ≤1% across the top two rungs as flat —
+`(top − second) / |second|`, not an absolute band in the metric's own units.
 Metrics are oriented larger-is-better by the repo's own binding before they
 reach `mlkit`.
+
+### Declaring a ladder
+
+`{0.01, 0.10, 0.25}` is the default, and with no declaration the verdict is
+taken between 10% and 25% exactly as before. Declare your own when your probe
+runs different fractions:
+
+```toml
+[scaling]
+fractions = [0.01, 0.10, 0.25]
+```
+
+A repo whose probe never ran a 1% rung used to **FAIL E1 on contract** with a
+curve that was comfortably not flat, which tells nobody anything about whether
+the run buys something. Two rules keep a declared ladder honest, and both refuse
+the **declaration**, before any curve is read:
+
+* the top rung may not sit **below 0.25**. E1 asks whether the run you would
+  actually buy is worth buying, and a ladder topping out at 5% never asks it.
+* the top two rungs may be **no further apart than `mlkit`'s own 2.5×**.
+  Widening that step is the one way a declared ladder could make a flat curve
+  look steep — more data always buys something if you ask for enough more.
+
+At least three rungs, strictly increasing, each in `(0, 1]`, read from the blob
+at HEAD; an uncommitted ladder is NA, not a silent default. **The 1% flatness
+threshold is `mlkit`'s and is not declarable** — a subject that sets its own
+pass mark sets no pass mark.
 
 ## E2 `HPARAM_SANITY`
 

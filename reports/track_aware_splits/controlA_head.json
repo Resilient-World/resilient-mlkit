@@ -1,0 +1,446 @@
+{
+  "cases": [
+    {
+      "D6": {
+        "evidence": {
+          "arm": "val",
+          "block_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2",
+          "blocking_unit": "crop_year",
+          "detail": "",
+          "draws": 4000,
+          "n_blocks_declared": 5,
+          "n_blocks_in_arm": 5,
+          "n_groups_in_splits": 133,
+          "n_rows": 1365,
+          "n_rows_panel": 43383,
+          "n_units_in_arm": 5,
+          "only_in_declaration": [
+            "2016",
+            "2017",
+            "2018",
+            "2019",
+            "2020"
+          ],
+          "only_in_splits": [
+            "51999959",
+            "51999961",
+            "54999969",
+            "57999976",
+            "58999983",
+            "58999985",
+            "58999992",
+            "59999984",
+            "59999985",
+            "59999986",
+            "59999990",
+            "59999995",
+            "60000002",
+            "60999984",
+            "60999987",
+            "60999996",
+            "61000003",
+            "61000004",
+            "61000008",
+            "61000014"
+          ],
+          "policy": "county_year_splits",
+          "procedure": "bootstrap",
+          "refusal": "NA",
+          "relation": "UNIT_IS_THE_BLOCK",
+          "row_digest": "f09e58c91f79cbcbb7fe209a95011e8a2a95f636ff507bddfec586fb634a4ace",
+          "unit": "crop_year",
+          "unit_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2"
+        },
+        "reason": "BLOCKS_CONTRADICT_SPLITS: the declaration says arm 'val' holds 5 'crop_year' block(s) and `splits` says it holds 133 group(s). Only in the declaration: ['2016', '2017', '2018', '2019', '2020']. Only in splits: ['51999959', '51999961', '54999969', '57999976', '58999983']. The unit an interval was resampled over is judged against the partition, so the two have to be the same partition.",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {
+          "n_test": 133,
+          "n_train": 399,
+          "n_val": 133
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "A1_flat_county_splits__crop_year_declaration"
+    },
+    {
+      "D6": {
+        "evidence": {
+          "declarations": [
+            {
+              "evidence": {
+                "arm": "val",
+                "block_digest": "848e1fa09b3e2fbbb42f87fb50f1be28e1a58918f8ad803ce8ec0f3357e41830",
+                "blocking_unit": "spatial_block",
+                "blocks_tied_to": "splits.tracks.county_block",
+                "detail": "",
+                "draws": 4000,
+                "n_blocks_in_arm": 133,
+                "n_groups_in_splits": 133,
+                "n_rows": 9170,
+                "n_rows_panel": 43383,
+                "n_units_in_arm": 133,
+                "policy": "county_label_splits",
+                "procedure": "bootstrap",
+                "refusal": "NA",
+                "relation": "UNIT_IS_THE_BLOCK",
+                "row_digest": "6b631bcefbe7cdf5eafd8301fd0b14bf1609d0fcbb08340db51b77e50c10e3d7",
+                "track": "county_block",
+                "unit": "spatial_block",
+                "unit_digest": "848e1fa09b3e2fbbb42f87fb50f1be28e1a58918f8ad803ce8ec0f3357e41830"
+              },
+              "reason": "",
+              "status": "PASS",
+              "track": "county_block"
+            },
+            {
+              "evidence": {
+                "arm": "val",
+                "block_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2",
+                "blocking_unit": "crop_year",
+                "blocks_tied_to": "splits.tracks.crop_year",
+                "detail": "",
+                "draws": 4000,
+                "n_blocks_in_arm": 5,
+                "n_groups_in_splits": 5,
+                "n_rows": 1365,
+                "n_rows_panel": 43383,
+                "n_units_in_arm": 5,
+                "policy": "county_year_splits",
+                "procedure": "bootstrap",
+                "refusal": "NA",
+                "relation": "UNIT_IS_THE_BLOCK",
+                "row_digest": "f09e58c91f79cbcbb7fe209a95011e8a2a95f636ff507bddfec586fb634a4ace",
+                "track": "crop_year",
+                "unit": "crop_year",
+                "unit_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2"
+              },
+              "reason": "",
+              "status": "PASS",
+              "track": "crop_year"
+            }
+          ],
+          "n_declarations": 2,
+          "tracks_in_splits": [
+            "county_block",
+            "crop_year"
+          ],
+          "tracks_without_declaration": []
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "R3": {
+        "evidence": {
+          "group_ids_shared_between_tracks": {
+            "county_block&crop_year": 0
+          },
+          "n_tracks": 2,
+          "per_track": {
+            "county_block": {
+              "n_test": 133,
+              "n_train": 399,
+              "n_val": 133
+            },
+            "crop_year": {
+              "n_test": 5,
+              "n_train": 96,
+              "n_val": 5
+            }
+          },
+          "tracks": [
+            "county_block",
+            "crop_year"
+          ]
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "A2_tracked_splits__both_tracks_declared"
+    },
+    {
+      "D6": {
+        "evidence": {
+          "declarations": [
+            {
+              "evidence": {
+                "arm": "val",
+                "block_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2",
+                "blocking_unit": "crop_year",
+                "detail": "the bootstrap resampled 1365 'row' unit(s) inside arm 'val', but holdout policy 'county_year_splits' keeps whole 'crop_year' blocks in one partition and that arm holds 5 of them. 5 block(s) are split across units (e.g. \"2016\" spans 253 units). The policy declares rows inside a 'crop_year' to be dependent -- that is why it refuses to separate them -- and this procedure drew them as independent replicates, so it manufactured more evidence out of the arm than the arm contains. Resample 'crop_year', or declare a unit the split does not partition.",
+                "draws": 4000,
+                "n_blocks_in_arm": 5,
+                "n_rows": 1365,
+                "n_rows_panel": 43383,
+                "n_units_in_arm": 1365,
+                "policy": "county_year_splits",
+                "procedure": "bootstrap",
+                "refusal": "DEPENDENCE_UNIT_TOO_FINE",
+                "relation": "UNIT_FINER_THAN_BLOCK",
+                "row_digest": "f09e58c91f79cbcbb7fe209a95011e8a2a95f636ff507bddfec586fb634a4ace",
+                "track": "crop_year",
+                "unit": "row",
+                "unit_digest": "f09e58c91f79cbcbb7fe209a95011e8a2a95f636ff507bddfec586fb634a4ace"
+              },
+              "reason": "DEPENDENCE_UNIT_TOO_FINE: the bootstrap resampled 1365 'row' unit(s) inside arm 'val', but holdout policy 'county_year_splits' keeps whole 'crop_year' blocks in one partition and that arm holds 5 of them. 5 block(s) are split across units (e.g. \"2016\" spans 253 units). The policy declares rows inside a 'crop_year' to be dependent -- that is why it refuses to separate them -- and thi \u2026[truncated]",
+              "status": "FAIL",
+              "track": "crop_year"
+            }
+          ],
+          "n_declarations": 1,
+          "tracks_in_splits": [
+            "county_block",
+            "crop_year"
+          ],
+          "tracks_without_declaration": [
+            "county_block"
+          ]
+        },
+        "reason": "track 'crop_year': DEPENDENCE_UNIT_TOO_FINE: the bootstrap resampled 1365 'row' unit(s) inside arm 'val', but holdout policy 'county_year_splits' keeps whole 'crop_year' blocks in one partition and that arm holds 5 of them. 5 block(s) are split across units (e.g. \"2016\" spans 253 units). The policy declares rows inside a 'crop_year' to be dependent -- that is why it refuses to separ \u2026[truncated]",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {
+          "group_ids_shared_between_tracks": {
+            "county_block&crop_year": 0
+          },
+          "n_tracks": 2,
+          "per_track": {
+            "county_block": {
+              "n_test": 133,
+              "n_train": 399,
+              "n_val": 133
+            },
+            "crop_year": {
+              "n_test": 5,
+              "n_train": 96,
+              "n_val": 5
+            }
+          },
+          "tracks": [
+            "county_block",
+            "crop_year"
+          ]
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "A3_crop_year_track__unit_row"
+    },
+    {
+      "D6": {
+        "evidence": {
+          "declarations": [
+            {
+              "evidence": {
+                "arm": "val",
+                "block_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2",
+                "blocking_unit": "crop_year",
+                "blocks_tied_to": "splits.tracks.crop_year",
+                "detail": "",
+                "draws": 4000,
+                "n_blocks_in_arm": 5,
+                "n_groups_in_splits": 5,
+                "n_rows": 1365,
+                "n_rows_panel": 43383,
+                "n_units_in_arm": 344,
+                "policy": "county_year_splits",
+                "procedure": "bootstrap",
+                "refusal": "NA",
+                "relation": "UNIT_CROSSCUTS_ARMS",
+                "row_digest": "f09e58c91f79cbcbb7fe209a95011e8a2a95f636ff507bddfec586fb634a4ace",
+                "track": "crop_year",
+                "unit": "county",
+                "unit_digest": "454d90892431283589521a4cb6ac258a4381d61ad05022fd7824bedf6720ab41"
+              },
+              "reason": "",
+              "status": "PASS",
+              "track": "crop_year"
+            }
+          ],
+          "n_declarations": 1,
+          "tracks_in_splits": [
+            "county_block",
+            "crop_year"
+          ],
+          "tracks_without_declaration": [
+            "county_block"
+          ]
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "R3": {
+        "evidence": {
+          "group_ids_shared_between_tracks": {
+            "county_block&crop_year": 0
+          },
+          "n_tracks": 2,
+          "per_track": {
+            "county_block": {
+              "n_test": 133,
+              "n_train": 399,
+              "n_val": 133
+            },
+            "crop_year": {
+              "n_test": 5,
+              "n_train": 96,
+              "n_val": 5
+            }
+          },
+          "tracks": [
+            "county_block",
+            "crop_year"
+          ]
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "A3_crop_year_track__unit_county"
+    },
+    {
+      "D6": {
+        "evidence": {
+          "arm": "val",
+          "block_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2",
+          "blocking_unit": "crop_year",
+          "detail": "",
+          "draws": 4000,
+          "n_blocks_in_arm": 5,
+          "n_rows": 1365,
+          "n_rows_panel": 43383,
+          "n_units_in_arm": 5,
+          "policy": "county_year_splits",
+          "procedure": "bootstrap",
+          "refusal": "NA",
+          "relation": "UNIT_IS_THE_BLOCK",
+          "row_digest": "f09e58c91f79cbcbb7fe209a95011e8a2a95f636ff507bddfec586fb634a4ace",
+          "tracks_in_splits": [
+            "county_block",
+            "crop_year"
+          ],
+          "unit": "crop_year",
+          "unit_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2"
+        },
+        "reason": "TRACK_UNDECLARED: `splits` declares 2 tracks (['county_block', 'crop_year']) and this declaration names none. Two holdout policies over one panel are two different partitions, so 'the blocks agree with splits' has no meaning until the declaration says WHICH splits. mlkit will not choose the track whose blocks happen to match: declare `track`.",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {
+          "group_ids_shared_between_tracks": {
+            "county_block&crop_year": 0
+          },
+          "n_tracks": 2,
+          "per_track": {
+            "county_block": {
+              "n_test": 133,
+              "n_train": 399,
+              "n_val": 133
+            },
+            "crop_year": {
+              "n_test": 5,
+              "n_train": 96,
+              "n_val": 5
+            }
+          },
+          "tracks": [
+            "county_block",
+            "crop_year"
+          ]
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "A4_tracked_splits__declaration_names_no_track"
+    },
+    {
+      "D6": {
+        "evidence": {
+          "declarations": [
+            {
+              "evidence": {
+                "arm": "val",
+                "block_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2",
+                "blocking_unit": "crop_year",
+                "blocks_tied_to": "splits.tracks.crop_year",
+                "detail": "",
+                "draws": 4000,
+                "n_blocks_in_arm": 5,
+                "n_groups_in_splits": 5,
+                "n_rows": 1365,
+                "n_rows_panel": 43383,
+                "n_units_in_arm": 5,
+                "policy": "county_year_splits",
+                "procedure": "bootstrap",
+                "refusal": "NA",
+                "relation": "UNIT_IS_THE_BLOCK",
+                "row_digest": "f09e58c91f79cbcbb7fe209a95011e8a2a95f636ff507bddfec586fb634a4ace",
+                "track": "crop_year",
+                "unit": "crop_year",
+                "unit_digest": "16b962f07a22745259452a19e43e97e45da27f626d927bc92ab08074a89d1cb2"
+              },
+              "reason": "",
+              "status": "PASS",
+              "track": "crop_year"
+            }
+          ],
+          "n_declarations": 1,
+          "tracks_in_splits": [
+            "county_block",
+            "crop_year"
+          ],
+          "tracks_without_declaration": [
+            "county_block"
+          ]
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "R3": {
+        "evidence": {
+          "group_ids_shared_between_tracks": {
+            "county_block&crop_year": 0
+          },
+          "n_tracks": 2,
+          "per_track": {
+            "county_block": {
+              "n_test": 133,
+              "n_train": 399,
+              "n_val": 133
+            },
+            "crop_year": {
+              "n_test": 5,
+              "n_train": 96,
+              "n_val": 5
+            }
+          },
+          "tracks": [
+            "county_block",
+            "crop_year"
+          ]
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "A5_tracked_splits__one_track_declared"
+    }
+  ],
+  "fray_root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/wt-fray-throwaway",
+  "mlkit_decision_module": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/wt-mlkit-head/src/resilient_mlkit/checks/decision.py",
+  "panel": {
+    "n_groups_county_track": {
+      "test": 133,
+      "train": 399,
+      "val": 133
+    },
+    "n_groups_year_track": {
+      "test": 5,
+      "train": 96,
+      "val": 5
+    },
+    "n_rows_county_track": 43383,
+    "n_rows_year_track": 43383
+  }
+}
