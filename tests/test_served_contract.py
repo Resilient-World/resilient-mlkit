@@ -1221,3 +1221,37 @@ def test_residual_d_n_rows_is_still_a_caller_assertion_untied_to_the_digests():
     )
     assert decision.status is Status.PASS
     assert decision.n_rows == 500
+
+
+# -- E-M35: extracting the canonical key spelling changed no digest ---------
+
+
+def test_row_set_digest_is_byte_identical_after_the_canonical_key_extraction():
+    """The six digests below were measured BEFORE `_row_key_canonical` existed.
+
+    `row_set_digest` is the fleet's join key: every committed artifact that
+    names a row set names it with one of these values, so a refactor that
+    moved the canonical spelling into its own function has to prove it moved
+    nothing else. These are the values printed by the pre-extraction function
+    at `1dfacb6`, pasted here and not recomputed.
+    """
+    from resilient_mlkit.core.served import row_set_digest
+
+    measured_before = {
+        "b31ac2e5b858e7c4c988bf10a77f40c3bcb0a19143efdb7889bc66bd07183d64": [
+            "a", "b", "c"
+        ],
+        "ad53e8806d17c82d38902738d1d47d96bddaade27513466322efa0f793149dd0": [1, 2, 3],
+        "9eaa6aa6f8e8705c9bba54ba3f8350dd1b1bbd77e8dd7b47f3166075421b4555": [
+            {"a": 1, "b": 2}, {"c": 3}
+        ],
+        "799a92191712ddfb2ba8e2a16041d3d65a589e7fdee413b0ae37a97190a8e15c": [
+            [1, 2], [3, 4]
+        ],
+        "ba2df4903a2c14e86dc3bcca58911b44ac1d2514b7227bf6eb08cfb978f55a1b": ["x"],
+    }
+    for expected, keys in measured_before.items():
+        assert row_set_digest(keys) == expected, keys
+    assert row_set_digest([f"r-{i:06d}" for i in range(1000)]) == (
+        "585b91e52c29877047721ac0003a50ba87f212e78eac286a1b4bc502ecd1957d"
+    )

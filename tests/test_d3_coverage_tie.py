@@ -606,3 +606,104 @@ def test_the_coverage_verdict_is_taken_on_the_derived_empirical(tmp_path):
     # Both figures are on the record, and they are not the same figure.
     assert result.evidence["empirical"] == 0.90 + 5e-13
     assert result.evidence["derived_empirical"] == 0.90
+
+
+# -- E-M35: the duplicate guard and the digest must mean the same by "same" --
+#
+# Found by adversarial verification of this branch, driven before it was fixed.
+# `_refuse_repeats` decided sameness with `repr` while `core.served.row_set_
+# digest` decides it with a canonical JSON spelling, and the two disagree on
+# every key that is a mapping or a sequence. A subject with composite row ids
+# could therefore hand over ONE row twice, pass the duplicate guard, and have
+# the digest agree -- inflating `n` and `covered` together, which is exactly
+# what `_refuse_repeats` exists to refuse.
+
+
+def _key_order_collision_rows(n: int, covered: int) -> list[dict]:
+    """`n` rows, of which the first TWO are the same row written two ways."""
+    rows: list[dict] = [
+        {"row_id": {"gauge": "g-01", "date": "2024-01-01"}, "covered": True},
+        {"row_id": {"date": "2024-01-01", "gauge": "g-01"}, "covered": True},
+    ]
+    rows += [
+        {"row_id": {"gauge": f"g-{i:04d}", "date": "2024-01-02"}, "covered": i < covered - 2}
+        for i in range(n - 2)
+    ]
+    return rows
+
+
+def test_positive_control_a_row_repeated_under_a_permuted_key_is_refused(tmp_path):
+    """FIRES: one row, written twice with its id's keys in the other order.
+
+    `repr` calls these two different rows and `row_set_digest` calls them one,
+    so before E-M35 this reached the coverage verdict with n inflated by one
+    and a digest that agreed with the inflation.
+    """
+    rows = _key_order_collision_rows(MIN_COVERAGE_N, int(MIN_COVERAGE_N * 0.9))
+    payload = {
+        "nominal": DECLARED,
+        "empirical": sum(1 for r in rows if r["covered"]) / len(rows),
+        "n": len(rows),
+        "row_set_digest": row_set_digest([r["row_id"] for r in rows]),
+        "rows": rows,
+    }
+    result = run_d3(tmp_path, payload)
+    assert result.status is Status.FAIL
+    assert coverage_evidence.MALFORMED in result.reason
+    assert "appears more than once" in result.reason
+
+
+def test_positive_control_a_tuple_and_list_row_id_are_the_same_row(tmp_path):
+    """FIRES at the module: `(1, 2)` and `[1, 2]` digest identically.
+
+    Driven against `derive` rather than through `run_d3`, because the fixture
+    persists its payload as JSON and JSON has no tuple -- a binding that hands
+    D3 Python objects directly does, and D3 calls the binding with no JSON
+    round trip in between.
+    """
+    rows = [{"row_id": (1, 2), "covered": True}, {"row_id": [1, 2], "covered": True}]
+    rows += [{"row_id": f"r-{i}", "covered": True} for i in range(8)]
+    payload = {"rows": rows, "row_set_digest": row_set_digest([r["row_id"] for r in rows])}
+    with pytest.raises(coverage_evidence.CoverageRefused) as raised:
+        coverage_evidence.derive(payload)
+    assert raised.value.marker == coverage_evidence.MALFORMED
+    assert "appears more than once" in raised.value.detail
+
+
+def test_negative_control_distinct_composite_row_ids_still_pass(tmp_path):
+    """The SAME shape with the collision removed is silent.
+
+    Composite mapping row ids are legitimate and common -- a gauge and a date,
+    a county and a year -- so the refusal above must be about the repeat and
+    not about the shape of the key.
+    """
+    rows = [
+        {"row_id": {"gauge": f"g-{i:04d}", "date": "2024-01-01"}, "covered": i < 4500}
+        for i in range(5000)
+    ]
+    payload = {
+        "nominal": DECLARED,
+        "empirical": 0.90,
+        "n": 5000,
+        "row_set_digest": row_set_digest([r["row_id"] for r in rows]),
+        "rows": rows,
+    }
+    result = run_d3(tmp_path, payload)
+    assert result.status is Status.PASS, result.reason
+    assert result.evidence["derived_n"] == 5000
+    assert result.evidence["derived_covered"] == 4500
+
+
+def test_the_repeat_guard_uses_core_served_s_notion_of_the_same_key():
+    """One notion of sameness, for the same reason there is one digest.
+
+    A guard that disagrees with the digest about which keys are the same key
+    is a guard the digest can be steered around; this asserts the two agree on
+    the pair that broke them apart.
+    """
+    left = {"a": 1, "b": 2}
+    right = {"b": 2, "a": 1}
+    assert repr(left) != repr(right)
+    assert row_set_digest([left]) == row_set_digest([right])
+    with pytest.raises(coverage_evidence.CoverageRefused):
+        coverage_evidence._refuse_repeats([left, right], unit="row")
