@@ -2237,6 +2237,290 @@ and REPAIRED on this branch; two measured behaviours recorded OPEN above.**
 
 ---
 
+## E-M24 — two mlkit builds 40 commits apart both report `0.5.0`, so no report can name the instrument that wrote it
+
+**Raised 2026-09-01. REPAIRED on `fix/build-identity-e-054` (root cause in
+`src/`; no gate file edited, no threshold moved, no range widened, no holdout
+narrowed, no test that exists on `main` changed).**
+
+### The measurement
+
+`resilient-fray` pins mlkit by rev. Read from fray's own installed
+distribution, not from its `pyproject.toml` prose:
+
+```
+$ cat resilient-fray/.venv/lib/python3.12/site-packages/\
+resilient_mlkit-0.5.0.dist-info/direct_url.json
+{"url":"https://github.com/Resilient-World/resilient-mlkit.git",
+ "vcs_info":{"vcs":"git",
+             "commit_id":"c65b2e7627be8d3362dcdddc3103115095ddf3d0",
+             "requested_revision":"c65b2e7627be8d3362dcdddc3103115095ddf3d0"}}
+```
+
+mlkit `main` is `6921e9af146faad69ca09ed546c607d7e484e560`. Between them
+(measured 2026-09-01 in a local checkout of
+`https://github.com/Resilient-World/resilient-mlkit`):
+
+```
+$ git rev-list --count c65b2e7..6921e9a
+40
+$ git diff --numstat c65b2e7 6921e9a -- src/ | wc -l
+9
+$ git diff --numstat c65b2e7 6921e9a -- \
+      src/resilient_mlkit/checks/readiness.py src/resilient_mlkit/core/served.py
+50	5	src/resilient_mlkit/checks/readiness.py
+373	13	src/resilient_mlkit/core/served.py
+```
+
+`checks/readiness.py` is the file that emits R1–R12. `core/served.py` is the
+promotion verdict. The `.dist-info` directory name carries `0.5.0`, and
+`main`'s `src/resilient_mlkit/__init__.py` declares `__version__ = "0.5.0"`.
+**Both builds report the same version string.**
+
+Consequence: every adopter readiness table is *readiness under whichever mlkit
+happened to be installed*, and no reader of the report can establish which. A
+report that cannot name the instrument that measured it is not evidence.
+
+### Why the identity that existed did not close it
+
+`cli._self_sha()` shells `git -C <mlkit source dir> rev-parse HEAD`. In an
+adopter's environment that directory is `site-packages`, which is not a git
+worktree, so the call returns `""` and the two headers consuming it render
+`NA (not a git worktree)`. The one field that could have distinguished the two
+builds is empty in precisely the case that needed it.
+
+### The repair
+
+`src/resilient_mlkit/core/identity.py`, new. A **length-framed sha256 over
+every file the running package was loaded from** —
+`Path(core/identity.py).parent.parent`, the installed tree — excluding
+`__pycache__` and `*.pyc`/`*.pyo`, visited in sorted POSIX-relative order,
+each entry framed as `len(relpath)‖relpath‖len(bytes)‖bytes` with 8-byte
+big-endian lengths.
+
+The compared token is `<version>+src.<12 hex>`. It lives **beside**
+`__version__` and never inside it: release naming and tag cutting are reserved
+to the human signatory (CLAUDE.md rule 12), and
+`tests/test_version_declaration.py` is untouched.
+`resilient_mlkit.__build__` resolves it through PEP 562, so importing mlkit
+does not walk its own tree until something asks.
+
+The vcs commit from the installed dist's `direct_url.json` is reported
+**beside** the token and is deliberately not part of it: it records the commit
+*requested at install time* and does not move when someone edits
+`site-packages`, whereas the digest does; and two commits can ship a
+byte-identical tree, which measures identically. The read is **tied** — the
+dist's own records must describe the tree that was hashed, by install location
+or by an editable `direct_url` — so it cannot report the pin of a second mlkit
+elsewhere on the path.
+
+Emitted into every report header mlkit writes, from one emitter reading one
+prefix constant: `reports/readiness.md` (R8), `reports/fabricated_defaults.md`
+(R10), `reports/fabricated_targets.md` (R11), `reports/served_contract.md`
+(R12), the `*.UNMEASURABLE.md` refusal, `portfolio/FLEET_VERDICTS.md` and the
+spine report. Both machine payloads and both `scripts/*.py` payloads gain
+`mlkit_build` beside `mlkit_version` (additive; `artifact_schema` unchanged).
+
+Adopter side: `resilient_mlkit.verify_report(path)` and
+`mlkit identity --verify REPORT…`. Five verdicts, because asserting `MATCH` or
+`MISMATCH` from an unknown operand would be a fabricated answer — `MATCH`,
+`MISMATCH`, `UNSTAMPED`, `CONFLICTING`, `INDETERMINATE`. Exit `0` only on
+all-`MATCH`, `3` on any `MISMATCH`, `1` otherwise.
+
+### Driven, with the two real builds
+
+Both trees extracted from git (`git archive c65b2e7 src/resilient_mlkit`, same
+for `6921e9a`) and hashed by the new digest function, from a driver that
+asserts `resilient_mlkit.__file__` before it computes anything:
+
+```
+c65b2e7: __version__='0.5.0'  files=30  stamp=0.5.0+src.7f097d5e1346
+6921e9a: __version__='0.5.0'  files=30  stamp=0.5.0+src.4d687dba29e0
+```
+
+Equal version, distinct identity. That is the finding, and that is the repair,
+on the same two builds.
+
+### Control pair (`tests/test_build_identity.py`, 40 tests)
+
+Neither operand is constructed by the assertion that reads it. Two copies of
+the package tree, two **separate interpreters**, each driver asserting
+`resilient_mlkit.__file__` before it writes, each writing a real
+`reports/fabricated_defaults.md` through the real `_write_r10_report`:
+
+* **POSITIVE — FIRES.** One byte appended to `checks/readiness.py`;
+  `__init__.py` byte-identical, so both children declare the same
+  `__version__`. The report the mutated build wrote verifies **MISMATCH**
+  against the mlkit the parent is running.
+* **NEGATIVE — SILENT.** A byte-identical copy at a different path, in a
+  different process: **MATCH**. Identity follows the bytes, not the directory,
+  or the check would fire on every adopter for a reason that is not a source
+  change.
+
+Supporting pairs: the framing control (unframed concatenation collides
+`ab`+`c` with `a`+`bc` — both hash to `ba7816bf8f01…`, driven); the
+`__pycache__`/`.pyc` exclusion; no-partial-digest when one file cannot be read;
+the parser is position-anchored so a document *about* identity is not read as
+one; `INDETERMINATE` from either side of the comparison.
+
+One further refusal, driven the same way: the digest describes ONE directory,
+so a `resilient_mlkit` split across two `__path__` entries — a namespace
+package, a shadowing directory, a half-installed second copy — makes the
+identity **unmeasurable** rather than a true statement about half the running
+instrument. `core/identity.py` could be loaded from one tree while
+`checks/readiness.py` comes from the other. The stamp becomes `+src.unknown`
+and every comparison reports INDETERMINATE.
+
+### Check-not-dead — seven reverts, each killing named tests
+
+| revert | tests that FAIL |
+|---|---|
+| length framing removed from `digest_tree` | `test_positive_control_length_framing_separates_a_rename_from_a_move` |
+| `EXCLUDED_DIRS`/`EXCLUDED_SUFFIXES` emptied | `…bytecode_and_pycache_do_not_move_the_digest`, `test_control_pair_a_report_from_a_byte_identical_build_matches` |
+| digest made constant | 5, incl. both `positive_control` digest tests and `test_control_pair_a_report_from_a_different_build_is_a_mismatch` |
+| stamp dropped from the R11 writer only | `test_the_r11_writer_stamps_its_report`, `test_every_report_header_in_the_source_calls_the_one_emitter` |
+| parser anchoring loosened to a substring | `test_prose_quoting_a_stamp_is_not_a_stamp` |
+| `mlkit_build` dropped from the spine payload | `test_the_spine_report_stamps_itself_and_its_json_twin`, `test_every_payload_that_stamps_the_version_also_stamps_the_build` |
+| unknown operand adjudicated as `MATCH` | `test_a_report_whose_own_digest_was_unknown_is_indeterminate`, `…in_both_directions` |
+| split-package refusal disabled | `test_a_package_split_across_two_directories_refuses_to_name_an_identity` |
+
+Suite `912` → **`952`**. No test that exists on `main` was changed.
+`ruff==0.16.5 check src tests scripts` → all checks passed.
+`mypy==2.3.1 src/resilient_mlkit` → no issues, 30 source files.
+
+### OPEN, measured, not repaired here
+
+1. **This is forward-looking and cannot be retroactive.** Driven against
+   fray's real committed reports with the repaired mlkit installed:
+   `mlkit identity --verify resilient-fray/reports/readiness.md` →
+   **UNSTAMPED**, exit `1`. That is the honest verdict — the fact of which
+   build wrote that file is not recoverable from the file, only from re-running
+   the phase — but it means the existing fleet of committed readiness tables
+   stays unattributable until each repo re-runs under a stamping mlkit. A
+   `MISMATCH` between `c65b2e7` and `6921e9a` specifically **cannot** be
+   demonstrated, because neither of those builds stamps anything; what is
+   demonstrated above is that the digest separates them.
+2. **Repinning the adopters is not done here.** fray's `pyproject.toml` still
+   names `c65b2e7` and chokepoint still names `8517341`. Those are changes in
+   those repos with their own verifiers.
+3. **`.github/workflows/ci.yml`'s header comment records "no issues, 25 source
+   files" for mypy.** The measured figure on this branch is 30, and the comment
+   was already stale before this branch (mypy's count includes the new
+   `core/identity.py`, but 25 does not match `main` either). Not corrected
+   here: it is a comment inside a gate file, and this branch does not edit gate
+   files.
+4. **`build_identity()` is `lru_cache`d for the life of the process.** Correct
+   for a CLI invocation and for a test run; a long-lived process that edits
+   mlkit's own files under an editable install would keep the identity it
+   computed first. `build_identity.cache_clear()` exists. Recorded rather than
+   removed, because recomputing the digest per report header would walk the
+   tree once per emitted line.
+
+**Status: REPAIRED for every report written from here on. The four residuals
+above are recorded, not closed.**
+
+---
+
+## E-M25 — the two builds E-M24 could still fail to tell apart
+
+**Raised:** 2026-09-01, by adversarial verification of E-M24 (PR #31), driving
+its own control construction against the branch it verified.
+**Status: BOTH REPAIRED on `verify/e-m24-residuals-sourceless-digest-and-unstamped-results-store`.**
+No gate file edited, no threshold moved, no range widened, no holdout narrowed,
+no test that exists on `main` or on PR #31 changed. No ledgered test read was
+spent and no code path that could spend one was added.
+
+### 1. The digest could cover none of the running code (REPAIRED)
+
+`digest_tree` excludes `__pycache__` and `*.pyc`, correctly: bytecode moves for
+reasons that are not gate semantics. The boundary of that exclusion was open.
+In a **sourceless install** — every `.py` compiled to a `.pyc` in place and the
+source removed, which CPython still imports — the excluded set is the executing
+set, and the digest falls through to whatever non-Python data the package
+ships. `resilient_mlkit` ships exactly one such file, `py.typed`.
+
+Driven 2026-09-01, two copies of `src/resilient_mlkit` differing only by one
+byte in `checks/readiness.py`, each compiled sourceless, each imported in its
+own interpreter with `resilient_mlkit.__file__` asserted:
+
+```
+D4  loaded_from=__init__.pyc  files=1  stamp=0.5.0+src.5b9327f66528
+D5  loaded_from=__init__.pyc  files=1  stamp=0.5.0+src.5b9327f66528   (readiness.py DIFFERS)
+```
+
+A real R10 report written through `_write_r10_report` by D4 verified **MATCH**
+against D5. That is the E-M24 defect itself — two builds whose gate source
+differs reporting one identity — reappearing inside the fix for it, and it
+contradicts `core/identity.py`'s own stated invariant that the digest "never
+degrades into a plausible-looking string, because a plausible identity is worse
+than a missing one".
+
+**Repair.** `running_code_is_covered_or_reason()`: the file `core/identity.py`
+was *actually loaded from* must be one of the files the digest covers. Under
+any install form that ships source it is; under a sourceless install it is not,
+and then the build declines — `+src.unknown`, every comparison
+`INDETERMINATE`. Re-driven after the repair: `files=0`, `known False`, on both
+trees. The negative controls are driven too: a source-shipping copy at another
+path still digests to the same value, and stray bytecode beside real source
+still does not move the digest.
+
+### 2. `mlkit check --portfolio` — the readiness table nothing stamped (REPAIRED)
+
+E-M24 stamped every report mlkit *writes*. `.mlkit/results/*.json` holds the
+verdicts mlkit *keeps*, and `_cmd_portfolio` renders a full R1–R12 readiness
+table out of them with the exit code `README.md` says CI gates on. The store
+recorded the repo's git SHA and nothing about mlkit; `store.load` staled only
+on the SHA.
+
+Driven 2026-09-01, same two trees, two interpreters, bindings asserted both
+sides: 27 PASSes written by `0.5.0+src.b1686b22efc6` were read back at an
+**unchanged repo SHA** by `0.5.0+src.48480b572359` and rendered
+
+```
+fray   771b874  PPPPP  PPPPP  PPPPPPPPPPPP  PPPPP  PPPPP  READY-TO-TRAIN
+```
+
+at exit 0, with nothing in the table, the store, or the exit code naming either
+build. This is the finding E-M24 records — "readiness under whichever mlkit
+happened to be installed, and nothing says which" — in the one readiness table
+the stamping pass did not reach, and it is the table with the CI exit code.
+
+**Repair.** `save()` records `mlkit_build`; `load()` stales a PASS whose stored
+build is absent, unknown, or different, by the same rule and the same
+PASS/ESCALATED-only scope as the existing git-SHA rule — so a FAIL measured by
+another build is still reported rather than hidden. `render_portfolio` emits
+the E-M24 header lines, so the table names the build that rendered it.
+Re-driven after the repair: 27 `S`, `IN-PROGRESS`, exit 3; the same store read
+by the build that wrote it still resolves `READY-TO-TRAIN`.
+
+**This one moves verdicts and the CHANGELOG says so.** Every results file
+written before this records no `mlkit_build`, so its PASSes read STALE until
+the phase is re-run — the same treatment a result with no git SHA has always
+had, for the same reason.
+
+### What is still NOT closed (recorded, not repaired)
+
+* **E-M24's four recorded residuals stand**, in particular that the stamp is
+  forward-looking: the committed fleet of readiness tables stays unattributable
+  until each repo re-runs under a stamping mlkit, and repinning fray
+  (`c65b2e7`) and chokepoint (`8517341`) is not done here.
+* **The stamp is a provenance label, not a signature.** A line hand-typed into
+  a report verifies `MATCH`, because the equality is over text a writer emitted
+  and nothing signs it. Nothing gates on the stamp today (E-M24 deliberately
+  adds no readiness row), so this buys an attacker only a false answer from an
+  advisory command — but it must not become a gate without a tie a hand cannot
+  reproduce.
+* **`stamps_in` accepts a stamp-shaped line anywhere at line start**, including
+  inside a fenced code block. `mlkit identity --verify docs/BUILD_IDENTITY.md`
+  reports MISMATCH against that document's illustrative
+  `0.5.0+src.4f2a91c0be3d`. Docs are not reports, and this branch does not edit
+  E-M24's design note (it is that branch's pre-registration slot), so it is
+  recorded here rather than papered over.
+* **`docs/BUILD_IDENTITY.md` names the adopter API `verify_report_identity`**;
+  what shipped is `verify_report` / `verify_report_text`, and `README.md`
+  documents only the CLI surface. Same reason for not editing the design note.
+  The name to import is `resilient_mlkit.verify_report`, and this is the line
+  recording it.
 <!--
 NUMBERING NOTE. These three were first written as E-M24/25/26 and renumbered to
 30/31/32 before this branch was reviewed, because open PR #31
@@ -2332,6 +2616,50 @@ that the copy exists.
 
 **Can be done from here** (unlike E-M30/E-M31): it is a change inside mlkit.
 Left open deliberately, not blocked.
+
+### CLOSED 2026-09-01 by adversarial verification — the copy was not one copy, and the update missed it
+
+The entry above says "Updated to `28` in the same commit". **It was not.**
+Measured at `24f23b8`, the branch head as pushed: `README.md` contains the count
+**twice**, and only one was updated.
+
+| where | at `24f23b8` | measured truth |
+|---|---|---|
+| `README.md:114` "`READY-TO-TRAIN` requires all N gating checks" | `28` | `len(gating_ids())` = **28** |
+| `README.md:12` "the package. N gating checks across 4 phases" | `27` | **28** |
+| `README.md:13` "5 diagnostic triage checks: N in the registry" | `32` | `len(all_check_ids())` = **33** |
+
+So the file shipped contradicting itself nine lines apart, and the half that
+went stale is the half that **claims to be measured** — "Counted, not
+remembered — `len(gating_ids())` and `len(all_check_ids())` on 2026-08-29".
+A remembered number wearing a measurement's clothes is worse than one that
+admits it is prose, and it is CLAUDE.md rule 2's exact shape: a plausible
+number that does not get checked.
+
+Both literals are corrected here (28 / 33, counted on 2026-09-01), and the
+"nothing compares it" half is closed rather than restated:
+`tests/test_promotion_state.py::test_the_readme_states_no_check_count_the_registry_contradicts`
+holds both README figures against `len(gating_ids())` and `len(all_check_ids())`.
+
+Controls driven, each independently:
+
+- **A** — README as it ships at `24f23b8`: FAILS,
+  `README.md states a gating-check count the registry contradicts (checks.PHASE_ORDER gates 28): [('27', 27)]`.
+- **B** — gating count correct, registry size reverted to `32`: FAILS on the
+  second leg, `states a registry size the registry contradicts (33 checks are registered): [('32', 32)]`.
+  Neither leg is carried by the other.
+- **C, not dead** — a README stating neither count: FAILS
+  `README states no gating-check count`. A scanner that finds nothing is
+  otherwise indistinguishable from a file with nothing wrong in it.
+- **negative control** — `README.md:88`'s "Three of the readiness checks" is a
+  SUBSET count, is correct, and stays legal. The two parsers require the literal
+  words `gating checks` / `in the registry` rather than reusing
+  `stated_check_counts`, whose regex matches any count of checks at all.
+
+Scope kept deliberately narrow: the rule is "any TOTAL stated in README.md
+equals the registry's", not "README.md contains no numbers". `CHANGELOG.md`'s
+`26` and `25` are history and are correctly left alone — a changelog that
+rewrote its own past counts would be worse than one that goes stale.
 
 ---
 

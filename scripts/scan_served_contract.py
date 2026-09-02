@@ -34,6 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from resilient_mlkit import __version__
+from resilient_mlkit.core import identity as identity_mod
 from resilient_mlkit.core.repo import PORTFOLIO, find_root
 from resilient_mlkit.core.served_reimplementation import (
     CONTRACT_MODULE,
@@ -97,6 +98,10 @@ def main(argv: list[str] | None = None) -> int:
         "generated_at": datetime.now(UTC).isoformat(),
         "mlkit_version": __version__,
         "mlkit_git_sha": git_sha(REPO_ROOT),
+        # E-M24: which mlkit's scanner produced these findings. The scanner is
+        # core/served_reimplementation.py, which also moved between the two
+        # builds that declare the same version.
+        "mlkit_build": identity_mod.build_identity().to_dict(),
         "python": sys.version.split()[0],
         "portfolio_root": str(root),
         "contract_module": CONTRACT_MODULE,
