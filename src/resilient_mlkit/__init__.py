@@ -23,7 +23,17 @@ from .core.result import (
 #: the copy: ``pyproject.toml`` reads it through ``[tool.setuptools.dynamic]``
 #: and ``cli`` imports it, so a bump is one edit and a mismatch is
 #: unconstructible rather than merely discouraged.
-__version__ = "0.5.0"
+#: BUMPED 0.5.0 -> 0.6.0 for a reason this comment must outlive: `v0.5.0` was
+#: cut at `8517341` and `main` reached `6921e9a` 36 commits and +5438/-97 later
+#: with this literal unmoved on both sides and `git diff v0.5.0..HEAD --
+#: CHANGELOG.md` empty. chokepoint pins `8517341` and fray pins `c65b2e7`; all
+#: three trees stamped `"mlkit_version": "0.5.0"` into every artifact they
+#: wrote, across a span in which D3, R11 and `core.served.challenger_decision`
+#: all change verdict on unchanged repo code. A version that cannot separate
+#: two instruments is not naming one. `tests/test_tag_distance.py` fires on
+#: that state, so it cannot recur unseen; cutting the tag stays the
+#: signatory's, and this literal is not one.
+__version__ = "0.6.0"
 __all__ = [
     "CheckResult",
     "CredentialRequired",

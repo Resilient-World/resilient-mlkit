@@ -12,10 +12,111 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v0.6.0 — 2026-09-01
+
+Not yet tagged. `v0.5.0` **is** tagged — annotated tag object `15a188b` on
+commit `8517341`, cut 2026-08-31 (`git for-each-ref refs/tags`, this checkout,
+2026-09-01) — and the line above this one used to deny it. That denial is
+corrected in the `v0.5.0` entry below rather than deleted, for the same reason
+the retraction there was written out in full.
+
+**Why this entry exists at all.** Measured on `main` at `6921e9a`, before any
+edit on this branch:
+
+    git rev-list v0.5.0..HEAD --count       -> 36
+    git diff --shortstat v0.5.0..HEAD       -> 21 files, +5438 -97
+    git diff v0.5.0..HEAD -- CHANGELOG.md   -> EMPTY
+    git show v0.5.0:src/.../__init__.py     -> __version__ = "0.5.0"
+    resilient_mlkit.__version__ at 6921e9a  -> "0.5.0"
+
+Thirty-six commits of check semantics with the release notes untouched and the
+version string sitting still on both sides of the tag. `resilient-chokepoint`
+pins mlkit at `8517341`, which is that tag; `resilient-fray` pins `c65b2e7`.
+Every artifact any of those three trees writes stamps the same
+`"mlkit_version": "0.5.0"`, and the checks underneath are not the same checks.
+That is E-M08 one level up: E-M08 was three copies of the version inside one
+tree, repaired by holding the copies against each other; nothing then held the
+version against the release history, so the string could go stale in place.
+`tests/test_tag_distance.py` now fires on exactly that state.
+
+**Why `0.6.0`.** By the scale at the top of this file this is a **major**
+release — existing checks D3, R11 and the served-contract promotion decision
+all change verdict on unchanged repo code, and each is measured below. Whether
+major on a `0.x` line means `0.6.0` or `1.0.0` is still not written down
+anywhere and is still the signatory's to settle (E-M08); the `v0.4.0` entry
+below took the minimal reading — bump the leading nonzero — and `0.6.0` is that
+same reading applied to `0.5.0`. It is also the minimum this file's policy
+allows, since a new check exists. An agent takes the floor and records the
+question; it does not settle it.
+
+**What is NOT claimed.** No adopter was re-measured for this entry. The fleet
+verdict tables under `portfolio/` are untouched, and the per-repo consequences
+quoted below are the measurements the linked commits made when they landed, not
+a re-run. `mlkit portfolio` and `mlkit spine` were not executed for this
+release note.
+
+### Existing checks that change verdict on unchanged repo code
+
+* **D3 `UNCERTAINTY_COVERAGE`** (`11a5bcd`, drive `99ec8a2`). The nominal level
+  is now read from `.mlkit/repo.toml` `[coverage] nominal` and the binding's own
+  `nominal` is adjudicated against it. A binding reporting its own level as the
+  standard was PASS and is now FAIL `NOMINAL_SELF_DECLARED`; with no
+  declaration it is NA `NOMINAL_UNDECLARED`. `4bd42d6` records a read-only
+  survey of the eight adopters at their remote mains on 2026-08-31: three of
+  them (`arabica`, `torrent`, `surge`) carry a live D3 row and none of the eight
+  declares a level, because until that branch there was nowhere to declare one.
+  Two lines of config each repairs it.
+* **R11 `FABRICATED_TARGETS`** (`0960974`, `f5cd91c`, `59e9ddf`, `8846aba`).
+  Four further spellings of the E-M17 residual-4 stamp now fold, and a stamp the
+  scanner cannot read is no longer treated as clean: R11 serves three verdicts,
+  and the unreadable case is NA `UNREADABLE_STAMP`, not PASS. The R11 report's
+  two counts are split so an unadjudicated row is neither read as a defect nor
+  dilutes one. `f5cd91c` measured the over-fire budget read-only across the
+  fleet before landing: 0 new findings, 0 gone, and no repo's R11 verdict moved
+  on that measurement.
+* **The served-contract promotion decision**, `core.served.challenger_decision`
+  (`66c456b`, `7884be5`). A metric's direction and domain are DECLARED; an
+  undeclared polarity is NA `POLARITY_UNDECLARED` and an out-of-domain
+  comparison is NA `IMPOSSIBLE_MEASUREMENT`, both of which were PASS with
+  `promotable=True`. `row_matched` is derived from row-set identity evidence
+  instead of being assertable, giving NA `ROW_SET_UNTIED` and NA
+  `ROW_SET_MISMATCH` where an untied comparison used to pass. `7884be5` states
+  the adopter consequence in its own words — this is "the change most likely to
+  flip adopter R12 rows from PASS to NA until those repos tie their rows, and
+  THAT FLIP IS THE POINT".
+
+### New surface
+
+* `VerdictSealed` (`205aeb5`): a `CheckResult` is sealed once its verdict is
+  formed, and the empty-metric verdict is refused rather than returned. `66fec9b`
+  closes the follow-on that the seal read a flag the caller it guarded against
+  could set.
+* `GateAggregate` (`ab31233`): the gate verdict is a property equal to
+  `all(r.status is Status.PASS)` — no stored field to assign, no initial `True`
+  to leave standing, and **NA is not PASS**. This is the symbol the eight repos
+  must import instead of writing their own aggregation (rule 7).
+* `tests/test_tag_distance.py`: the check this entry is the repair for.
+
+### Escalations recorded in this span
+
+`E-M20`, `E-M22` and `E-M23` were appended, plus two entries both numbered
+`E-M21` (`4bd42d6` and `b29fad3` allocated the same id independently). The
+duplicate is left as committed — renumbering an escalation after the fact
+breaks every reference to it — and is recorded here so the next reader knows
+`E-M21` resolves to two entries, not one.
+
+### The CI header stopped being true
+
+`.github/workflows/ci.yml` claimed the workflow had never executed. It has;
+see that file's header for the run ids and the retrieval date.
+
 ## v0.5.0 — 2026-08-29
 
-Not yet tagged; the session lead cuts it after the adopters' verifiers pass.
-The heading is written at the version the code declares.
+Tagged 2026-08-31 as `v0.5.0` — annotated tag object `15a188b` on commit
+`8517341` (`git for-each-ref refs/tags`, retrieved 2026-09-01). This line
+read "Not yet tagged" until `v0.6.0`, which is one release too long: the
+heading is written at the version the code declares, and nothing made the
+sentence underneath it move when the tag was cut.
 
 **A retraction first, because it is the reason this entry reads differently.**
 These notes were written on `feat/r10-served-contract` (PR #6), where the
@@ -484,8 +585,12 @@ signatory-reserved work.
 
 ## v0.4.0 — 2026-08-28
 
-Not yet tagged. The heading is written at the version the code declares, not
-retitled from "Unreleased" after a tag is cut — that retitling step is what
+Never tagged, and now never will be: the release line goes `v0.3.0` ->
+`v0.5.0` (`git tag --list` reads exactly `v0.2.0`, `v0.3.0`, `v0.5.0`;
+retrieved 2026-09-01), so this entry's content shipped inside the `v0.5.0`
+tag. The sentence here said "Not yet tagged" and stayed technically true
+by never being revisited. The heading is written at the version the code
+declares, not retitled from "Unreleased" after a tag is cut — that retitling step is what
 went missing at `v0.3.0`, and `tests/test_version_declaration.py` now fails the
 suite whenever the newest heading here and `resilient_mlkit.__version__`
 disagree.
