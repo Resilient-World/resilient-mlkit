@@ -37,8 +37,18 @@ WHAT IS ASSERTED
 2. POSITIVE CONTROL — a workflow that floors a tool is REJECTED.
 3. NEGATIVE CONTROL — the same workflow, pinned, is ACCEPTED. Without it,
    assertion 1 is equally consistent with a checker that rejects everything.
-4. The workflow does not claim to have run. GitHub Actions is failing
-   account-wide on billing, so no run of it exists to claim.
+4. The workflow's description of its own execution is CITED, not asserted. Until
+   v0.6.0 this file demanded the string "UNVERIFIED AS COMMITTED", because on
+   2026-08-28 Actions was failing account-wide on billing and no run existed.
+   Runs exist now — `main` at `6921e9a` is green at run `33499020378`, retrieved
+   2026-09-01 — so that demand had become a demand for a false sentence, and a
+   control that forces the header to lie is worse than no control.
+
+   What replaces it is a CONJUNCTION and is strictly more than the old string
+   test could see: the header must NOT deny having run, AND it must cite at
+   least one run of THIS repo by URL, AND it must carry a retrieval date. The
+   old assertion could not tell a truthful citation from no citation at all; it
+   only checked that the file was modest. This one checks that it is sourced.
 
 SCOPE. The parser below is deliberately local to this test rather than added to
 `resilient_mlkit`. mlkit is installed into eight model repos and every public
@@ -218,14 +228,104 @@ jobs:
     assert unpinned_tools(mixed) == []
 
 
-def test_the_workflow_does_not_claim_a_run_it_never_had(workflow_text: str) -> None:
-    """GitHub Actions is failing account-wide on billing; no run exists to cite.
+#: A run of THIS repo's Actions, by URL. The repo is part of the pattern on
+#: purpose: a run id alone is a bare integer, and a link to some other
+#: repository's green tick is not evidence about this workflow.
+_RUN_URL = re.compile(
+    r"https://github\.com/Resilient-World/resilient-mlkit/actions/runs/(\d+)"
+)
 
-    The header must say so. This is the same rule the rest of the portfolio
-    runs under -- a number or a status you did not obtain by running does not
-    exist -- applied to the workflow's own description of itself.
+#: An ISO date. The portfolio rule is that a retrieved fact carries the date it
+#: was retrieved, because a run list is a live resource.
+_RETRIEVAL_DATE = re.compile(r"\b20\d{2}-\d{2}-\d{2}\b")
+
+#: Sentences that DENY having executed. Kept as patterns rather than one
+#: literal so the denial cannot come back in a synonym.
+_DENIALS = (
+    re.compile(r"UNVERIFIED\s+AS\s+COMMITTED"),
+    re.compile(r"has\s+never\s+executed", re.IGNORECASE),
+    re.compile(r"no\s+run\s+of\s+it\s+is\s+being\s+claimed", re.IGNORECASE),
+)
+
+
+def run_citations(workflow_text: str) -> list[str]:
+    """The run ids this workflow's header cites, in order of appearance."""
+    return _RUN_URL.findall(workflow_text)
+
+
+def denies_having_run(workflow_text: str) -> bool:
+    """True when the header still says the workflow has never executed."""
+    return any(p.search(workflow_text) for p in _DENIALS)
+
+
+def test_the_workflow_describes_its_own_execution_from_evidence(
+    workflow_text: str,
+) -> None:
+    """The real file. Both halves, because either alone is satisfiable by deletion.
+
+    This is the same rule the rest of the portfolio runs under -- a status you
+    did not obtain by running does not exist -- applied to the workflow's own
+    description of itself. It was satisfied on 2026-08-28 by admitting there was
+    nothing to cite. It is satisfied now by citing.
     """
-    assert "UNVERIFIED AS COMMITTED" in workflow_text, (
-        "the workflow no longer states that it has never executed. If it has now "
-        "run, cite the run; if it has not, say so."
+    assert not denies_having_run(workflow_text), (
+        "the workflow header still says it has never executed, while runs of it "
+        "exist and are linked from the repository's Actions tab (main at "
+        "6921e9a, run 33499020378, retrieved 2026-09-01). A header describing a "
+        "workflow that no longer exists is this package's own defect class "
+        "aimed at this package"
     )
+    cited = run_citations(workflow_text)
+    assert cited, (
+        "the workflow header no longer denies having run and cites no run "
+        "either, which is an unsourced claim rather than a corrected one; link "
+        "at least one https://github.com/Resilient-World/resilient-mlkit/"
+        "actions/runs/<id>"
+    )
+    assert _RETRIEVAL_DATE.search(workflow_text), (
+        f"the header cites runs {cited} with no retrieval date; a run list is a "
+        "live resource and a citation without a date cannot be checked against "
+        "the state it was read in"
+    )
+
+
+def test_positive_control_a_header_denying_a_run_it_had_is_caught() -> None:
+    """FIRES: the header exactly as it stood before v0.6.0."""
+    stale = (
+        "# UNVERIFIED AS COMMITTED. GitHub Actions is failing account-wide on\n"
+        "# billing, so this workflow has never executed and no run of it is\n"
+        "# being claimed.\n"
+    )
+    assert denies_having_run(stale)
+    assert run_citations(stale) == []
+
+
+def test_positive_control_an_unsourced_green_claim_is_caught() -> None:
+    """FIRES: dropping the denial without adding the citation. This is the hole
+    the old string assertion could not see -- it was equally happy with a file
+    that said nothing about its runs at all."""
+    unsourced = "# CI for resilient-mlkit. It passes.\n"
+    assert not denies_having_run(unsourced)
+    assert run_citations(unsourced) == []
+
+
+def test_positive_control_another_repos_run_is_not_evidence_about_this_one() -> None:
+    """FIRES: a green tick borrowed from elsewhere is not this workflow's."""
+    borrowed = (
+        "# Green, see\n"
+        "# https://github.com/Resilient-World/resilient-fray/actions/runs/1234\n"
+        "# retrieved 2026-09-01\n"
+    )
+    assert run_citations(borrowed) == []
+
+
+def test_negative_control_a_cited_header_is_accepted() -> None:
+    """SILENT: a denial-free header with a run of this repo and a date."""
+    cited = (
+        "# THIS WORKFLOW HAS EXECUTED. Retrieved 2026-09-01 with `gh run list`.\n"
+        "#   33499020378  main  6921e9a  success\n"
+        "#   https://github.com/Resilient-World/resilient-mlkit/actions/runs/33499020378\n"
+    )
+    assert not denies_having_run(cited)
+    assert run_citations(cited) == ["33499020378"]
+    assert _RETRIEVAL_DATE.search(cited)

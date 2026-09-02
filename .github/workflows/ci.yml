@@ -1,20 +1,45 @@
 # CI for resilient-mlkit.
 #
-# UNVERIFIED AS COMMITTED. GitHub Actions is failing account-wide on billing at
-# the time of writing (2026-08-28), so this workflow has never executed and no
-# run of it is being claimed. It is committed now so that it starts working the
-# moment billing is restored, rather than being written after the next
-# regression it would have caught.
+# THIS WORKFLOW HAS EXECUTED, AND THESE ARE THE RUNS.
 #
-# What HAS been run, locally, on the commit that added this file:
+# It said the opposite until v0.6.0: forty lines declaring the file unverified,
+# reporting that GitHub Actions was failing account-wide on billing, and
+# disclaiming any run at all. That was measured true on 2026-08-28 and it is
+# withdrawn here rather than quietly dropped. The withdrawn wording is
+# deliberately paraphrased and not reproduced: tests/test_ci_workflow.py scans
+# this header for the sentences that deny a run, and a checker that had to tell
+# a live denial from a quoted one would be a checker with a quoting loophole.
+# A header describing a workflow that no longer exists is this package's own
+# defect class aimed at this package a second time.
 #
-#   ruff 0.16.5  check src tests scripts          -> all checks passed
-#   mypy 2.3.1   src/resilient_mlkit              -> no issues, 25 source files
-#   pytest 9.1.1 (focused, per file)              -> see the PR body; the full
-#                                                    suite has NOT been run here
+# Retrieved 2026-09-01 with `gh run list --repo Resilient-World/resilient-mlkit`.
+# Every one of these completed with conclusion `success`, against the workflow
+# definition as it stood at the sha named on its row -- this header is prose and
+# is not what executed:
 #
-# Those local runs are what the jobs below reproduce. They are not evidence
-# that the workflow file itself is correct -- only a run is.
+#   33499020378  main   6921e9a  push          2026-09-01T10:45:22Z
+#     https://github.com/Resilient-World/resilient-mlkit/actions/runs/33499020378
+#   33562502701  verify/i1-m2-adversarial            a534e9be  pull_request
+#     https://github.com/Resilient-World/resilient-mlkit/actions/runs/33562502701
+#   33560677454  feat/track-aware-splits-contract    1896184f  pull_request
+#     https://github.com/Resilient-World/resilient-mlkit/actions/runs/33560677454
+#   33560662411  feat/track-aware-splits-contract    1896184f  push
+#     https://github.com/Resilient-World/resilient-mlkit/actions/runs/33560662411
+#   33558666743  fix/m-d6-crosscut-proportional      e6966830  pull_request
+#     https://github.com/Resilient-World/resilient-mlkit/actions/runs/33558666743
+#   33558545955  fix/m-d6-crosscut-proportional      923c8da9  pull_request
+#     https://github.com/Resilient-World/resilient-mlkit/actions/runs/33558545955
+#
+# The first is the one that matters for a consumer: `main` itself, green. The
+# others are listed because they are what makes the first reproducible rather
+# than a single lucky run.
+#
+# WHAT THAT DOES AND DOES NOT LICENCE
+# -----------------------------------
+# A green run is evidence about the three jobs below and nothing else. It is not
+# evidence that the fleet is measured -- see the scope note at the foot of this
+# header, which is now a statement about what has not been written rather than
+# an argument that it cannot be.
 #
 # WHY THE TOOL VERSIONS ARE PINNED EXACTLY
 # ----------------------------------------
@@ -40,11 +65,37 @@
 # tests/test_ci_workflow.py enforces the pins, so this reasoning cannot rot back
 # into a floor.
 #
-# Scope note: `mlkit portfolio` and `mlkit spine` deliberately have NO job here.
-# Both read the eight model repos as sibling checkouts, which do not exist on a
-# runner. A job that ran them would find no repos and exit clean, which is a
-# green tick for having measured nothing -- the exact defect this package was
-# written to detect.
+# SCOPE NOTE: `mlkit portfolio` and `mlkit spine` have NO job here, and the
+# reason is that nobody has written one -- not that one is impossible.
+#
+# This note used to argue the second thing. Its premise was that both commands
+# read the eight model repos as sibling checkouts "which do not exist on a
+# runner", so any such job would find no repos, exit clean, and hand out a green
+# tick for having measured nothing. The first half is true of a bare
+# `actions/checkout`. The conclusion does not follow, because a job can make the
+# siblings exist. MEASURED 2026-09-02T01:06:40Z, from this environment, on the
+# eight repos at their remote mains:
+#
+#   for r in fray torrent chokepoint choco arabica surge blackout triage; do \
+#     git clone --depth 1 https://github.com/Resilient-World/resilient-$r.git $r
+#   done
+#
+#   real 24.53s      du -sh . -> 205M
+#   fray 28M  torrent 23M  chokepoint 13M  choco 24M
+#   arabica 16M  surge 75M  blackout 14M  triage 13M
+#
+# That is one checkout step, inside this workflow's existing 15-minute timeout.
+# The obstacles that remain are real ones and none of them is the runner: the
+# clones above ran with this environment's credentials, so a runner job needs a
+# token scoped to all eight and that is a permissions decision, not a technical
+# one; a fleet sweep needs a declared expectation to compare against, or it is
+# a job that prints numbers nobody adjudicates; and the eight repos' own venvs
+# are not reconstructed by a shallow clone, so only the checks that are pure AST
+# walks over source would run.
+#
+# So: NOT WRITTEN, and the honest verdict on whether it should be is NA until
+# someone measures a sweep against a declared baseline. What this note may not
+# do is keep asserting an impossibility that 24 seconds of clock refutes.
 
 name: CI
 
@@ -117,6 +168,15 @@ jobs:
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # tests/test_tag_distance.py compares the declared version against the
+          # source inside every release tag. actions/checkout fetches NO tags at
+          # its default fetch-depth: 1, and that test's fixture would then take
+          # its named "no vX.Y.Z tag is visible" skip -- a control that is
+          # present, green, and measuring nothing. 0 fetches the full history
+          # and the tags with it. The lint and typecheck jobs read no history
+          # and keep the default.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
