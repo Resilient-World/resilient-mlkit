@@ -27,49 +27,92 @@ true before the tag was cut. It is withdrawn here rather than quietly dropped,
 and `tests/test_version_declaration.py` now FIRES on it: the newest entry may
 not restate it, and must name at least one of the checks whose verdict moved.
 
-### D6's crosscut carve-out is proportional and fail-closed, not existential
+### Every report now names the mlkit that wrote it, and adopters can check it (E-M24)
 
-**A verdict change inside a check that has not shipped yet, and the reason it is
-recorded here rather than folded into the entry below.** The dependence-unit
-contract as first written asked `if crosscutting:` — *does any unit key appear
-in more than one arm* — and one key answering yes silenced
-`DEPENDENCE_UNIT_TOO_FINE` for every other key in the arm. Its own adversarial
-verifier drove `resilient-fray`'s panel with COUNTY unit keys and recorded **D6
-PASS**, the wrong answer in the repo the finding came from, and then turned a
-FAIL into a PASS for 1,364 rows by editing the `unit_key` of **one**. Both
-drives are in `reports/D6_CROSSCUT_BASE.json`, taken at the base sha before a
-source file was edited.
+**Nothing in this section moves a check's verdict** — the release's verdict
+changes are the ones the sections below record, and this is not one of them.
+What it adds is a report header line, two keys in two machine payloads, one
+CLI subcommand and one public function. It deliberately does **not** add a
+readiness row: doing so would move every adopter's table, which is a decision
+for the signatory and not a side effect of a repair.
 
-Each unit key is now classified on its own. A block of the holdout policy that
-is split with at least one **arm-local** piece refuses; `UNIT_CROSSCUTS_ARMS` is
-reported only when the arm-local mass is empty. Four counts join the record —
-`n_units_crosscutting_arms`, `n_units_local_to_arm`,
-`n_blocks_split_by_local_units`, `n_blocks_split_by_crosscutting_units` — so the
-carve-out is a proportion a reader can see rather than an existence claim.
+**What was wrong.** `resilient-fray` pins mlkit by rev `c65b2e7`; mlkit main is
+`6921e9a`. Forty commits apart, nine source files different — `+50/-5` in
+`checks/readiness.py`, the file that emits R1–R12, and `+373/-13` in
+`core/served.py`, the promotion verdict — and **both trees declare
+`__version__ = "0.5.0"`**. Every adopter readiness table was therefore
+"readiness under whichever mlkit happened to be installed", with nothing in the
+report able to say which. `cli._self_sha()` did not close it: it shells `git
+rev-parse HEAD` in mlkit's own directory, which in an adopter's environment is
+`site-packages` and not a git worktree, so it returned `""` and the header read
+`NA (not a git worktree)` — empty in exactly the case that needed it.
 
-**chokepoint's convention is unchanged and that was the falsification
-condition**: 28 of 28 corridors cross every arm, so the carve-out covers the
-whole arm, relation `UNIT_CROSSCUTS_ARMS`, no refusal, `28` units still printed
-beside `20` blocks.
+**What is new.** `resilient_mlkit.__build__`, e.g. `0.5.0+src.4f2a91c0be3d`: a
+length-framed sha256 over every file the running package was loaded from,
+excluding compiled bytecode. It moves iff the shipped source moves, and it is
+computable from a wheel, an sdist or an editable install. It lives **beside**
+`__version__` and never inside it — release naming and tag cutting stay the
+signatory's, and `tests/test_version_declaration.py` is untouched.
 
-**Measured, not asserted.** 209,952 assignments enumerated at the base sha and
-at the head and diffed by content: **0 cases that refuse at the base are silent
-at the head**, 6,912 silent cases now refuse, and 6,912 refuse on both sides
-under an earlier, more specific constant
-(`UNIT_LABEL_CONTRADICTS_CONTENT → DEPENDENCE_UNIT_TOO_FINE`). The
-preregistered claim that the constant would also be preserved is **falsified,
-and said so** in `reports/D6_CROSSCUT_RESULTS.md` §4.1. Suite 977 → 991 with no
-existing test edited.
+**Where it appears.** `reports/readiness.md`, `reports/fabricated_defaults.md`,
+`reports/fabricated_targets.md`, `reports/served_contract.md`, the
+`*.UNMEASURABLE.md` refusal file, `portfolio/FLEET_VERDICTS.md` and the spine
+report each gain two header lines. Both `.json` twins, and both
+`scripts/*.py` payloads, gain `mlkit_build` beside `mlkit_version`
+(**additive**; `artifact_schema` is unchanged, so a consumer pinned to
+`resilient-mlkit/fleet-verdicts/1` keeps reading it).
 
-**One regression was found in this fix by attacking it, not by shipping it.**
-Making the relation proportional would on its own have loosened
-`UNIT_LABEL_CONTRADICTS_CONTENT`: with that half removed, 2,160 of the 209,952
-cases go from refusing to silent (`reports/D6_CROSSCUT_CONTAINMENT_NOT_DEAD.json`).
+**For adopters.** `mlkit identity` says which build is installed;
+`mlkit identity --verify REPORT…` says whether a report was written by it —
+`MATCH` / `MISMATCH` / `UNSTAMPED` / `CONFLICTING` / `INDETERMINATE`, exiting
+`0` only on all-`MATCH`, `3` on any `MISMATCH`, `1` otherwise. Reports written
+before this exists verify `UNSTAMPED`, which is an absence and not a mismatch:
+the fact is not recoverable from the file, only from re-running the phase.
+Design note: `docs/BUILD_IDENTITY.md`.
 
-**What is still not closed, named rather than left to be found**: a unit that
-crosscuts *every* arm remains refusal-free even when it is finer than the
-policy's blocks inside the arm. chokepoint's endorsed bootstrap has that exact
-shape, and nothing measured in this round tells the two apart.
+### The two builds E-M24 could still fail to tell apart (E-M25)
+
+Adversarial verification of the section above drove two ways an mlkit build
+still went unnamed. Both are closed; both carry a fires/silent pair and a
+revert that kills a named test.
+
+**A digest that covered none of the running code.** The digest excludes
+`__pycache__` and `*.pyc` — bytecode moves for reasons that are not source
+changes. In a *sourceless* install (`.py` compiled to `.pyc` in place and
+removed, which CPython still imports) that exclusion excludes every executing
+file and the digest falls through to whatever data the package ships. Measured
+2026-09-01 on two copies of `src/resilient_mlkit` differing only in
+`checks/readiness.py`: both digested `py.typed` alone, `files=1`, both stamped
+`0.5.0+src.5b9327f66528`, and a real R10 report written by the first verified
+**`MATCH`** against the second — the E-M24 defect inside the fix for it.
+`core/identity.py` now requires that the file `core/identity.py` was *actually
+loaded from* be one of the files hashed; where it is not, the build declines to
+name an identity (`+src.unknown`, every comparison `INDETERMINATE`) instead of
+naming a plausible one. Re-driven after the repair: `files=0`, `known False`,
+both trees. **A source-shipping install is unaffected**, including the
+existing rule that stray bytecode does not move the digest.
+
+**The one readiness table that is composed rather than measured.**
+`mlkit check --portfolio` renders R1–R12 out of `.mlkit/results/*.json` and
+exits on it. The store recorded the repo's git SHA and nothing about mlkit, and
+`store.load` staled only on the SHA. Measured 2026-09-01: 27 PASSes written by
+`0.5.0+src.b1686b22efc6` were read back at an unchanged repo SHA by
+`0.5.0+src.48480b572359` and rendered `R(9-12,1-8) PPPPPPPPPPPP` /
+`READY-TO-TRAIN` at exit 0, with nothing naming either build. `save()` now
+records `mlkit_build`, and `load()` stales a PASS whose stored build is absent,
+unknown, or different — the same rule, and the same PASS/ESCALATED-only scope,
+as the existing git-SHA rule, so a FAIL from another build is still reported
+rather than hidden. Re-driven after the repair: 27 `S`, `IN-PROGRESS`, exit 3;
+the same store read by the build that wrote it still resolves `READY-TO-TRAIN`.
+`render_portfolio` also emits the E-M24 header lines, so the table names the
+build that rendered it.
+
+**This one does move verdicts, and says so.** A stored PASS carrying no
+`mlkit_build` — which is every results file written before this — reads STALE
+until the phase is re-run. That is the same treatment a result with no git SHA
+has always had, for the same reason: it cannot be tied to anything. The
+portfolio legend now reads `S=stale(repo SHA or mlkit build moved)`, because
+`SHA moved` would send a reader looking at the wrong thing.
 
 ### D6 `RESAMPLING_UNIT`, and the dependence unit inside `core.served`
 
@@ -133,6 +176,50 @@ every committed `artifact_sha256` in the fleet is unaffected.
 
 **Adoption is a write into other repos and is not done here** — see
 `docs/ESCALATIONS.md` E-M30 and E-M31.
+
+### D6's crosscut carve-out is proportional and fail-closed, not existential
+
+**A verdict change inside a check that has not shipped yet, and the reason it is
+recorded here rather than folded into the entry below.** The dependence-unit
+contract as first written asked `if crosscutting:` — *does any unit key appear
+in more than one arm* — and one key answering yes silenced
+`DEPENDENCE_UNIT_TOO_FINE` for every other key in the arm. Its own adversarial
+verifier drove `resilient-fray`'s panel with COUNTY unit keys and recorded **D6
+PASS**, the wrong answer in the repo the finding came from, and then turned a
+FAIL into a PASS for 1,364 rows by editing the `unit_key` of **one**. Both
+drives are in `reports/D6_CROSSCUT_BASE.json`, taken at the base sha before a
+source file was edited.
+
+Each unit key is now classified on its own. A block of the holdout policy that
+is split with at least one **arm-local** piece refuses; `UNIT_CROSSCUTS_ARMS` is
+reported only when the arm-local mass is empty. Four counts join the record —
+`n_units_crosscutting_arms`, `n_units_local_to_arm`,
+`n_blocks_split_by_local_units`, `n_blocks_split_by_crosscutting_units` — so the
+carve-out is a proportion a reader can see rather than an existence claim.
+
+**chokepoint's convention is unchanged and that was the falsification
+condition**: 28 of 28 corridors cross every arm, so the carve-out covers the
+whole arm, relation `UNIT_CROSSCUTS_ARMS`, no refusal, `28` units still printed
+beside `20` blocks.
+
+**Measured, not asserted.** 209,952 assignments enumerated at the base sha and
+at the head and diffed by content: **0 cases that refuse at the base are silent
+at the head**, 6,912 silent cases now refuse, and 6,912 refuse on both sides
+under an earlier, more specific constant
+(`UNIT_LABEL_CONTRADICTS_CONTENT → DEPENDENCE_UNIT_TOO_FINE`). The
+preregistered claim that the constant would also be preserved is **falsified,
+and said so** in `reports/D6_CROSSCUT_RESULTS.md` §4.1. Suite 977 → 991 with no
+existing test edited.
+
+**One regression was found in this fix by attacking it, not by shipping it.**
+Making the relation proportional would on its own have loosened
+`UNIT_LABEL_CONTRADICTS_CONTENT`: with that half removed, 2,160 of the 209,952
+cases go from refusing to silent (`reports/D6_CROSSCUT_CONTAINMENT_NOT_DEAD.json`).
+
+**What is still not closed, named rather than left to be found**: a unit that
+crosscuts *every* arm remains refusal-free even when it is finer than the
+policy's blocks inside the arm. chokepoint's endorsed bootstrap has that exact
+shape, and nothing measured in this round tells the two apart.
 
 ### R10 `absence adjudicated as a pass` fired on honest NA-reporting guards (E-M19)
 
