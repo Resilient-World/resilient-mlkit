@@ -1,0 +1,1387 @@
+[
+  {
+    "check": "T1",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "batch binding raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "T2",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "overfit binding raised ModuleNotFoundError: No module named 'torch'",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "T3",
+    "evidence": {
+      "checkpoints": {
+        "baselines/climate_multiplier.pkl": "MISSING: declared by models/baselines.dvc (dir md5 8540467e2a36a181d42700d69b6ee99b.dir, nfiles 8) but not on disk; dvc pull has not been run",
+        "baselines/corridor_ensemble_weights.yaml": "MISSING: declared by models/baselines.dvc (dir md5 8540467e2a36a181d42700d69b6ee99b.dir, nfiles 8) but not on disk; dvc pull has not been run",
+        "baselines/fragility/": "MISSING: declared by models/baselines.dvc (dir md5 8540467e2a36a181d42700d69b6ee99b.dir, nfiles 8) but not on disk; dvc pull has not been run",
+        "baselines/fragility_open.json": "MISSING: declared by models/baselines.dvc (dir md5 8540467e2a36a181d42700d69b6ee99b.dir, nfiles 8) but not on disk; dvc pull has not been run",
+        "baselines/gnn_cascade_v1.pt": "MISSING: declared by models/baselines.dvc (dir md5 8540467e2a36a181d42700d69b6ee99b.dir, nfiles 8) but not on disk; dvc pull has not been run",
+        "baselines/manifest.json": "MISSING: declared by models/baselines.dvc (dir md5 8540467e2a36a181d42700d69b6ee99b.dir, nfiles 8) but not on disk; dvc pull has not been run"
+      }
+    },
+    "phase": "triage",
+    "reason": "checkpoints not resolving to pretrained weights: baselines/climate_multiplier.pkl=MISSING: declared by models/baselines.dvc (dir md5 8540467e2a36a181d42700d69b6ee99b.dir, nfiles 8) but not on disk; dvc pull has not been run, baselines/corridor_ensemble_weights.yaml=MISSING: declared by models/baselines.dvc (dir md5 8540467e2a36a181d42700d69b6ee99b.dir, nfiles 8) but not on disk; dvc \u2026[truncated]",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "T4",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "label_counts binding raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "T5",
+    "evidence": {
+      "allowlist_signed": true,
+      "not_allowed": {
+        "marinecadastre-ais": "EVAL-ONLY",
+        "oecd-icio-tiva": "EVAL-ONLY"
+      },
+      "sources": 8,
+      "unlisted": [
+        "commercial-ais",
+        "customer-network"
+      ]
+    },
+    "phase": "triage",
+    "reason": "2 source(s) absent from the allowlist: commercial-ais, customer-network",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "S1",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-chokepoint)",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "S2",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-chokepoint)",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "S3",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-chokepoint)",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "S4",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-chokepoint)",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "S5",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "S5 is a human decision record and is reserved to the signatory; the agent may not write it",
+    "repo": "chokepoint",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "R9",
+    "evidence": {
+      "allowlist_signed": true,
+      "blocked_in_manifest": [],
+      "eval_only_in_manifest": [
+        "oecd-icio-tiva",
+        "marinecadastre-ais"
+      ],
+      "sources": 8,
+      "unlisted": [
+        "commercial-ais",
+        "customer-network"
+      ]
+    },
+    "phase": "readiness",
+    "reason": "2 source(s) not on the allowlist: commercial-ais, customer-network",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "R10",
+    "evidence": {
+      "files_walked": 282,
+      "findings": 6,
+      "metric_registry": {
+        "derived_names": 114,
+        "files_parsed": 282,
+        "refusal": null,
+        "unclassified": [
+          "advantage",
+          "ahp",
+          "aicgaussian",
+          "aict",
+          "archivereport",
+          "assignspatialblocks",
+          "avoidedeuetscosts",
+          "bboxareakm2",
+          "bearingdeg",
+          "bivariatenormaluppertail",
+          "bprlatency",
+          "brierskillscore",
+          "canonicaldigest",
+          "clusterrobustse",
+          "compoundfloodamplification",
+          "compoundslrstormdepth",
+          "computeactivitydrop",
+          "computeauc",
+          "computeirr",
+          "coriolisparameter",
+          "countrydependence",
+          "digest",
+          "downloadcmip6region",
+          "downloadera5region",
+          "downloadibtracsregion",
+          "downloadworldpopregion",
+          "empiricalkendalltau",
+          "evaluatecoverage",
+          "evalue",
+          "fallbackmultiplier",
+          "fetch",
+          "flooddepthdamagefraction",
+          "floodeventintensity",
+          "floodreturnperiodtoannualfrequency",
+          "gaussiancopulajointexceedance",
+          "gbm",
+          "generatesupplychainreport",
+          "haversinekm",
+          "haversinekmvec",
+          "headlineverdict",
+          "heuristicmultiplier",
+          "ingestoecdicio",
+          "jointexceedance",
+          "jointhazardintensity",
+          "labelfromarms",
+          "logisticdamagefraction",
+          "logisticloss",
+          "logposterior",
+          "lossfraction",
+          "lossfractionsampled",
+          "maeskillscore",
+          "manifestpath",
+          "manifestpathfor",
+          "mde",
+          "mincalibrationrows",
+          "montieloleaeffectivef",
+          "mumidpointprior",
+          "muslopeprior",
+          "normcdf",
+          "normppf",
+          "npv",
+          "npvprime",
+          "optimizeweights",
+          "paireddifferences",
+          "panamadraftrestriction",
+          "paramshash",
+          "permutationnulldirection",
+          "pithistogram",
+          "predict",
+          "predictdirectionproba",
+          "predictlossmtpd",
+          "prefgaussian",
+          "preflinear",
+          "promethee",
+          "pvfactor",
+          "redundancybcr",
+          "refscalextrainmeandepth",
+          "relativedrop",
+          "requiredn",
+          "resolveweightspath",
+          "revenueatrisk",
+          "ridgedepth",
+          "riverbargecapacityfraction",
+          "rngcenteredsamples",
+          "save",
+          "scalestorylinewarming",
+          "sha256",
+          "sha256file",
+          "sigmamidpointprior",
+          "sigmaslopeprior",
+          "slrinundationfactor",
+          "slrprojection",
+          "softsigmoidbound",
+          "stipulationheldconstantreference",
+          "stormthroughputlossfraction",
+          "surfacewindspeed",
+          "syntheticproxyobjective",
+          "syntheticscore",
+          "throughputlossfraction",
+          "topsis",
+          "trainingstep",
+          "verdict",
+          "wasserstein1d",
+          "weightedmean",
+          "writecoverage",
+          "writedetections",
+          "writegateresult",
+          "writemarkdown",
+          "writeoil",
+          "writerollbackpayload",
+          "writetestmarkdown",
+          "writetimeseries",
+          "writevalmarkdown"
+        ],
+        "vocabulary_known": [
+          "skill"
+        ]
+      },
+      "publishes_unmeasured": 0,
+      "report": "reports/fabricated_defaults.md",
+      "satisfies_gate": 0,
+      "top": [
+        {
+          "line": 287,
+          "literal": "1.0",
+          "path": "src/resilient_chokepoint/analysis/sensitivity.py",
+          "severity": "UNCLASSIFIED_NAME",
+          "shape": "ternary fallback",
+          "sink": "stored into a metrics/report mapping",
+          "snippet": "e_ci = 1.0 if (rr_ci - 1.0) * (rr_point - 1.0) <= 0.0 else _evalue(rr_ci)",
+          "symbol": "_evalue"
+        },
+        {
+          "line": 187,
+          "literal": "0.0",
+          "path": "src/resilient_chokepoint/causal/instrumental_variables.py",
+          "severity": "UNCLASSIFIED_NAME",
+          "shape": "metric function returns a literal",
+          "sink": "returned from _montiel_olea_effective_f()",
+          "snippet": "return 0.0",
+          "symbol": "_montiel_olea_effective_f"
+        },
+        {
+          "line": 806,
+          "literal": "0.0",
+          "path": "src/resilient_chokepoint/engine/avoided_loss.py",
+          "severity": "UNCLASSIFIED_NAME",
+          "shape": "metric function returns a literal",
+          "sink": "returned from _compute_irr()",
+          "snippet": "return 0.0",
+          "symbol": "_compute_irr"
+        },
+        {
+          "line": 42,
+          "literal": "-8.0",
+          "path": "src/resilient_chokepoint/hazards/compound.py",
+          "severity": "UNCLASSIFIED_NAME",
+          "shape": "metric function returns a literal",
+          "sink": "returned from _norm_ppf()",
+          "snippet": "return -8.0",
+          "symbol": "_norm_ppf"
+        }
+      ],
+      "trees": [
+        "src",
+        "scripts"
+      ],
+      "unclassified_name": 6
+    },
+    "phase": "readiness",
+    "reason": "6 plausible literal(s) stand at metric name(s) THIS REPO declares by computing them, which mlkit's own vocabulary cannot classify, so no polarity can be read and neither PASS nor FAIL is earned: src/resilient_chokepoint/analysis/sensitivity.py:287 _evalue=1.0 (ternary fallback \u2192 stored into a metrics/report mapping); src/resilient_chokepoint/causal/instrumental_variables.py:187 _mon \u2026[truncated]",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "R11",
+    "evidence": {
+      "by_rule": {},
+      "files_walked": 285,
+      "findings": 0,
+      "input_fabricated": 0,
+      "report": "reports/fabricated_targets.md",
+      "source_registry": {
+        "entries": 16,
+        "parse_error": "",
+        "path": "docs/allowlist.yaml",
+        "present": true
+      },
+      "stamped_into_holdout": 0,
+      "target_fabricated": 0,
+      "top": [],
+      "unreadable_stamp": 0
+    },
+    "phase": "readiness",
+    "reason": "",
+    "repo": "chokepoint",
+    "status": "PASS"
+  },
+  {
+    "check": "R12",
+    "evidence": {
+      "contract_module": "resilient_mlkit.core.served",
+      "contract_reimplemented": 0,
+      "files_named": [],
+      "files_walked": 285,
+      "findings": 0,
+      "report": "reports/served_contract.md",
+      "serving_adjacent": 0,
+      "top": []
+    },
+    "phase": "readiness",
+    "reason": "",
+    "repo": "chokepoint",
+    "status": "PASS"
+  },
+  {
+    "check": "R1",
+    "evidence": {
+      "incomplete": {
+        "baselines/climate_multiplier.pkl": [
+          "sha256",
+          "licence_url"
+        ],
+        "baselines/corridor_ensemble_weights.yaml": [
+          "sha256",
+          "licence_url"
+        ],
+        "baselines/fragility/": [
+          "sha256",
+          "licence_url"
+        ],
+        "baselines/fragility_open.json": [
+          "sha256",
+          "licence_url"
+        ],
+        "baselines/gnn_cascade_v1.pt": [
+          "sha256",
+          "licence_url"
+        ],
+        "baselines/manifest.json": [
+          "sha256",
+          "licence_url"
+        ]
+      }
+    },
+    "phase": "readiness",
+    "reason": "checkpoints without full provenance: baselines/climate_multiplier.pkl missing sha256,licence_url; baselines/gnn_cascade_v1.pt missing sha256,licence_url; baselines/fragility_open.json missing sha256,licence_url",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "R2",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "overfit binding raised ModuleNotFoundError: No module named 'torch'",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "R3",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "splits raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "R4",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "metric_known_answer raised ModuleNotFoundError: No module named 'scipy'",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "R5",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "provenance raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "R6",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "deterministic_run raised ModuleNotFoundError: No module named 'torch'",
+    "repo": "chokepoint",
+    "status": "FAIL"
+  },
+  {
+    "check": "R7",
+    "evidence": {
+      "stray_region_refs": 0,
+      "strays": []
+    },
+    "phase": "readiness",
+    "reason": "no [remote] section in .mlkit/repo.toml; region and image are undeclared (no foreign-region config found, but parity itself is unmeasured)",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "R8",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "no R-check results in this run to report on",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "D1",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "D1 specifies what the counterfactual means commercially and is reserved to the signatory; the agent may not write it",
+    "repo": "chokepoint",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "D2",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "chokepoint: no 'placebo_test' binding declared in .mlkit/repo.toml; the placebo run is a SageMaker Processing Job and the training plane has not been bootstrapped",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "D3",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "chokepoint: no 'coverage' binding declared in .mlkit/repo.toml; coverage is measured on the blocked holdout via a Processing Job and the training plane has not been bootstrapped",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "D4",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "D4 is reserved to the signatory; the agent may not write it",
+    "repo": "chokepoint",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "D5",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "D5 is reserved to the signatory; the agent may not write it",
+    "repo": "chokepoint",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "E1",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "chokepoint: no 'scaling_probe' binding declared in .mlkit/repo.toml; scaling probes run as SageMaker jobs and the training plane has not been bootstrapped",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "E2",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "chokepoint: no 'hparam_sanity' binding declared in .mlkit/repo.toml; the sweep runs on SageMaker AMT and the training plane has not been bootstrapped",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "E3",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "chokepoint: no 'efficiency' binding declared in .mlkit/repo.toml; utilisation is measured on a SageMaker job and the training plane has not been bootstrapped",
+    "repo": "chokepoint",
+    "status": "NA"
+  },
+  {
+    "check": "E4",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "E4 allocates credits and wires a Budgets alarm \u2014 a billing action reserved to the signatory",
+    "repo": "chokepoint",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "E5",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "E5 states what each run will teach and what would change your mind; it is human-written by design",
+    "repo": "chokepoint",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "T1",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "batch binding raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "fray",
+    "status": "FAIL"
+  },
+  {
+    "check": "T2",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "overfit binding raised ModuleNotFoundError: No module named 'torch'",
+    "repo": "fray",
+    "status": "FAIL"
+  },
+  {
+    "check": "T3",
+    "evidence": {
+      "checkpoints": {
+        "baselines/cotton_yield_dual_stream.pt": "MISSING: models/baselines/cotton_yield_dual_stream.pt not on disk",
+        "baselines/cotton_yield_gru.pt": "MISSING: models/baselines/cotton_yield_gru.pt not on disk",
+        "baselines/cotton_yield_surrogate_v2.pt": "MISSING: models/baselines/cotton_yield_surrogate_v2.pt not on disk",
+        "cotton-yield-dual-stream": "MISSING: models/cotton_yield_dual_stream.pt not on disk"
+      }
+    },
+    "phase": "triage",
+    "reason": "checkpoints not resolving to pretrained weights: baselines/cotton_yield_dual_stream.pt=MISSING: models/baselines/cotton_yield_dual_stream.pt not on disk, baselines/cotton_yield_gru.pt=MISSING: models/baselines/cotton_yield_gru.pt not on disk, baselines/cotton_yield_surrogate_v2.pt=MISSING: models/baselines/cotton_yield_surrogate_v2.pt not on disk, cotton-yield-dual-stream=MISSING: m \u2026[truncated]",
+    "repo": "fray",
+    "status": "FAIL"
+  },
+  {
+    "check": "T4",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "label_counts binding raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "fray",
+    "status": "FAIL"
+  },
+  {
+    "check": "T5",
+    "evidence": {
+      "allowlist_signed": true,
+      "not_allowed": {},
+      "sources": 8,
+      "unlisted": []
+    },
+    "phase": "triage",
+    "reason": "",
+    "repo": "fray",
+    "status": "PASS"
+  },
+  {
+    "check": "S1",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-fray)",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "S2",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-fray)",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "S3",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-fray)",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "S4",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-fray)",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "S5",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "S5 is a human decision record and is reserved to the signatory; the agent may not write it",
+    "repo": "fray",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "R9",
+    "evidence": {
+      "allowlist_signed": true,
+      "blocked_in_manifest": [],
+      "eval_only_in_manifest": [],
+      "sources": 8,
+      "unlisted": []
+    },
+    "phase": "readiness",
+    "reason": "",
+    "repo": "fray",
+    "status": "PASS"
+  },
+  {
+    "check": "R10",
+    "evidence": {
+      "files_walked": 234,
+      "findings": 0,
+      "metric_registry": {
+        "derived_names": 53,
+        "files_parsed": 234,
+        "refusal": null,
+        "unclassified": [
+          "activationtcavsensitivity",
+          "adaptivelearningrate",
+          "adjustedlintvalueusd",
+          "blockidsfromcoords",
+          "canonicaldigest",
+          "combinedqualityfactor",
+          "computesmd",
+          "constantsamples",
+          "declaredcheckpoint",
+          "declaredtrainingpanel",
+          "delta",
+          "difference",
+          "digest",
+          "digestpath",
+          "downloadchunk",
+          "downloadyear",
+          "droughtdeltaforscenario",
+          "droughtyieldfactor",
+          "dualstreamcheckpoint",
+          "estimatedidatt",
+          "estimatepsmatt",
+          "expectedlossfromsamples",
+          "fetchcountyareaharvestedha",
+          "filedigest",
+          "forward",
+          "haversinekm",
+          "heatdeltadegreedays",
+          "heatstressyieldfactor",
+          "leadingcommentblock",
+          "mechanisticfactor",
+          "mergetrainmetrics",
+          "nextversiondir",
+          "normalisedbylevel",
+          "parametricqualityadjustment",
+          "paramshash",
+          "preferdualstreamcheckpoint",
+          "premiumfromrma",
+          "ratio",
+          "regiononehot",
+          "rendermarkdown",
+          "resolve",
+          "samplevolumetricfraction",
+          "saturationvapourpressurekpa",
+          "scaled",
+          "sha256",
+          "sha256file",
+          "shifted",
+          "sigmoidderivative",
+          "syntheticproxyobjective",
+          "verifyrecordedcheckpoint",
+          "weightedmean",
+          "writerollbackpayload"
+        ],
+        "vocabulary_known": [
+          "r2"
+        ]
+      },
+      "publishes_unmeasured": 0,
+      "report": "reports/fabricated_defaults.md",
+      "satisfies_gate": 0,
+      "top": [],
+      "trees": [
+        "src",
+        "scripts"
+      ],
+      "unclassified_name": 0
+    },
+    "phase": "readiness",
+    "reason": "",
+    "repo": "fray",
+    "status": "PASS"
+  },
+  {
+    "check": "R11",
+    "evidence": {
+      "by_rule": {},
+      "files_walked": 235,
+      "findings": 0,
+      "input_fabricated": 0,
+      "report": "reports/fabricated_targets.md",
+      "source_registry": {
+        "entries": 18,
+        "parse_error": "",
+        "path": "docs/allowlist.yaml",
+        "present": true
+      },
+      "stamped_into_holdout": 0,
+      "target_fabricated": 0,
+      "top": [],
+      "unreadable_stamp": 0
+    },
+    "phase": "readiness",
+    "reason": "",
+    "repo": "fray",
+    "status": "PASS"
+  },
+  {
+    "check": "R12",
+    "evidence": {
+      "contract_module": "resilient_mlkit.core.served",
+      "contract_reimplemented": 0,
+      "files_named": [],
+      "files_walked": 235,
+      "findings": 0,
+      "report": "reports/served_contract.md",
+      "serving_adjacent": 0,
+      "top": []
+    },
+    "phase": "readiness",
+    "reason": "",
+    "repo": "fray",
+    "status": "PASS"
+  },
+  {
+    "check": "R1",
+    "evidence": {
+      "incomplete": {
+        "baselines/cotton_yield_dual_stream.pt": [
+          "uri",
+          "sha256",
+          "licence_url"
+        ],
+        "baselines/cotton_yield_gru.pt": [
+          "uri",
+          "sha256",
+          "licence_url"
+        ],
+        "baselines/cotton_yield_surrogate_v2.pt": [
+          "uri",
+          "sha256",
+          "licence_url"
+        ],
+        "cotton-yield-dual-stream": [
+          "uri",
+          "sha256",
+          "licence_url"
+        ]
+      }
+    },
+    "phase": "readiness",
+    "reason": "checkpoints without full provenance: baselines/cotton_yield_dual_stream.pt missing uri,sha256,licence_url; baselines/cotton_yield_gru.pt missing uri,sha256,licence_url; baselines/cotton_yield_surrogate_v2.pt missing uri,sha256,licence_url",
+    "repo": "fray",
+    "status": "FAIL"
+  },
+  {
+    "check": "R2",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "overfit binding raised ModuleNotFoundError: No module named 'torch'",
+    "repo": "fray",
+    "status": "FAIL"
+  },
+  {
+    "check": "R3",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "splits raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "fray",
+    "status": "FAIL"
+  },
+  {
+    "check": "R4",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "metric_known_answer raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "fray",
+    "status": "FAIL"
+  },
+  {
+    "check": "R5",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "UNMEASURABLE INPUT \u2014 this binding raised BindingError, not a verdict about rows: the derived prior-yield anchor cache nass_yields.json is absent or unreadable, so no row's provenance is measured or claimed. Regenerate it with data.nass_yield.regenerate_anchor_cache_from_bulk; it is derived and gitignored, so a fresh checkout does not carry it. Path: /private/tmp/claude-501/-Users-da \u2026[truncated]",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "R6",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "deterministic_run raised ModuleNotFoundError: No module named 'torch'",
+    "repo": "fray",
+    "status": "FAIL"
+  },
+  {
+    "check": "R7",
+    "evidence": {
+      "stray_region_refs": 0,
+      "strays": []
+    },
+    "phase": "readiness",
+    "reason": "no [remote] section in .mlkit/repo.toml; region and image are undeclared (no foreign-region config found, but parity itself is unmeasured)",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "R8",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "no R-check results in this run to report on",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "D1",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "D1 specifies what the counterfactual means commercially and is reserved to the signatory; the agent may not write it",
+    "repo": "fray",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "D2",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "fray: no 'placebo_test' binding declared in .mlkit/repo.toml; the placebo run is a SageMaker Processing Job and the training plane has not been bootstrapped",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "D3",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "fray: no 'coverage' binding declared in .mlkit/repo.toml; coverage is measured on the blocked holdout via a Processing Job and the training plane has not been bootstrapped",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "D4",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "D4 is reserved to the signatory; the agent may not write it",
+    "repo": "fray",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "D5",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "D5 is reserved to the signatory; the agent may not write it",
+    "repo": "fray",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "E1",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "fray: no 'scaling_probe' binding declared in .mlkit/repo.toml; scaling probes run as SageMaker jobs and the training plane has not been bootstrapped",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "E2",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "fray: no 'hparam_sanity' binding declared in .mlkit/repo.toml; the sweep runs on SageMaker AMT and the training plane has not been bootstrapped",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "E3",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "fray: no 'efficiency' binding declared in .mlkit/repo.toml; utilisation is measured on a SageMaker job and the training plane has not been bootstrapped",
+    "repo": "fray",
+    "status": "NA"
+  },
+  {
+    "check": "E4",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "E4 allocates credits and wires a Budgets alarm \u2014 a billing action reserved to the signatory",
+    "repo": "fray",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "E5",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "E5 states what each run will teach and what would change your mind; it is human-written by design",
+    "repo": "fray",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "T1",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'batch' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "T2",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'overfit_one_batch' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "T3",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'checkpoint_status' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "T4",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'label_counts' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "T5",
+    "evidence": {},
+    "phase": "triage",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'manifest' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "S1",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-torrent)",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "S2",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-torrent)",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "S3",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-torrent)",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "S4",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "docs/selection.yaml does not exist \u2014 artifact not found at docs/selection.yaml in the checkout or any linked worktree (searched 1 tree(s): /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/fleet/resilient-torrent)",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "S5",
+    "evidence": {},
+    "phase": "selection",
+    "reason": "S5 is a human decision record and is reserved to the signatory; the agent may not write it",
+    "repo": "torrent",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "R9",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'manifest' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "R10",
+    "evidence": {
+      "files_walked": 546,
+      "findings": 17,
+      "metric_registry": {
+        "derived_names": 149,
+        "files_parsed": 546,
+        "refusal": null,
+        "unclassified": [
+          "absdiff",
+          "addnoise",
+          "annualflashdensity",
+          "annualmeasurecost",
+          "annualpremium",
+          "annualvalue",
+          "applyscsclimatedelta",
+          "applyspatiallyvaryingdelta",
+          "applytoloss",
+          "archivetoparquet",
+          "arearatio",
+          "averagediscountrate",
+          "basincsvpath",
+          "benefitcostratio",
+          "betascaled",
+          "bilineardeposit",
+          "biodiversityupliftvalue",
+          "brierskillscore",
+          "brildamagereduction",
+          "buildarchive",
+          "buildspatialweights",
+          "cachepath",
+          "canonicaldigest",
+          "capeprecipflashproxy",
+          "carbonvalue",
+          "cdf",
+          "chunk",
+          "cobenefitnpv",
+          "compoundaal",
+          "computeagedegradation",
+          "computeannualflashdensity",
+          "computeareakm2",
+          "computebuildingvalue",
+          "computecsi",
+          "computeproxyclimatology",
+          "computevolume",
+          "convert",
+          "costnpv",
+          "criticalsuccessindex",
+          "damagepct",
+          "defaultresponse",
+          "deltaadjust",
+          "depthmmperdaytom3pers",
+          "deviationpct",
+          "digest",
+          "dischargefromstage",
+          "dischargetostage",
+          "displaypath",
+          "dobkowitzdamagereduction",
+          "download",
+          "effectiveheight",
+          "empiricalreturnperiods",
+          "energyhelicityindex",
+          "evalcsi",
+          "evalstep",
+          "exceedanceprob",
+          "extentpct",
+          "factor",
+          "fallbackdelta",
+          "ferreiradamagereduction",
+          "fhv",
+          "findparams",
+          "finetune",
+          "fit",
+          "fitpowerlaw",
+          "flv",
+          "forward",
+          "generatetriangularmesh",
+          "getrate",
+          "getwarmstarttimestep",
+          "hailequivalentgust",
+          "hailstonekineticenergyj",
+          "haversinekm",
+          "heatmitigationvalue",
+          "impliedspread",
+          "interp",
+          "inundationiouproxy",
+          "inversepredict",
+          "jrcsigmoid",
+          "lapserate",
+          "lclheight",
+          "logistic",
+          "logisticpoperational",
+          "mdr",
+          "mdrresidential1story",
+          "meandepth",
+          "model",
+          "multiplier",
+          "nodeidx",
+          "normcdf",
+          "outputdir",
+          "parsedamagefigure",
+          "parsesizelabel",
+          "parsespcloss",
+          "pbias",
+          "pdf",
+          "pinspath",
+          "pngfromgrid",
+          "power",
+          "predict",
+          "quantile",
+          "rateat",
+          "reachabilityhours",
+          "reparameterise",
+          "resolvecaravanroot",
+          "resolvecheckpoint",
+          "rpforflow",
+          "salinitymodifier",
+          "sample",
+          "samplehourutc",
+          "samplemonth",
+          "scalepopulation",
+          "searchupwards",
+          "sedimentmodifier",
+          "sequentialclusteringbonus",
+          "sha256",
+          "sigmoid",
+          "significanthailparameter",
+          "significanttornadoparameter",
+          "stagecaravansubset",
+          "stagedsubsetroot",
+          "stagefromdischarge",
+          "step",
+          "storepath",
+          "stpgenesisprobability",
+          "sumdepthvolume",
+          "supercellcompositeparameter",
+          "timedep",
+          "tofloat",
+          "topmtiles",
+          "tornadoeffectivegust",
+          "totalcost",
+          "trainstep",
+          "truetarget",
+          "trydownloadtile",
+          "tvar",
+          "valstep",
+          "velocity",
+          "volumecontinuityloss",
+          "weightedmean",
+          "width",
+          "widthfactor",
+          "wmaxshear"
+        ],
+        "vocabulary_known": [
+          "crps",
+          "csi",
+          "f1",
+          "iou",
+          "kge",
+          "nse"
+        ]
+      },
+      "publishes_unmeasured": 0,
+      "report": "reports/fabricated_defaults.md",
+      "satisfies_gate": 1,
+      "top": [
+        {
+          "line": 269,
+          "literal": "0.0",
+          "path": "src/torrent/scs/vulnerability/fragility/power.py",
+          "severity": "SATISFIES_GATE",
+          "shape": "metric function returns a literal",
+          "sink": "returned from _lognormal_exceedance()",
+          "snippet": "return 0.0",
+          "symbol": "_lognormal_exceedance"
+        }
+      ],
+      "trees": [
+        "src",
+        "scripts"
+      ],
+      "unclassified_name": 16
+    },
+    "phase": "readiness",
+    "reason": "1 fabricated default(s) reach a gate, metric or report (1 of them satisfy the gate that consumes them): src/torrent/scs/vulnerability/fragility/power.py:269 _lognormal_exceedance=0.0 (metric function returns a literal \u2192 returned from _lognormal_exceedance()); and 16 further site(s) at metric name(s) this repo declares but mlkit cannot classify \u2014 see reports/fabricated_defaults.md",
+    "repo": "torrent",
+    "status": "FAIL"
+  },
+  {
+    "check": "R11",
+    "evidence": {
+      "by_rule": {},
+      "files_walked": 551,
+      "findings": 0,
+      "input_fabricated": 0,
+      "report": "reports/fabricated_targets.md",
+      "source_registry": {
+        "entries": 49,
+        "parse_error": "",
+        "path": "docs/allowlist.yaml",
+        "present": true
+      },
+      "stamped_into_holdout": 0,
+      "target_fabricated": 0,
+      "top": [],
+      "unreadable_stamp": 0
+    },
+    "phase": "readiness",
+    "reason": "",
+    "repo": "torrent",
+    "status": "PASS"
+  },
+  {
+    "check": "R12",
+    "evidence": {
+      "contract_module": "resilient_mlkit.core.served",
+      "contract_reimplemented": 0,
+      "files_named": [],
+      "files_walked": 551,
+      "findings": 0,
+      "report": "reports/served_contract.md",
+      "serving_adjacent": 0,
+      "top": []
+    },
+    "phase": "readiness",
+    "reason": "",
+    "repo": "torrent",
+    "status": "PASS"
+  },
+  {
+    "check": "R1",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'checkpoint_provenance' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "R2",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'overfit_one_batch' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "R3",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'splits' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "R4",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'metric_known_answer' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "R5",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'provenance' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "R6",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'deterministic_run' raised ModuleNotFoundError: No module named 'pandas'",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "R7",
+    "evidence": {
+      "image": "",
+      "region": "us-west-2",
+      "stray_region_refs": 0,
+      "strays": []
+    },
+    "phase": "readiness",
+    "reason": "no ECR image declared",
+    "repo": "torrent",
+    "status": "FAIL"
+  },
+  {
+    "check": "R8",
+    "evidence": {},
+    "phase": "readiness",
+    "reason": "no R-check results in this run to report on",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "D1",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "D1 specifies what the counterfactual means commercially and is reserved to the signatory; the agent may not write it",
+    "repo": "torrent",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "D2",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "torrent: no 'placebo_test' binding declared in .mlkit/repo.toml; the placebo run is a SageMaker Processing Job and the training plane has not been bootstrapped",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "D3",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "torrent: importing 'mlkit_bindings' for binding 'coverage' raised ModuleNotFoundError: No module named 'pandas'; coverage is measured on the blocked holdout via a Processing Job and the training plane has not been bootstrapped",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "D4",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "D4 is reserved to the signatory; the agent may not write it",
+    "repo": "torrent",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "D5",
+    "evidence": {},
+    "phase": "decision",
+    "reason": "D5 is reserved to the signatory; the agent may not write it",
+    "repo": "torrent",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "E1",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "torrent: no 'scaling_probe' binding declared in .mlkit/repo.toml; scaling probes run as SageMaker jobs and the training plane has not been bootstrapped",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "E2",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "torrent: no 'hparam_sanity' binding declared in .mlkit/repo.toml; the sweep runs on SageMaker AMT and the training plane has not been bootstrapped",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "E3",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "torrent: no 'efficiency' binding declared in .mlkit/repo.toml; utilisation is measured on a SageMaker job and the training plane has not been bootstrapped",
+    "repo": "torrent",
+    "status": "NA"
+  },
+  {
+    "check": "E4",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "E4 allocates credits and wires a Budgets alarm \u2014 a billing action reserved to the signatory",
+    "repo": "torrent",
+    "status": "ESCALATED"
+  },
+  {
+    "check": "E5",
+    "evidence": {},
+    "phase": "economics",
+    "reason": "E5 states what each run will teach and what would change your mind; it is human-written by design",
+    "repo": "torrent",
+    "status": "ESCALATED"
+  }
+]

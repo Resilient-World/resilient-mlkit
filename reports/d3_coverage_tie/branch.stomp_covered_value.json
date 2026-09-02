@@ -1,0 +1,14 @@
+{
+  "case": "stomp_covered_value",
+  "evidence": {
+    "declared_nominal": 0.9,
+    "empirical": 0.8954,
+    "n": 5000,
+    "nominal": 0.9,
+    "reported_nominal": 0.9,
+    "tol": 0.05
+  },
+  "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/mlkit/src/resilient_mlkit/__init__.py",
+  "reason": "COVERAGE_ROWS_MALFORMED: rows[0] carries covered='yes', which is not a coverage indicator. A row is covered or it is not: write True/False (or 1/0). Anything else would be counted by truthiness, and a count assembled out of truthiness is not a measurement",
+  "status": "FAIL"
+}

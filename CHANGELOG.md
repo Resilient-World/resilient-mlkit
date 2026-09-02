@@ -482,6 +482,48 @@ added and none removed.
 re-run, and re-measuring it under the new read semantics is E-M10's
 signatory-reserved work.
 
+### D3's coverage evidence is recounted, not accepted (E-M23 residual 2)
+
+**D3 changes verdict on unchanged adopter code**, PASS → NA
+`COVERAGE_UNTIED`, wherever a `coverage` binding does not yet carry the
+operands its figures were computed from. By the scale at the top of this file
+that is a MAJOR event and it is named first, not buried.
+
+`docs/ESCALATIONS.md` E-M23 residual 2, pinned and unassigned since
+2026-08-31: with an honest COMMITTED `[coverage] nominal = 0.90`, a binding
+returning `{"nominal": 0.90, "empirical": 0.90, "n": 1000000}` PASSed. E-M21
+tied the `nominal` operand to committed state and clamped `tol` to mlkit's;
+`empirical` and `n` stayed where tick 13 found them — two scalars asserted over
+a row set nobody named. Re-driven at `6921e9a` rather than quoted, and eight
+other forgeries PASS the same way; all nine recordings are committed under
+`reports/d3_coverage_tie/` with their `main.*` twins.
+
+The evidence contract now carries a `row_set_digest` —
+`core.served.row_set_digest`, the fleet's one definition, imported and not
+reimplemented — beside exactly one of `rows` (`{"row_id": ..., "covered":
+True}`) or `groups` (`{"group_id": ..., "n": ..., "covered": ...}`).
+`core/coverage_evidence.py` re-derives `n` and `empirical` from them and D3
+takes its verdict on the recount. Four named outcomes: NA `COVERAGE_UNTIED`
+(operands or digest missing, naming which), FAIL `COVERAGE_ROWS_MALFORMED`,
+FAIL `COVERAGE_ROW_SET_MISMATCH`, FAIL `COVERAGE_SELF_REPORTED` naming the
+re-derived figure. Never a silent PASS and never a silent FAIL.
+
+**What it does not buy**: the rows are still the subject's, and a binding that
+generates rows to match a figure satisfies this contract. The tie makes the two
+figures re-derivable and gives the row set a name the rest of the fleet can
+compare against; tying that name to COMMITTED state — the shape the nominal
+level now has — is the next tie and is recorded OPEN in E-M34 rather than
+half-built.
+
+**Adopters**: `mlkit check --phase decision` reports the missing operand by
+name. None of the three in-scope repos reaches D3 today, so no in-scope row
+moves; a repo with a live D3 row moves to NA until its binding carries the
+rows.
+
+Suite 909 → 948 (+39, the new controls file; collected node ids diffed against
+main, zero removed). Every registered check driven over three repos in two
+interpreters produced records with the same sha256 either side.
+
 ## v0.4.0 — 2026-08-28
 
 Not yet tagged. The heading is written at the version the code declares, not

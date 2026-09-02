@@ -1,0 +1,14 @@
+{
+  "case": "untied",
+  "evidence": {
+    "declared_nominal": 0.9,
+    "empirical": 0.9,
+    "n": 1000000,
+    "nominal": 0.9,
+    "reported_nominal": 0.9,
+    "tol": 0.05
+  },
+  "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/mlkit/src/resilient_mlkit/__init__.py",
+  "reason": "COVERAGE_UNTIED: the coverage evidence carries no rows and no groups, so `empirical` and `n` are figures nobody -- mlkit included -- can re-derive. Supply one entry per held-out row ({\"row_id\": ..., \"covered\": True}) or per declared group ({\"group_id\": ..., \"n\": ..., \"covered\": ...}), beside a `row_set_digest` from core.served.row_set_digest. docs/ESCALATIONS.md E-M23 residual 2",
+  "status": "NA"
+}

@@ -1,0 +1,142 @@
+[
+  {
+    "mutation": "M1 untied refusal removed",
+    "file": "coverage_evidence.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_the_escalation_payload_no_longer_passes",
+      "1 failed in 6.53s"
+    ],
+    "sha256_restored": "dcdbf579db631ca58efadb9016859a595c51603bc2aa062357cb3bed2700c443"
+  },
+  {
+    "mutation": "M2 digest requirement removed",
+    "file": "coverage_evidence.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_operands_without_a_digest_are_untied_too",
+      "1 failed, 1 passed in 1.19s"
+    ],
+    "sha256_restored": "dcdbf579db631ca58efadb9016859a595c51603bc2aa062357cb3bed2700c443"
+  },
+  {
+    "mutation": "M3 digest comparison removed",
+    "file": "coverage_evidence.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_a_stomped_digest_is_refused",
+      "1 failed, 5 passed in 3.03s"
+    ],
+    "sha256_restored": "dcdbf579db631ca58efadb9016859a595c51603bc2aa062357cb3bed2700c443"
+  },
+  {
+    "mutation": "M4 sha256 shape check removed",
+    "file": "coverage_evidence.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_a_digest_that_is_not_a_sha256_is_refused",
+      "1 failed, 6 passed in 3.53s"
+    ],
+    "sha256_restored": "dcdbf579db631ca58efadb9016859a595c51603bc2aa062357cb3bed2700c443"
+  },
+  {
+    "mutation": "M5 n comparison removed",
+    "file": "coverage_evidence.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_a_stomped_n_is_refused_by_the_rows",
+      "1 failed, 4 passed in 2.24s"
+    ],
+    "sha256_restored": "dcdbf579db631ca58efadb9016859a595c51603bc2aa062357cb3bed2700c443"
+  },
+  {
+    "mutation": "M6 empirical comparison removed",
+    "file": "coverage_evidence.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_a_stomped_empirical_is_refused_by_the_rows",
+      "1 failed, 3 passed in 1.70s"
+    ],
+    "sha256_restored": "dcdbf579db631ca58efadb9016859a595c51603bc2aa062357cb3bed2700c443"
+  },
+  {
+    "mutation": "M7 indicator becomes truthiness",
+    "file": "coverage_evidence.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_a_covered_flag_that_is_not_an_indicator_is_refused[yes]",
+      "1 failed, 7 passed in 3.51s"
+    ],
+    "sha256_restored": "dcdbf579db631ca58efadb9016859a595c51603bc2aa062357cb3bed2700c443"
+  },
+  {
+    "mutation": "M8 duplicate-key refusal removed",
+    "file": "coverage_evidence.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_a_repeated_row_id_is_refused",
+      "1 failed, 12 passed in 5.94s"
+    ],
+    "sha256_restored": "dcdbf579db631ca58efadb9016859a595c51603bc2aa062357cb3bed2700c443"
+  },
+  {
+    "mutation": "M9 both-forms refusal removed",
+    "file": "coverage_evidence.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_both_forms_at_once_are_refused",
+      "1 failed, 13 passed in 7.21s"
+    ],
+    "sha256_restored": "dcdbf579db631ca58efadb9016859a595c51603bc2aa062357cb3bed2700c443"
+  },
+  {
+    "mutation": "M10 group covered>n refusal removed",
+    "file": "coverage_evidence.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_a_group_covering_more_rows_than_it_holds_is_refused",
+      "1 failed, 17 passed in 8.61s"
+    ],
+    "sha256_restored": "dcdbf579db631ca58efadb9016859a595c51603bc2aa062357cb3bed2700c443"
+  },
+  {
+    "mutation": "M11 tie not called at all",
+    "file": "decision.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_the_escalation_payload_no_longer_passes",
+      "1 failed in 0.63s"
+    ],
+    "sha256_restored": "1708db49a5e85502c42192fe3767c6da889643504fcdaec943c22558f3d9ec27"
+  },
+  {
+    "mutation": "M12 untied reported as FAIL not NA",
+    "file": "decision.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_the_escalation_payload_no_longer_passes",
+      "1 failed in 0.72s"
+    ],
+    "sha256_restored": "1708db49a5e85502c42192fe3767c6da889643504fcdaec943c22558f3d9ec27"
+  },
+  {
+    "mutation": "M13 self-reported refusal ignored",
+    "file": "decision.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_positive_control_a_stomped_empirical_is_refused_by_the_rows",
+      "1 failed, 3 passed in 2.31s"
+    ],
+    "sha256_restored": "1708db49a5e85502c42192fe3767c6da889643504fcdaec943c22558f3d9ec27"
+  },
+  {
+    "mutation": "M14 verdicts taken on the reported figures",
+    "file": "decision.py",
+    "caught": true,
+    "first_failures": [
+      "FAILED tests/test_d3_coverage_tie.py::test_the_coverage_verdict_is_taken_on_the_derived_empirical",
+      "1 failed, 38 passed in 12.39s"
+    ],
+    "sha256_restored": "1708db49a5e85502c42192fe3767c6da889643504fcdaec943c22558f3d9ec27"
+  }
+]

@@ -1843,17 +1843,24 @@ adoption. They must now COMMIT the declaration, which is the same two lines and
 one `git add`. A repo running `mlkit check` on a dirty tree gets NA on D3 where
 it used to get a verdict; that is the same bargain S1-S4 already make.
 
-### Residual 2 (OPEN) — `empirical` and `n` are still the subject's alone
+### ~~Residual 2 (OPEN)~~ — CLOSED by E-M34; `empirical` and `n` are recounted now
 
 Driven here and left open because it is not M-05's scope: with an honest
 committed 0.90, a binding returning `{"nominal": 0.90, "empirical": 0.90,
 "n": 1000000}` PASSes, and nothing ties either figure to a row set. E-M21 named
 the general form — "when a verdict is a comparison, every operand needs a tie"
 — and tied one of the three. The row-digest work in round-8 M-06 is the shape
-the remaining two need. **Unassigned.**
+the remaining two need. ~~**Unassigned.**~~
+
+**CLOSED on `fix/m-d3-coverage-row-digest-tie` (recursive-loop I2-M1). The
+remedy is the shape named above — the round-8 M-06 row-digest tie — and the
+payload quoted in this paragraph was re-driven at `6921e9a` (PASS) and at that
+branch (NA `COVERAGE_UNTIED`). See E-M34 at the foot of this file for what it
+closes, what it does NOT, and the verdict change it costs adopters. Nothing
+else in this entry is rewritten.**
 
 **Status: the bypass CLOSED. E-M21's residuals 2 and 3 stand as written.
-Residual 2 above OPEN and unassigned.**
+Residual 2 above CLOSED by E-M34.**
 
 *Numbering note: E-M21 is contended (mlkit PR #24 and PR #26 both took it) and
 E-M22 is taken by PR #25, all three still open at 2026-08-31. This entry took
@@ -2234,3 +2241,140 @@ verification entry is an append.
 
 **Status: M-04 STANDS on its substance. One NA-lane over-fire found by driving
 and REPAIRED on this branch; two measured behaviours recorded OPEN above.**
+
+---
+
+## E-M34 — E-M23 residual 2 is CLOSED: D3 recounts `empirical` and `n`, and names the rows
+
+**Raised and repaired** 2026-09-02 on `fix/m-d3-coverage-row-digest-tie`
+(recursive-loop item I2-M1), from `main` `6921e9a`. E-M23's own residual 2,
+pinned and unassigned since 2026-08-31.
+
+### The defect, re-driven rather than quoted
+
+E-M23 residual 2 said that with an honest committed `nominal = 0.90`, a binding
+returning `{"nominal": 0.90, "empirical": 0.90, "n": 1000000}` PASSes. That was
+re-measured, not taken on trust: driven at `6921e9a` in an interpreter
+asserting its own `resilient_mlkit.__file__`, against a real git repo whose
+`.mlkit/repo.toml` COMMITS `[coverage] nominal = 0.90`, through the real
+binding-resolution path —
+
+    PASS
+    evidence {'nominal': 0.9, 'empirical': 0.9, 'n': 1000000, 'tol': 0.05,
+              'declared_nominal': 0.9, 'reported_nominal': 0.9}
+
+No dirty tree, no substituted level, nothing for E-M21 or E-M23 to catch. A
+million held-out rows that never existed, and D3 had no way to ask. Eight more
+forgeries PASS the same way at `6921e9a` — a stomped `empirical`, a stomped
+`n`, a stomped digest, a `covered` flag reading `"yes"`, a duplicated row id,
+both operand forms at once, and a missing digest. All nine recordings are
+committed under `reports/d3_coverage_tie/`, `main.*` beside `branch.*`.
+
+### The repair
+
+`core/coverage_evidence.py` recounts the two figures from the operands they
+were computed on, and names the row set with `core.served.row_set_digest` —
+the fleet's ONE definition of that digest, imported and not reimplemented
+(rule 7; a test asserts the module contains no `hashlib` of its own). The
+evidence contract gains a `row_set_digest` beside exactly one of `rows`
+(`{"row_id": ..., "covered": True}`) or `groups`
+(`{"group_id": ..., "n": ..., "covered": ...}`). `n` is the row count or the
+sum of the group counts; `empirical` is `covered / n`; both are re-derived
+inside mlkit and the verdict is taken on the recount.
+
+Four outcomes, all named, never silent in either direction:
+
+* **NA `COVERAGE_UNTIED`** — no operands, or no digest. The message names the
+  missing one.
+* **FAIL `COVERAGE_ROWS_MALFORMED`** — operands that cannot be recounted.
+* **FAIL `COVERAGE_ROW_SET_MISMATCH`** — a digest that is not the digest of the
+  keys handed over.
+* **FAIL `COVERAGE_SELF_REPORTED`** — a reported figure that is not what the
+  operands re-derive to, naming the re-derived figure.
+
+The NA/FAIL split is E-M21's own distinction: "you did not supply this" is a
+gap an adopter fills; "you supplied something else" is a claim that was checked
+and lost. Placement inside D3 is chosen and pinned by tests: AFTER the whole
+committed-`nominal` block, so a substituted pass mark stays
+`NOMINAL_SELF_DECLARED` rather than being downgraded to an untied NA, and after
+the non-finite guards, so E-M09/E-M10 keep their own reasons; BEFORE the
+small-holdout NA and the coverage verdict, so neither rests on a figure that
+was merely asserted.
+
+### What the controls measured
+
+    full suite   909 passed / 3 skipped at 6921e9a
+              -> 948 passed / 3 skipped here
+                 (+39 = exactly the new file; collected node ids DIFFED against
+                  main, not counted: 912 -> 951, zero removed)
+
+    CONTROL A    the escalation's own payload   PASS -> NA COVERAGE_UNTIED
+                 stomped empirical (tied rows)  PASS -> FAIL COVERAGE_SELF_REPORTED
+                                                naming 0.8954 from 4477 of 5000
+                 stomped n                      PASS -> FAIL COVERAGE_SELF_REPORTED
+                 stomped digest                 PASS -> FAIL COVERAGE_ROW_SET_MISMATCH
+                 covered = "yes"                PASS -> FAIL COVERAGE_ROWS_MALFORMED
+                 duplicated row id              PASS -> FAIL COVERAGE_ROWS_MALFORMED
+                 rows AND groups                PASS -> FAIL COVERAGE_ROWS_MALFORMED
+                 no digest                      PASS -> NA COVERAGE_UNTIED
+
+    CONTROL B    a tied artifact from real fixture rows PASSes at the same
+                 nominal on BOTH trees. Every registered check (T1-5, S1-5,
+                 R9-12/R1-8, D1-5, E1-5) driven over fray 66a1eb2, chokepoint
+                 1a905d2 and torrent 373d935 in two interpreters, each
+                 asserting its own `resilient_mlkit.__file__`: 96 rows a side,
+                 and the two JSON records hash to the SAME sha256
+                 b9ff07e01d50f8f7fc9e821b50f080aca1a75518b6465c10f5c656c02eaf1ab5.
+                 ruff 0.16.5 clean; mypy 2.3.1 at main's exact two pre-existing
+                 PyYAML-stub errors, none new.
+
+    CONTROL C    14 mutations, one guard at a time, each file restored with its
+                 sha256 asserted byte-identical afterwards: 13 caught on the
+                 first pass. The one that SURVIVED was rewriting the verdict
+                 back onto the reported figures — invisible because past the tie
+                 the two agree — and it is now killed by a test using a declared
+                 `tol` below the representation allowance. 14/14.
+
+### What this does NOT close
+
+* **The rows are still the subject's.** The tie makes `empirical` and `n`
+  re-derivable; it does not make them true. A binding that GENERATES rows to
+  match a figure it wants satisfies this contract, and the test fixtures in
+  this branch do exactly that — deliberately, and in the test file rather than
+  in `src/`, because a library shipping that forge would ship the bypass with
+  the gate. **The next tie is a `row_set_digest` declared in COMMITTED state
+  beside `[coverage] nominal`**, which is the shape the level itself now has.
+  Left open rather than half-built. **Unassigned.**
+* **The group form ties to a declared partition, not to rows.** Internally
+  consistent fabricated group counts are refused by nothing here. It exists
+  because a million-row holdout cannot be handed to a check row by row, and a
+  contract nobody can satisfy is a contract nobody adopts.
+* **A `numpy.bool_` `covered` flag is refused** (`COVERAGE_ROWS_MALFORMED`).
+  mlkit has no numpy dependency to recognise one with and will not take one on
+  for eight repos; the adopter's fix is `bool(x)` at the yield site.
+
+### Residual 1 (OPEN) — the verdict change adopters inherit
+
+**D3 changes verdict on unchanged repo code**, PASS → NA `COVERAGE_UNTIED`, for
+every adopter whose coverage binding does not yet carry the operands. Measured
+over the three in-scope repos at their remote mains: none reaches D3 at all
+today (fray and chokepoint declare no `coverage` binding; torrent's binding
+raises `ModuleNotFoundError: pandas` in mlkit's own environment), so **no
+in-scope row moves on adoption of this branch**. The colleague-owned repos —
+arabica, surge, backend, blackout, choco — were not driven here and are not
+this agent's to change; arabica is the repo whose disclosed shortfall E-M21
+records being erased, and it is the one most likely to have a live D3 row.
+That is the same bargain E-M21 residual 1 and E-M23 residual 1 already record,
+one operand further along.
+
+**Status: E-M23 residual 2 CLOSED. Residual 1 above OPEN. The committed-digest
+tie named under "what this does NOT close" is OPEN and unassigned.**
+
+*Numbering note: E-M24 through E-M33 are taken by mlkit PRs #31-#39, all open
+at 2026-09-02. This entry took E-M34 to leave those alone; if the merge order
+makes E-M34 collide it is a heading rename and nothing else — no entry here is
+renumbered or rewritten. The one IN-PLACE edit this branch makes to this file
+is E-M23's residual-2 heading and status, struck through and pointed here,
+which is the bookkeeping a pinned residual's closure asks for and is the same
+move E-M22's verification entry recorded making. It is disclosed in the PR
+body.*
