@@ -40,7 +40,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from .served import ServedContractError, _SHA256_HEX, row_set_digest
+from .served import _SHA256_HEX, ServedContractError, row_set_digest
 
 __all__ = [
     "COVERED_KEY",
@@ -304,7 +304,7 @@ def _derive_groups(payload: Mapping[str, Any]) -> DerivedCoverage:
     if total == 0:
         raise CoverageRefused(
             MALFORMED,
-            f"the declared groups hold no rows at all; a coverage figure over "
+            "the declared groups hold no rows at all; a coverage figure over "
             "zero rows is a division by zero wearing a proportion's clothes",
         )
     return DerivedCoverage(

@@ -12,6 +12,7 @@ can invalidate a model before a single GPU-hour is bought.
 from __future__ import annotations
 
 import math
+from typing import Any
 
 from ..core import artifact, coverage_evidence
 from ..core.repo import BindingError, Repo
@@ -285,7 +286,12 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
             {"nominal": nominal, "empirical": empirical, "n": n, "tol": declared_tol},
         )
     tol = min(declared_tol, MAX_COVERAGE_TOL)
-    evidence = {"nominal": nominal, "empirical": empirical, "n": n, "tol": tol}
+    # `Any`, because past the tie below this dict carries the row-set digest and
+    # the tie unit beside the figures. Annotated rather than inferred so that a
+    # later string field is a decision and not a type error nobody sees until CI.
+    evidence: dict[str, Any] = {
+        "nominal": nominal, "empirical": empirical, "n": n, "tol": tol
+    }
 
     # Same NaN-comparison defect the D2 guard above refuses: a non-finite
     # coverage figure makes the tolerance comparison False and returns PASS.
