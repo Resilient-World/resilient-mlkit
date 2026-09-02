@@ -78,12 +78,30 @@ def test_the_gating_set_is_the_four_non_triage_phases() -> None:
     a repo whose serving path defines "promotable" for itself is not ready to
     train against a bar it can reinterpret.
 
+    It moved again, from 27 to 28, when D6 (``RESAMPLING_UNIT``) joined the
+    decision phase on 2026-09-01, and this paragraph is the "saying so".
+    ``assert len(ids) == 27`` → ``assert len(ids) == 28``; the assertion is the
+    same exact equality on a set one larger, and nothing else in this file
+    moved. D6 is a gating check on purpose, for R12's reason one layer up: a
+    repo whose interval rests on a resampling unit that contradicts its own
+    holdout policy has a promotion bar it can reinterpret. Round-8 adjudication
+    measured the size of that reinterpretation in ``resilient-fray`` — one
+    identical set of 1,365 rows, ``[+16.016, +29.646]`` under the unit the run
+    resampled and ``[-1.289, +41.704]`` under the unit its own split implies.
+
+    WHAT THIS DOES TO THE FLEET, measured rather than reasoned: nothing, today.
+    D6 answers NA wherever the ``resampling_declaration`` binding is absent,
+    which is every repo, and every repo already carries several NAs (D2, D3,
+    E1, E2, E3, R7 at minimum), so every repo was already IN-PROGRESS by the
+    branch above. What changes is the count in that state's message —
+    ``N of 27`` becomes ``N+1 of 28``.
+
     This is the ONLY place the number is written. The READY message below reads
     it back from ``gating_ids()`` rather than repeating it, because two copies
     of a count is how the version literal went stale in E-M08.
     """
     ids = gating_ids()
-    assert len(ids) == 27
+    assert len(ids) == 28
     assert set(PHASE_ORDER["triage"]).isdisjoint(ids), "triage diagnoses; it does not gate"
     for cid in HUMAN_ONLY:
         assert cid in ids, f"{cid} is reserved to the signatory and must still gate"
@@ -400,3 +418,96 @@ def test_the_parser_can_see_a_count_at_all() -> None:
     assert stated_check_counts("twenty-seven gating checks") == [("twenty-seven", 27)]
     assert stated_check_counts("26 checks") == [("26", 26)]
     assert stated_check_counts("triage checks") == []
+
+
+# -- the README's copy of the same count (E-M32)
+#
+# E-M32 recorded that `README.md` states the gating-check count in prose and
+# that NOTHING reads it. Adding D6 proved the point twice over: the sentence at
+# `README.md:114` was updated 27 -> 28 and the one in the Layout section nine
+# lines above it was NOT, so the file shipped saying `27 gating checks ... 32 in
+# the registry` in one paragraph and `28 gating checks` in the next -- and the
+# stale pair is the one that claims to be MEASURED, `len(gating_ids())` and
+# `len(all_check_ids())` with a retrieval date. A remembered number wearing a
+# measurement's clothes is worse than one that admits it is prose.
+#
+# The rule is the same one `test_portfolio_states_no_gating_count_the_registry
+# _contradicts` applies to `portfolio.py`, and deliberately no wider: only the
+# two phrasings that state a TOTAL are held. "Three of the readiness checks"
+# (`README.md:88`) is a subset count, is correct, and must stay legal -- which
+# is why this reads `gating checks` and `in the registry` rather than reusing
+# `stated_check_counts`, whose regex matches any count of checks at all.
+
+#: `28 gating checks`, `twenty-eight gating checks`. Requires the word
+#: "gating", so a subset count of some other kind of check is not matched.
+_README_GATING = re.compile(
+    r"\b([A-Za-z]+(?:-[A-Za-z]+)?|\d+)\s+gating\s+checks\b", re.IGNORECASE
+)
+#: `33 in the registry` — the whole registry, triage included.
+_README_REGISTRY = re.compile(
+    r"\b([A-Za-z]+(?:-[A-Za-z]+)?|\d+)\s+in\s+the\s+registry\b", re.IGNORECASE
+)
+
+
+def _readme_source() -> str:
+    import resilient_mlkit
+
+    root = Path(resilient_mlkit.__file__).resolve().parents[2]
+    return (root / "README.md").read_text(encoding="utf-8")
+
+
+def _stated(pattern: re.Pattern[str], source: str) -> list[tuple[str, int]]:
+    out: list[tuple[str, int]] = []
+    for token in pattern.findall(source):
+        value = _as_int(token)
+        if value is not None:
+            out.append((token, value))
+    return out
+
+
+def test_the_readme_states_no_check_count_the_registry_contradicts() -> None:
+    """FIRES at 24f23b8: README says both `27 gating checks` and `28 gating checks`."""
+    from resilient_mlkit.checks import all_check_ids, load_all
+
+    load_all()
+    source = _readme_source()
+    gating, registry = len(gating_ids()), len(all_check_ids())
+
+    wrong_gating = [(t, v) for t, v in _stated(_README_GATING, source) if v != gating]
+    wrong_registry = [
+        (t, v) for t, v in _stated(_README_REGISTRY, source) if v != registry
+    ]
+    assert wrong_gating == [], (
+        f"README.md states a gating-check count the registry contradicts "
+        f"(checks.PHASE_ORDER gates {gating}): {wrong_gating}"
+    )
+    assert wrong_registry == [], (
+        f"README.md states a registry size the registry contradicts "
+        f"({registry} checks are registered): {wrong_registry}"
+    )
+
+
+def test_the_readme_actually_states_both_counts() -> None:
+    """Not-dead. Without this the check above passes on a README stating neither.
+
+    That is the whole failure mode of a scanner: E-M32 exists because a count
+    nothing reads goes stale in place, and a reader that finds no count is
+    indistinguishable from a file with no stale count in it.
+    """
+    source = _readme_source()
+    assert _stated(_README_GATING, source), "README states no gating-check count"
+    assert _stated(_README_REGISTRY, source), "README states no registry size"
+
+
+def test_the_readme_parsers_do_not_match_a_subset_count() -> None:
+    """Negative control: `README.md:88`'s "Three of the readiness checks" is legal.
+
+    Without this pair the check above is indistinguishable from a rule banning
+    every number near the word "checks" in the README, which would forbid the
+    correct sentence along with the wrong one.
+    """
+    assert _stated(_README_GATING, "Three of the readiness checks import nothing") == []
+    assert _stated(_README_GATING, "28 gating checks") == [("28", 28)]
+    assert _stated(_README_REGISTRY, "5 diagnostic triage checks: 33 in the registry") == [
+        ("33", 33)
+    ]
