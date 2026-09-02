@@ -68,9 +68,16 @@ ROW_ID_KEY = "row_id"
 COVERED_KEY = "covered"
 
 #: Per-group operands: one entry per cell of a partition the subject declares.
-#: A million-row holdout cannot be handed to a check row by row, and a contract
-#: nobody can satisfy is a contract nobody adopts -- which is how a gate comes
-#: to be worked around rather than met.
+#:
+#: Why this form exists at all, MEASURED rather than asserted, because the
+#: first version of this comment claimed a million rows "cannot be handed to a
+#: check row by row" and that is not what the clock says. Driven on this
+#: module: 1,000,000 per-row operands derive in **0.96 s**, which is nothing.
+#: What they cost is MEMORY -- 242 MB for the payload and a 344 MB peak through
+#: :func:`derive` (``tracemalloc``, CPython 3.14) -- and that is charged inside
+#: the adopter's own process, beside whatever model held the holdout. The group
+#: form is the way out of the memory, not the way out of the arithmetic, and a
+#: contract nobody can afford to satisfy is a contract nobody adopts.
 GROUPS_KEY = "groups"
 GROUP_ID_KEY = "group_id"
 GROUP_N_KEY = "n"

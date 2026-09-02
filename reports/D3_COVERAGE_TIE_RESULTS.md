@@ -56,8 +56,8 @@ carries `row_set_digest`
 `01a5d69d82b2453bc2fbf32a55a24d833773ff4c8a8232ec4dbfd0a109b7d819`,
 `tie_unit: row`, `derived_covered: 4477`, `derived_n: 5000`,
 `derived_empirical: 0.8954`. A tied GROUP artifact over 1,000,000 rows in two
-cells also PASSes — the form that exists because a contract nobody can satisfy
-is a contract nobody adopts.
+cells also PASSes — the form that exists for the memory cost measured in
+section 5.
 
 **B2 — the suite.**
 
@@ -117,7 +117,23 @@ holdout or gate file was edited: `MAX_COVERAGE_TOL`, `MIN_COVERAGE_N` and
 `NOMINAL_AGREEMENT_EPS` stand as committed, and `git diff main..HEAD` touches
 no `.mlkit/`, no `docs/allowlist.yaml`, no `pyproject.toml` and no CI config.
 
-## 5. What is NOT closed
+## 5. Cost of the contract, measured
+
+A gate's adoption cost is a number, so it was measured rather than described.
+Driven on this branch (CPython 3.14, `tracemalloc`):
+
+| operands | `derive()` | payload in memory | peak through `derive()` |
+|---|---|---|---|
+| 100,000 rows | 0.09 s | — | — |
+| 1,000,000 rows | **0.96 s** | **242 MB** | **344 MB** |
+
+**This refutes the first version of this branch's own comment**, which said a
+million-row holdout "cannot be handed to a check row by row". A second is
+nothing; 344 MB inside the adopter's process, beside whatever model is holding
+the holdout, is not nothing. The group form is the way out of the MEMORY and
+not out of the arithmetic, and the comment now says that.
+
+## 6. What is NOT closed
 
 Written in the preregistration before the measurement and unchanged by it:
 

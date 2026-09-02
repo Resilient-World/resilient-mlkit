@@ -380,10 +380,12 @@ def test_negative_control_a_tied_row_artifact_passes_at_the_same_nominal(tmp_pat
 def test_negative_control_a_tied_group_artifact_passes(tmp_path):
     """SILENT: the per-declared-group form, for a holdout too big to list.
 
-    A million-row holdout cannot be handed to a check row by row, and a
-    contract nobody can satisfy is a contract nobody adopts. What this form
-    ties is stated in the preregistration and is deliberately weaker: the
-    figures are re-derived from a DECLARED PARTITION, not from rows.
+    It exists for a measured reason and not a rhetorical one: 1,000,000
+    per-row operands derive in 0.96 s, which is nothing, and cost 242 MB of
+    payload with a 344 MB peak inside the adopter's own process, which is not
+    (`reports/D3_COVERAGE_TIE_RESULTS.md` section 5). What this form ties is
+    stated in the preregistration and is deliberately weaker: the figures are
+    re-derived from a DECLARED PARTITION, not from rows.
     """
     payload = tied_groups([(400_000, 360_000), (600_000, 540_000)])
     result = run_d3(tmp_path, payload)

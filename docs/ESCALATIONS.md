@@ -2347,8 +2347,11 @@ was merely asserted.
   Left open rather than half-built. **Unassigned.**
 * **The group form ties to a declared partition, not to rows.** Internally
   consistent fabricated group counts are refused by nothing here. It exists
-  because a million-row holdout cannot be handed to a check row by row, and a
-  contract nobody can satisfy is a contract nobody adopts.
+  because of what the row form COSTS, measured rather than asserted: 1,000,000
+  per-row operands derive in 0.96 s -- which is nothing -- but cost 242 MB of
+  payload and a 344 MB peak inside the adopter's own process, beside whatever
+  model is holding the holdout. The group form is the way out of the memory and
+  not out of the arithmetic.
 * **A `numpy.bool_` `covered` flag is refused** (`COVERAGE_ROWS_MALFORMED`).
   mlkit has no numpy dependency to recognise one with and will not take one on
   for eight repos; the adopter's fix is `bool(x)` at the yield site.
