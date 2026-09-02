@@ -213,10 +213,39 @@ def test_negative_control_an_all_zero_count_still_fires_for_its_own_reason(tmp_p
 # -- D3: coverage, and the tolerance clamp a NaN defeats ------------------
 
 
+#: The row operands D3 recounts (E-M23 residual 2), forged fixture-side.
+#:
+#: The NaN controls below reach their guards BEFORE the tie -- that ordering is
+#: deliberate in `checks/decision.py` and is what keeps "this coverage was never
+#: measured" from being reported as "these operands disagree" -- so `_tie`
+#: returns those payloads untouched and only the two finite fixtures acquire
+#: rows. See `tests/test_decision_controls.py` for the same forge and the
+#: reasons it is not a library function.
+_TIE_FORGE = '''
+        from resilient_mlkit.core.served import row_set_digest
+
+        def _tie(out):
+            n, empirical = out.get("n"), out.get("empirical")
+            if not isinstance(n, int) or isinstance(n, bool) or n <= 0:
+                return out
+            if not isinstance(empirical, float) or not 0.0 <= empirical <= 1.0:
+                return out
+            covered = round(empirical * n)
+            if covered / n != empirical:
+                return out
+            rows = [
+                {"row_id": "row-%06d" % i, "covered": i < covered} for i in range(n)
+            ]
+            out["rows"] = rows
+            out["row_set_digest"] = row_set_digest([r["row_id"] for r in rows])
+            return out
+'''
+
+
 def _coverage(fields: str) -> str:
-    return f"""
+    return f"""{_TIE_FORGE}
         def coverage():
-            return {{{fields}}}
+            return _tie({{{fields}}})
     """
 
 

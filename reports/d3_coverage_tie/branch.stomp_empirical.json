@@ -1,0 +1,19 @@
+{
+  "case": "stomp_empirical",
+  "evidence": {
+    "declared_nominal": 0.9,
+    "derived_covered": 4477,
+    "derived_empirical": 0.8954,
+    "derived_n": 5000,
+    "empirical": 0.9,
+    "n": 5000,
+    "nominal": 0.9,
+    "reported_nominal": 0.9,
+    "row_set_digest": "01a5d69d82b2453bc2fbf32a55a24d833773ff4c8a8232ec4dbfd0a109b7d819",
+    "tie_unit": "row",
+    "tol": 0.05
+  },
+  "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/mlkit/src/resilient_mlkit/__init__.py",
+  "reason": "COVERAGE_SELF_REPORTED: the coverage binding reported empirical 0.9 against the 0.8954 its own row operands re-derive to -- 4477 covered of 5000 -- differing by 0.0046. The figure a verdict is taken on is the one the rows support, and these rows do not support this one",
+  "status": "FAIL"
+}

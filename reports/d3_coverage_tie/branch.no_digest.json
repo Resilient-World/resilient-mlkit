@@ -1,0 +1,14 @@
+{
+  "case": "no_digest",
+  "evidence": {
+    "declared_nominal": 0.9,
+    "empirical": 0.8954,
+    "n": 5000,
+    "nominal": 0.9,
+    "reported_nominal": 0.9,
+    "tol": 0.05
+  },
+  "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/mlkit/src/resilient_mlkit/__init__.py",
+  "reason": "COVERAGE_UNTIED: the coverage evidence carries operands but no row_set_digest, so the rows it counts have no name and this figure cannot be held against any other figure over the same rows. Compute it with core.served.row_set_digest over the same keys",
+  "status": "NA"
+}

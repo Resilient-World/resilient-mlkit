@@ -1,0 +1,21 @@
+{
+  "case": "tied",
+  "evidence": {
+    "declared_nominal": 0.9,
+    "derived_covered": 4477,
+    "derived_empirical": 0.8954,
+    "derived_n": 5000,
+    "empirical": 0.8954,
+    "n": 5000,
+    "nominal": 0.9,
+    "reported_empirical": 0.8954,
+    "reported_n": 5000,
+    "reported_nominal": 0.9,
+    "row_set_digest": "01a5d69d82b2453bc2fbf32a55a24d833773ff4c8a8232ec4dbfd0a109b7d819",
+    "tie_unit": "row",
+    "tol": 0.05
+  },
+  "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/mlkit/src/resilient_mlkit/__init__.py",
+  "reason": "",
+  "status": "PASS"
+}

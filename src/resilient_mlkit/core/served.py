@@ -270,6 +270,25 @@ def canonical_payload_sha256(payload: Mapping[str, Any], *, hash_key: str = HASH
 _SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
 
+def _row_key_canonical(row_key: Any) -> str:
+    """The one written form of a row key, which is what makes two keys equal.
+
+    Extracted from :func:`row_set_digest` verbatim -- same arguments, same
+    output, and `tests/test_served_contract.py` holds the digest of six fixed
+    key sets against the values measured before the extraction.
+
+    It exists as a name because a SECOND caller needs the same notion of
+    "the same key". ``core.coverage_evidence`` refuses a repeated row key, and
+    it was deciding sameness with ``repr``, which disagrees with this function
+    on any key that is a mapping or a sequence: ``{"a": 1, "b": 2}`` and
+    ``{"b": 2, "a": 1}`` are two keys to ``repr`` and one key here, and
+    ``(1, 2)`` and ``[1, 2]`` likewise. A guard whose notion of sameness
+    differs from the digest's is a guard the digest can be steered around,
+    which is docs/ESCALATIONS.md E-M35.
+    """
+    return json.dumps(row_key, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
 def row_set_digest(row_keys: Iterable[Any]) -> str:
     """sha256 over the identifiers of the rows a figure was computed on.
 
@@ -286,10 +305,7 @@ def row_set_digest(row_keys: Iterable[Any]) -> str:
     An empty key set is refused. A digest over no rows is a constant, and two
     comparisons carrying it would tie to each other and read as matched.
     """
-    canonical = sorted(
-        json.dumps(k, sort_keys=True, separators=(",", ":"), allow_nan=False)
-        for k in row_keys
-    )
+    canonical = sorted(_row_key_canonical(k) for k in row_keys)
     if not canonical:
         raise ServedContractError(
             "a row-set digest over no rows identifies nothing, and two of them "

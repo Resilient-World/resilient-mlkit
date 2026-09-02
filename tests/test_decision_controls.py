@@ -493,10 +493,60 @@ def _run_d3(
         repo.release()
 
 
-def _coverage(fields: str) -> str:
-    return f"""
+#: A fixture-side forge for the row operands D3 now recounts (E-M23 residual 2).
+#:
+#: NOT a library function, and deliberately never one: it manufactures rows to
+#: match a claimed figure, which is the thing the tie exists to refuse, and
+#: mlkit must not ship a way to do it. It lives in the fixture because the
+#: fixture is the SUBJECT here.
+#:
+#: The digest comes from `core.served.row_set_digest` -- the one definition
+#: (rule 7). A second spelling in the test would prove agreement with itself.
+#:
+#: Payloads whose `empirical`/`n` are not an exact quotient (the NaN and
+#: non-number controls) are returned untouched: those fixtures assert refusals
+#: D3 reaches BEFORE the tie, and forging operands for them would move which
+#: guard the control measures.
+_TIE_FORGE = '''
+        from resilient_mlkit.core.served import row_set_digest
+
+        def _tie(out):
+            n, empirical = out.get("n"), out.get("empirical")
+            if not isinstance(n, int) or isinstance(n, bool) or n <= 0:
+                return out
+            if not isinstance(empirical, float) or not 0.0 <= empirical <= 1.0:
+                return out
+            covered = round(empirical * n)
+            if covered / n != empirical:
+                return out
+            rows = [
+                {"row_id": "row-%06d" % i, "covered": i < covered} for i in range(n)
+            ]
+            out["rows"] = rows
+            out["row_set_digest"] = row_set_digest([r["row_id"] for r in rows])
+            return out
+'''
+
+
+def _coverage(fields: str, *, tie: bool = True) -> str:
+    """A coverage binding, tied to a row set by default.
+
+    `tie=False` is the payload shape E-M23 residual 2 recorded as PASSing --
+    two scalars over a row set nobody names -- and it now has controls of its
+    own in `tests/test_d3_coverage_tie.py`. Everything else here gains a
+    CONFORMING tie and keeps its assertion verbatim, which is exactly what
+    these same fixtures did when E-M21 made the nominal level a declaration:
+    the fixture became honest under the new contract, and nothing it asserts
+    moved.
+    """
+    if not tie:
+        return f"""
         def coverage():
             return {{{fields}}}
+    """
+    return f"""{_TIE_FORGE}
+        def coverage():
+            return _tie({{{fields}}})
     """
 
 

@@ -1,0 +1,14 @@
+{
+  "case": "both_forms",
+  "evidence": {
+    "declared_nominal": 0.9,
+    "empirical": 0.8954,
+    "n": 5000,
+    "nominal": 0.9,
+    "reported_nominal": 0.9,
+    "tol": 0.05
+  },
+  "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/i2m1w/mlkit/src/resilient_mlkit/__init__.py",
+  "reason": "COVERAGE_ROWS_MALFORMED: the evidence carries both rows and groups. Two descriptions of the same row set can disagree, and a check that picked one would be choosing which of the subject's answers to believe; supply the rows or the groups they partition, not both",
+  "status": "FAIL"
+}
