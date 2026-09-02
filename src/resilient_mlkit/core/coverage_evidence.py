@@ -40,7 +40,12 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from .served import _SHA256_HEX, ServedContractError, row_set_digest
+from .served import (
+    _SHA256_HEX,
+    ServedContractError,
+    _row_key_canonical,
+    row_set_digest,
+)
 
 __all__ = [
     "COVERED_KEY",
@@ -244,10 +249,27 @@ def _refuse_repeats(keys: Sequence[Any], *, unit: str) -> None:
     with `r7` twice is either one row counted twice or two rows sharing a name.
     Both make ``n`` mean something other than "how many held-out rows there
     are", and neither can be joined to another artifact by that name.
+
+    Sameness is decided by ``core.served``'s own written form of a key and NOT
+    by ``repr``, because the two disagree and the disagreement was exploitable
+    (docs/ESCALATIONS.md E-M35, found by adversarial verification of this
+    branch). ``repr({"a": 1, "b": 2}) != repr({"b": 2, "a": 1})`` while the
+    digest treats them as one key, and the same holds for ``(1, 2)`` against
+    ``[1, 2]``: a subject with composite row ids could hand over the SAME row
+    twice, evade this guard, and inflate ``n`` and ``covered`` past both the
+    small-holdout NA and the coverage verdict, with the digest agreeing. A
+    guard whose notion of "the same row" differs from the digest's is a guard
+    the digest can be steered around, so there is now one notion.
     """
     seen: set[str] = set()
     for key in keys:
-        marker = repr(key)
+        try:
+            marker = _row_key_canonical(key)
+        except (TypeError, ValueError):
+            # Not writable down; `_digest_of` refuses it by name a moment later
+            # and says why. Falling back to `repr` here keeps this loop total
+            # without letting an unwritable key decide anything.
+            marker = repr(key)
         if marker in seen:
             raise CoverageRefused(
                 MALFORMED,

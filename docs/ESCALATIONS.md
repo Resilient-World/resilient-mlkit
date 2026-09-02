@@ -2381,3 +2381,95 @@ is E-M23's residual-2 heading and status, struck through and pointed here,
 which is the bookkeeping a pinned residual's closure asks for and is the same
 move E-M22's verification entry recorded making. It is disclosed in the PR
 body.*
+
+---
+
+## E-M35 — the duplicate-row guard and the row-set digest disagreed about which keys are the same key
+
+**Raised and repaired** 2026-09-02 on `verify/i2-m1-adversarial`, branched from
+`fix/m-d3-coverage-row-digest-tie` (mlkit PR #41, recursive-loop item I2-M1),
+by adversarial verification of that branch. Root cause in `src/`; no gate file
+edited, no threshold moved, no range widened, no holdout narrowed, no test that
+exists on `main` or on PR #41 changed.
+
+### The defect, driven before it was fixed
+
+PR #41 gives D3 a tie: `empirical` and `n` are recounted from per-row operands,
+and the rows are named with `core.served.row_set_digest`. Part of that contract
+is that a repeated row key is refused —
+`core.coverage_evidence._refuse_repeats`, whose own docstring says the digest
+"is the only handle on WHICH rows a count is over, and a set of keys with `r7`
+twice is either one row counted twice or two sharing a name".
+
+That guard decided sameness with `repr`. `row_set_digest` decides it with
+`json.dumps(..., sort_keys=True, separators=(",", ":"), allow_nan=False)`. The
+two disagree on every key that is a mapping or a sequence. Driven at PR #41's
+head `1dfacb6`, in an interpreter asserting its own
+`resilient_mlkit.core.coverage_evidence.__file__`:
+
+    row_id {"a": 1, "b": 2} and row_id {"b": 2, "a": 1}
+      repr differ:        True      -> _refuse_repeats sees two rows
+      row_set_digest same: True     -> the digest sees one row
+
+    derive(...)  ->  n=5000  covered=4500  empirical=0.9     (NOT refused)
+
+and the same for `(1, 2)` against `[1, 2]`. So a subject whose row ids are
+composite — a gauge and a date, a county and a year, which is the ordinary
+shape for a panel — could hand the SAME row over twice, pass the duplicate
+guard, and have the digest agree with the inflation. That buys exactly what
+`_refuse_repeats` exists to refuse: `n` and `covered` moved together, past the
+small-holdout NA and into the coverage verdict, on rows that were counted
+twice.
+
+The mapping form reaches D3 through a real binding: `run_d3`'s fixture
+persists its payload as JSON and reads it back, and JSON preserves key order,
+so the collision survives the round trip. The tuple/list form does not survive
+JSON and is driven against `derive` directly — which is the reachable path,
+because D3 calls the coverage binding and uses its return value with no JSON
+round trip in between.
+
+### The repair
+
+One notion of sameness, for the same reason there is one digest (rule 7).
+`core.served` grows `_row_key_canonical`, extracted from `row_set_digest`
+**verbatim** — same arguments, same output — and `_refuse_repeats` decides
+sameness with it instead of with `repr`.
+
+Because `row_set_digest` is the fleet's join key and every committed artifact
+that names a row set names it with one of its values, the extraction is held to
+byte identity: `tests/test_served_contract.py::test_row_set_digest_is_byte_
+identical_after_the_canonical_key_extraction` pins the digests of six fixed key
+sets to the values measured at `1dfacb6` BEFORE the extraction, pasted rather
+than recomputed. Mutating the canonical spelling fails it.
+
+### Controls, driven
+
+* FIRES — one row written twice with its id's keys permuted, through `run_d3`
+  against a real git repo committing `[coverage] nominal = 0.90`: FAIL
+  `COVERAGE_ROWS_MALFORMED`, "appears more than once".
+* FIRES — a `(1, 2)` row id beside a `[1, 2]` one, at the module: `CoverageRefused`.
+* SILENT — 5,000 rows whose ids are genuinely distinct mappings: PASS,
+  `derived_n = 5000`, `derived_covered = 4500`. The refusal is about the
+  repeat, not about composite keys, which are legitimate.
+* CHECK-NOT-DEAD — restoring `repr` fails the three new positive controls;
+  changing the canonical spelling fails the digest-identity test.
+* Suite 948 → 953 at PR #41's head, node ids diffed, **zero removed**, 5 added.
+  `ruff check src tests scripts` clean at 0.16.5; `mypy src/resilient_mlkit`
+  clean at 2.3.1.
+
+### What this does NOT establish
+
+Everything E-M34 records as open stays open, unchanged: the rows are still the
+subject's, a binding that GENERATES rows to match a figure still satisfies the
+tie, the group form still ties to a declared partition rather than to rows, and
+adopters still move PASS → NA on unchanged code. This entry closes one bypass
+of one guard inside that contract; it does not make the contract stronger than
+E-M34 says it is.
+
+### Merge note
+
+This branch is `fix/m-d3-coverage-row-digest-tie` plus one commit. It touches
+`src/resilient_mlkit/core/served.py` at lines 256-293 on `main`, a region no
+other open mlkit PR modifies (#32, #37 and #38 all change `served.py`, at the
+import block, `__all__`, and from `seal` onward); `__all__` is deliberately NOT
+touched, so `_row_key_canonical` stays private and adds no conflict there.
