@@ -9,10 +9,11 @@ that did not come out of a run of this CLI does not exist.
 
 ## Layout
 
-- `src/resilient_mlkit/` — the package. 27 gating checks across 4 phases, plus
-  5 diagnostic triage checks: 32 in the registry. Counted, not remembered —
-  `len(gating_ids())` and `len(all_check_ids())` on 2026-08-29, which is the
-  same discipline `checks/__init__.py` states in its own docstring.
+- `src/resilient_mlkit/` — the package. 28 gating checks across 4 phases, plus
+  5 diagnostic triage checks: 33 in the registry. Counted, not remembered —
+  `len(gating_ids())` and `len(all_check_ids())` on 2026-09-01, which is the
+  same discipline `checks/__init__.py` states in its own docstring, and which
+  `tests/test_promotion_state.py` now holds this file to.
 - `src/resilient_mlkit/measurement.py` — **the import that replaces the hand
   copies.** The repo-facing `Measured` / `Unmeasured` gate vocabulary, over the
   canonical six-state `Status` re-exported from `core.result` (identity, not a
