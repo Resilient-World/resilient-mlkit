@@ -2521,3 +2521,142 @@ had, for the same reason.
   documents only the CLI surface. Same reason for not editing the design note.
   The name to import is `resilient_mlkit.verify_report`, and this is the line
   recording it.
+<!--
+NUMBERING NOTE. These three were first written as E-M24/25/26 and renumbered to
+30/31/32 before this branch was reviewed, because open PR #31
+(`fix/build-identity-e-054`) had already taken E-M24 on a branch that had not
+reached `main` when this file was appended to. Two entries wearing one id is
+exactly the collision this file exists to make findable, and the gap 27-29 is
+left deliberately for the other branches in flight rather than closed up. Both
+branches APPEND at EOF, so the merge is a textual conflict at the tail and not a
+semantic one; resolve it by keeping both blocks.
+-->
+
+## E-M30 — fray's unseen-year track resamples rows under a crop-year policy
+
+**Measured by** round-8 adjudication (`scratchpad/loop/adjudication.md` §2.1),
+re-read here on 2026-09-01. Not re-measured by mlkit: the figures below are
+quoted from that adjudication, which rebuilt the selected checkpoint's val
+predictions through fray's own builders with feature names asserted equal to
+the checkpoint's 26.
+
+`resilient-fray`'s holdout policy puts **whole crop years in one partition**, so
+the exchangeable unit is the crop year and VAL has five. The run's bootstrap
+resampled **1,365 rows** as if independent.
+
+| resampling unit | point | 95% CI | clears zero |
+|---|---:|---|---|
+| ROW — what the run reported | +22.811 | [+16.016, +29.646] | yes |
+| CROP-YEAR block (5 clusters) | +22.811 | **[−1.289, +41.704]** | **NO** |
+
+**No gate was edited.** fray's preregistration fixed the row bootstrap in
+advance and the run honoured it exactly; this is a specification defect found by
+adjudication, not a loosened threshold.
+
+`mlkit` now carries the instrument (`core.served.ResamplingDeclaration`, check
+`D6`), and D6 measures **NA** on fray because no `resampling_declaration`
+binding exists — driven 2026-09-01, along with the other seven repos.
+
+**Cannot be done from here**: declaring the binding is a write into
+`resilient-fray`, and its trainer is owned by open PR #78
+(`feat/f3-unseen-year-track`), which this branch does not touch.
+
+**Proposed**: on a branch taken FROM #78, add `resampling_declaration` to
+`.mlkit/repo.toml` returning `blocking_unit = "crop_year"` with the assignment
+built from `validation.yield_holdout.county_year_splits` — the same splitter
+`splits` already reports — and `unit = "crop_year"`. D6 will then FAIL if the
+trainer's bootstrap is ever pointed back at rows, and the trainer's own
+promotion condition can carry the interval into
+`core.served.Comparison(skill_interval_low=..., skill_interval_high=...,
+resampling=...)`, where `INTERVAL_COVERS_ZERO` is a FAIL rather than a footnote.
+
+---
+
+## E-M31 — chokepoint's corridor bootstrap is the fleet's correct convention and is undeclared
+
+`resilient-chokepoint` resamples corridors — 28 clusters, predictions held
+fixed — which is the convention the round-8 adjudication endorsed and asked the
+fleet to adopt. D6 measures **NA** there too (no binding), so the fleet's
+*correct* convention is as undeclared as the incorrect one.
+
+`ResamplingDeclaration` classifies chokepoint's shape as `UNIT_CROSSCUTS_ARMS`
+and does **not** refuse it: a corridor's rows appear in train, val and test, so
+the time-blocked split does not partition that axis and the policy's blocks say
+nothing about it.
+
+**Stated so it is not read as more than it is**: that classification records the
+convention, it does not certify it. A corridor bootstrap does not account for
+the temporal axis the split partitions, and mlkit makes no claim that it does.
+What the declaration does is put both numbers in the record side by side — the
+units resampled and the blocks in the arm that were not — which is precisely the
+disclosure whose absence made §2.1 a hand reconstruction.
+
+**Cannot be done from here**: a write into `resilient-chokepoint`, whose ladder
+runner is owned by open PR #101 (`run/foundation-full-val-ladder`).
+
+**Proposed**: branch from #101; `blocking_unit = "date"`, `unit = "corridor"`,
+`arm = "val"`, assignment from `daily_flow.build_flow_frame` / `split_frame`.
+
+---
+
+## E-M32 — README states the gating-check count as a second literal that nothing compares
+
+`portfolio.py`'s docstring records the rule ("a count is obtained by counting,
+never by remembering") and `tests/test_promotion_state.py` holds any count
+stated **in that file** against `len(gating_ids())`. `README.md` states the same
+count in prose and **no test reads it**. It said `27` while D6 was being added
+and would have gone on saying it.
+
+Found by adding a gating check, not by a check. Updated to `28` in the same
+commit and recorded here rather than fixed properly, because the honest fix —
+generating that sentence from `gating_ids()`, or extending the
+`test_version_declaration` style of doc/code agreement to the README — is a
+separate change and needs its own control pair. This entry is the standing note
+that the copy exists.
+
+**Can be done from here** (unlike E-M30/E-M31): it is a change inside mlkit.
+Left open deliberately, not blocked.
+
+### CLOSED 2026-09-01 by adversarial verification — the copy was not one copy, and the update missed it
+
+The entry above says "Updated to `28` in the same commit". **It was not.**
+Measured at `24f23b8`, the branch head as pushed: `README.md` contains the count
+**twice**, and only one was updated.
+
+| where | at `24f23b8` | measured truth |
+|---|---|---|
+| `README.md:114` "`READY-TO-TRAIN` requires all N gating checks" | `28` | `len(gating_ids())` = **28** |
+| `README.md:12` "the package. N gating checks across 4 phases" | `27` | **28** |
+| `README.md:13` "5 diagnostic triage checks: N in the registry" | `32` | `len(all_check_ids())` = **33** |
+
+So the file shipped contradicting itself nine lines apart, and the half that
+went stale is the half that **claims to be measured** — "Counted, not
+remembered — `len(gating_ids())` and `len(all_check_ids())` on 2026-08-29".
+A remembered number wearing a measurement's clothes is worse than one that
+admits it is prose, and it is CLAUDE.md rule 2's exact shape: a plausible
+number that does not get checked.
+
+Both literals are corrected here (28 / 33, counted on 2026-09-01), and the
+"nothing compares it" half is closed rather than restated:
+`tests/test_promotion_state.py::test_the_readme_states_no_check_count_the_registry_contradicts`
+holds both README figures against `len(gating_ids())` and `len(all_check_ids())`.
+
+Controls driven, each independently:
+
+- **A** — README as it ships at `24f23b8`: FAILS,
+  `README.md states a gating-check count the registry contradicts (checks.PHASE_ORDER gates 28): [('27', 27)]`.
+- **B** — gating count correct, registry size reverted to `32`: FAILS on the
+  second leg, `states a registry size the registry contradicts (33 checks are registered): [('32', 32)]`.
+  Neither leg is carried by the other.
+- **C, not dead** — a README stating neither count: FAILS
+  `README states no gating-check count`. A scanner that finds nothing is
+  otherwise indistinguishable from a file with nothing wrong in it.
+- **negative control** — `README.md:88`'s "Three of the readiness checks" is a
+  SUBSET count, is correct, and stays legal. The two parsers require the literal
+  words `gating checks` / `in the registry` rather than reusing
+  `stated_check_counts`, whose regex matches any count of checks at all.
+
+Scope kept deliberately narrow: the rule is "any TOTAL stated in README.md
+equals the registry's", not "README.md contains no numbers". `CHANGELOG.md`'s
+`26` and `25` are history and are correctly left alone — a changelog that
+rewrote its own past counts would be worse than one that goes stale.

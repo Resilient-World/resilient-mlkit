@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from typing import Any
 
 from ..core import (
     environment,
@@ -199,6 +200,56 @@ def r2_overfit(repo: Repo, ctx: RunContext) -> CheckResult:
     )
 
 
+class SplitsUnreadable(RuntimeError):
+    """A ``splits`` binding did not return a mapping of split → group ids.
+
+    Carries the reason AND the evidence, because both were already part of R3's
+    verdict and a refusal that loses its evidence on the way through a helper
+    is a weaker refusal than the one it replaced.
+    """
+
+    def __init__(self, reason: str, evidence: dict[str, Any] | None = None) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.evidence: dict[str, Any] = dict(evidence or {})
+
+
+def normalise_splits(raw: Any) -> dict[str, set[str]]:
+    """``{split: {group id, …}}`` from a ``splits`` binding's return value.
+
+    Extracted from R3 so that D6 — which ties a repo's declared resampling
+    blocks to the same binding — reads it through the SAME parser. Two readings
+    of "what the splits binding said" is the rule-7 failure mode inside one
+    package: the character-splitting defect below would have to be found and
+    fixed twice, and the second copy is the one nobody remembers to fix.
+
+    A str (or bytes) is iterable, so ``set(map(str, v))`` accepts one and
+    silently splits it into CHARACTERS. That is not a type quibble: a binding
+    returning ``{"train": "abc", "val": "de", "test": "fg"}`` was reported PASS
+    with ``n_train=3, n_val=2, n_test=2`` -- the letters of 'abc' counted as
+    three sites, disjoint, above the holdout floor, and indistinguishable in
+    the table from a real blocked split. It fails loudly on long strings, which
+    share characters, and silently on short ones, so the defect appears only
+    where it does damage. Refused explicitly rather than coerced: mlkit does
+    not get to decide that one string means one group.
+    """
+    mapping = dict(raw)
+    stringy = {
+        str(k): type(v).__name__
+        for k, v in mapping.items()
+        if isinstance(v, str | bytes)
+    }
+    if stringy:
+        raise SplitsUnreadable(
+            "splits must map each split to a collection of group ids, but "
+            + ", ".join(f"{k} is a {t}" for k, t in sorted(stringy.items()))
+            + "; a string would be iterated by character and counted as one "
+            "group per letter",
+            {"non_collection_splits": stringy},
+        )
+    return {str(k): set(map(str, v)) for k, v in mapping.items()}
+
+
 @check("R3", PHASE, "BLOCKED_SPLITS — train/val/test share no group")
 def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
     try:
@@ -206,28 +257,9 @@ def r3_blocked_splits(repo: Repo, ctx: RunContext) -> CheckResult:
     except BindingError as exc:
         return CheckResult.na("R3", PHASE, str(exc))
     try:
-        raw = dict(fn())
-        # A str (or bytes) is iterable, so `set(map(str, v))` accepts one and
-        # silently splits it into CHARACTERS. That is not a type quibble: a
-        # binding returning {"train": "abc", "val": "de", "test": "fg"} was
-        # reported PASS with n_train=3, n_val=2, n_test=2 -- the letters of
-        # 'abc' counted as three sites, disjoint, above the holdout floor, and
-        # indistinguishable in the table from a real blocked split. It fails
-        # loudly on long strings, which share characters, and silently on
-        # short ones, so the defect appears only where it does damage.
-        # Refused explicitly rather than coerced: mlkit does not get to decide
-        # that one string means one group.
-        stringy = {str(k): type(v).__name__ for k, v in raw.items() if isinstance(v, str | bytes)}
-        if stringy:
-            return CheckResult.failed(
-                "R3", PHASE,
-                "splits must map each split to a collection of group ids, but "
-                + ", ".join(f"{k} is a {t}" for k, t in sorted(stringy.items()))
-                + "; a string would be iterated by character and counted as one "
-                "group per letter",
-                {"non_collection_splits": stringy},
-            )
-        splits = {str(k): set(map(str, v)) for k, v in raw.items()}
+        splits = normalise_splits(fn())
+    except SplitsUnreadable as exc:
+        return CheckResult.failed("R3", PHASE, exc.reason, exc.evidence)
     except CredentialRequired:
         raise
     except Exception as exc:  # noqa: BLE001

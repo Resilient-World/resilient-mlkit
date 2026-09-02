@@ -114,6 +114,69 @@ has always had, for the same reason: it cannot be tied to anything. The
 portfolio legend now reads `S=stale(repo SHA or mlkit build moved)`, because
 `SHA moved` would send a reader looking at the wrong thing.
 
+### D6 `RESAMPLING_UNIT`, and the dependence unit inside `core.served`
+
+**New check, new gating check, and one contract surface widened.** Nothing here
+re-decides a comparison that carries no interval — measured, not asserted: the
+suite is 912 passed at `6921e9a` and 912 passed with these lanes added, and
+every existing lane of `challenger_decision` is unreachable-by-construction from
+the new ones.
+
+**What it is for.** Round-8 adjudication measured it in `resilient-fray`. That
+repo's holdout policy puts whole crop years in one partition, so the
+exchangeable unit is the crop year and its val arm has five of them. The run's
+bootstrap resampled 1,365 rows as if independent. On one identical set of rows:
+`[+16.016, +29.646]` under the unit the run resampled — clears zero — against
+`[-1.289, +41.704]` under the unit its own split implies — does not.
+`resilient-chokepoint` resamples its dependence unit (corridor block). **No gate
+had been edited by anyone**: fray's preregistration fixed the row bootstrap in
+advance and the run honoured it exactly. Two conventions, one fleet, and nothing
+in this instrument required either or required the choice to be stated.
+
+**What landed.**
+
+* `core.served.RowUnit` and `core.served.ResamplingDeclaration`. Six labels are
+  declared; the counts, three `row_set_digest` ties, the relation and the
+  refusal are all `init=False` and derived from an assignment covering the whole
+  panel. `ResamplingDeclaration(..., n_units_in_arm=5)` is a `TypeError` naming
+  the argument — `Comparison.row_matched` (M-06) one level up.
+* `Comparison` gains `skill_interval_low` / `skill_interval_high` /
+  `resampling`. An interval with no declaration raises; a declaration with no
+  interval raises; an interval that does not contain its own point estimate
+  raises.
+* `challenger_decision` gains `RESAMPLING_ROWS_UNTIED` (NA),
+  `DEPENDENCE_UNIT_CONTRADICTS_POLICY` (NA) and `INTERVAL_COVERS_ZERO` (FAIL,
+  asked only after the point estimate has already cleared).
+  `ChallengerDecision.to_dict()` emits a top-level `resampling` key that reads
+  `"NA"` when nobody declared one — a printed absence, not a missing key.
+* `D6 RESAMPLING_UNIT` in the decision phase, resolving a new
+  `resampling_declaration` binding and tying its declared blocks to the `splits`
+  binding R3 already reads. `checks.readiness.normalise_splits` is R3's parser
+  EXTRACTED, not copied; R3's verdicts are byte-identical across all eight repos
+  and ten synthetic edge cases, driven at both shas.
+
+**Consumer impact, measured.** `PHASE_ORDER["decision"]` goes from five ids to
+six, so the phase prints `0/6` where it printed `0/5`, and the gating set goes
+27 → 28 (`tests/test_promotion_state.py`'s deliberate tripwire, edited with the
+reason written in). D6 answers NA wherever the binding is absent, which is all
+eight repos today — driven directly against each of them, NA 8/8, PASS 0/8, and
+a PASS anywhere would have been evidence the check is blind. Every repo already
+carried several NAs, so no repo's terminal state moves; only the count in its
+message does.
+
+**One artifact's BYTES move, and no verdict does.**
+`ChallengerDecision.to_dict()` gains a top-level `resampling` key and each
+comparison in `evidence` gains three. Grepped across the fleet rather than
+assumed: `resilient-fray/src/registry/promotion_gate.py:360` embeds a decision
+dict inside the promotion record it writes at `:928` and the release bundle at
+`:910`, so fray's promotion records gain four keys reading `"NA"` the first time
+it repins. `resilient-chokepoint` serialises no `ChallengerDecision`. Nothing
+about `canonical_payload_sha256` or a served-model artifact's own hash changes;
+every committed `artifact_sha256` in the fleet is unaffected.
+
+**Adoption is a write into other repos and is not done here** — see
+`docs/ESCALATIONS.md` E-M30 and E-M31.
+
 ### R10 `absence adjudicated as a pass` fired on honest NA-reporting guards (E-M19)
 
 **R10 changes verdict on unchanged repo code in one repo**, in the direction
