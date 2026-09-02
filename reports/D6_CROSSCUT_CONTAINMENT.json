@@ -1,0 +1,272 @@
+{
+  "REFUSAL_CONSTANT_MOVED": 6912,
+  "REFUSAL_CONSTANT_MOVED_LATER_IN_THE_LADDER": 0,
+  "RELATION_MOVED_WITHOUT_VERDICT_MOVING": 56160,
+  "SILENCED": 0,
+  "SILENT_LABEL_CLAUSE_REGRESSIONS": 0,
+  "TIGHTENED": 6912,
+  "UNCHANGED": 196128,
+  "example_constant_moved": [
+    {
+      "base": {
+        "blocking_unit": "the_unit",
+        "cells": [
+          [
+            "val",
+            1,
+            "u0"
+          ],
+          [
+            "val",
+            1,
+            "u2"
+          ],
+          [
+            "val",
+            1,
+            "u2"
+          ],
+          [
+            "train",
+            2,
+            "u0"
+          ]
+        ],
+        "n_blocks_in_arm": 1,
+        "n_units_in_arm": 2,
+        "refusal": "UNIT_LABEL_CONTRADICTS_CONTENT",
+        "relation": "UNIT_CROSSCUTS_ARMS"
+      },
+      "case": "0002f67dd52d828b",
+      "head": {
+        "blocking_unit": "the_unit",
+        "cells": [
+          [
+            "val",
+            1,
+            "u0"
+          ],
+          [
+            "val",
+            1,
+            "u2"
+          ],
+          [
+            "val",
+            1,
+            "u2"
+          ],
+          [
+            "train",
+            2,
+            "u0"
+          ]
+        ],
+        "n_blocks_in_arm": 1,
+        "n_units_in_arm": 2,
+        "refusal": "DEPENDENCE_UNIT_TOO_FINE",
+        "relation": "UNIT_FINER_THAN_BLOCK"
+      }
+    },
+    {
+      "base": {
+        "blocking_unit": "the_unit",
+        "cells": [
+          [
+            "train",
+            0,
+            "u1"
+          ],
+          [
+            "val",
+            2,
+            "u0"
+          ],
+          [
+            "train",
+            1,
+            "u2"
+          ],
+          [
+            "val",
+            2,
+            "u1"
+          ]
+        ],
+        "n_blocks_in_arm": 1,
+        "n_units_in_arm": 2,
+        "refusal": "UNIT_LABEL_CONTRADICTS_CONTENT",
+        "relation": "UNIT_CROSSCUTS_ARMS"
+      },
+      "case": "001f5599789b0db9",
+      "head": {
+        "blocking_unit": "the_unit",
+        "cells": [
+          [
+            "train",
+            0,
+            "u1"
+          ],
+          [
+            "val",
+            2,
+            "u0"
+          ],
+          [
+            "train",
+            1,
+            "u2"
+          ],
+          [
+            "val",
+            2,
+            "u1"
+          ]
+        ],
+        "n_blocks_in_arm": 1,
+        "n_units_in_arm": 2,
+        "refusal": "DEPENDENCE_UNIT_TOO_FINE",
+        "relation": "UNIT_FINER_THAN_BLOCK"
+      }
+    }
+  ],
+  "example_silenced": [],
+  "example_tightened": [
+    {
+      "base": {
+        "blocking_unit": "the_block",
+        "cells": [
+          [
+            "train",
+            0,
+            "u0"
+          ],
+          [
+            "val",
+            2,
+            "u2"
+          ],
+          [
+            "val",
+            2,
+            "u0"
+          ],
+          [
+            "train",
+            0,
+            "u0"
+          ]
+        ],
+        "n_blocks_in_arm": 1,
+        "n_units_in_arm": 2,
+        "refusal": "",
+        "relation": "UNIT_CROSSCUTS_ARMS"
+      },
+      "case": "003b614a0ab65a12",
+      "head": {
+        "blocking_unit": "the_block",
+        "cells": [
+          [
+            "train",
+            0,
+            "u0"
+          ],
+          [
+            "val",
+            2,
+            "u2"
+          ],
+          [
+            "val",
+            2,
+            "u0"
+          ],
+          [
+            "train",
+            0,
+            "u0"
+          ]
+        ],
+        "n_blocks_in_arm": 1,
+        "n_units_in_arm": 2,
+        "refusal": "DEPENDENCE_UNIT_TOO_FINE",
+        "relation": "UNIT_FINER_THAN_BLOCK"
+      }
+    },
+    {
+      "base": {
+        "blocking_unit": "the_block",
+        "cells": [
+          [
+            "val",
+            0,
+            "u2"
+          ],
+          [
+            "val",
+            0,
+            "u0"
+          ],
+          [
+            "train",
+            1,
+            "u2"
+          ],
+          [
+            "val",
+            2,
+            "u1"
+          ]
+        ],
+        "n_blocks_in_arm": 2,
+        "n_units_in_arm": 3,
+        "refusal": "",
+        "relation": "UNIT_CROSSCUTS_ARMS"
+      },
+      "case": "0041cb8bfce2b5f7",
+      "head": {
+        "blocking_unit": "the_block",
+        "cells": [
+          [
+            "val",
+            0,
+            "u2"
+          ],
+          [
+            "val",
+            0,
+            "u0"
+          ],
+          [
+            "train",
+            1,
+            "u2"
+          ],
+          [
+            "val",
+            2,
+            "u1"
+          ]
+        ],
+        "n_blocks_in_arm": 2,
+        "n_units_in_arm": 3,
+        "refusal": "DEPENDENCE_UNIT_TOO_FINE",
+        "relation": "UNIT_FINER_THAN_BLOCK"
+      }
+    }
+  ],
+  "n_cases": 209952,
+  "refusal_transitions": {
+    "UNIT_LABEL_CONTRADICTS_CONTENT -> DEPENDENCE_UNIT_TOO_FINE": 6912
+  },
+  "relation_transitions": {
+    "UNIT_CROSSCUTS_ARMS -> UNIT_COARSER_THAN_BLOCK": 2592,
+    "UNIT_CROSSCUTS_ARMS -> UNIT_CROSSCUTS_BLOCK": 3456,
+    "UNIT_CROSSCUTS_ARMS -> UNIT_FINER_THAN_BLOCK": 16416,
+    "UNIT_CROSSCUTS_ARMS -> UNIT_IS_THE_BLOCK": 33696
+  },
+  "tightened_by_new_refusal": {
+    "DEPENDENCE_UNIT_TOO_FINE": 6912
+  },
+  "verdict": "CONTAINED: no case that refused at the base is silent at the head, and no refusal moved later in the ladder"
+}
