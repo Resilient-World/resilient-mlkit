@@ -1,0 +1,178 @@
+{
+  "cases": [
+    {
+      "D6": {
+        "evidence": {
+          "arm": "val",
+          "block_digest": "b5e4e878b2febd8c8e16f82e3a8897c08b8b3088c9f5c773501d29c1ed13e53f",
+          "blocking_unit": "basin",
+          "blocks_tied_to": "splits",
+          "detail": "",
+          "draws": 4000,
+          "n_blocks_in_arm": 71,
+          "n_groups_in_splits": 71,
+          "n_rows": 213,
+          "n_rows_panel": 1056,
+          "n_units_in_arm": 71,
+          "policy": "basin_blocked_split",
+          "procedure": "block bootstrap",
+          "refusal": "NA",
+          "relation": "UNIT_IS_THE_BLOCK",
+          "row_digest": "c5c8ce01f80c814dd15e4bcf2226b4b4d2a00657e6f84542bc75d225153c2a70",
+          "unit": "basin",
+          "unit_digest": "b5e4e878b2febd8c8e16f82e3a8897c08b8b3088c9f5c773501d29c1ed13e53f"
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "R3": {
+        "evidence": {
+          "n_test": 70,
+          "n_train": 211,
+          "n_val": 71
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "B_torrent_real_splits__block_unit"
+    },
+    {
+      "D6": {
+        "evidence": {
+          "arm": "val",
+          "block_digest": "b5e4e878b2febd8c8e16f82e3a8897c08b8b3088c9f5c773501d29c1ed13e53f",
+          "blocking_unit": "basin",
+          "detail": "the block bootstrap resampled 213 'row' unit(s) inside arm 'val', but holdout policy 'basin_blocked_split' keeps whole 'basin' blocks in one partition and that arm holds 71 of them. 71 block(s) are split across units (e.g. \"GRDC_4120955\" spans 3 units). The policy declares rows inside a 'basin' to be dependent -- that is why it refuses to separate them -- and this procedure drew them as independent replicates, so it manufactured more evidence out of the arm than the arm contains. Resample 'basin', or declare a unit the split does not partition.",
+          "draws": 4000,
+          "n_blocks_in_arm": 71,
+          "n_rows": 213,
+          "n_rows_panel": 1056,
+          "n_units_in_arm": 213,
+          "policy": "basin_blocked_split",
+          "procedure": "block bootstrap",
+          "refusal": "DEPENDENCE_UNIT_TOO_FINE",
+          "relation": "UNIT_FINER_THAN_BLOCK",
+          "row_digest": "c5c8ce01f80c814dd15e4bcf2226b4b4d2a00657e6f84542bc75d225153c2a70",
+          "unit": "row",
+          "unit_digest": "c5c8ce01f80c814dd15e4bcf2226b4b4d2a00657e6f84542bc75d225153c2a70"
+        },
+        "reason": "DEPENDENCE_UNIT_TOO_FINE: the block bootstrap resampled 213 'row' unit(s) inside arm 'val', but holdout policy 'basin_blocked_split' keeps whole 'basin' blocks in one partition and that arm holds 71 of them. 71 block(s) are split across units (e.g. \"GRDC_4120955\" spans 3 units). The policy declares rows inside a 'basin' to be dependent -- that is why it refuses to separate them -- a \u2026[truncated]",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {
+          "n_test": 70,
+          "n_train": 211,
+          "n_val": 71
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "B_torrent_real_splits__row_unit"
+    },
+    {
+      "D6": {
+        "evidence": {},
+        "reason": "fixturerepo: no 'resampling_declaration' binding declared in .mlkit/repo.toml; an interval or a promotion that rests on a resampling procedure must declare the unit that procedure drew. Declare `resampling_declaration` returning {procedure, draws, policy, blocking_unit, unit, arm, assignment}, where `assignment` is one mapping per panel row naming ['row_key', 'arm', 'block_key', 'unit_key'].",
+        "status": "NA"
+      },
+      "R3": {
+        "evidence": {
+          "n_test": 70,
+          "n_train": 211,
+          "n_val": 71
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "B_torrent_real_splits__no_binding"
+    },
+    {
+      "D6": {
+        "evidence": {
+          "arm": "val",
+          "block_digest": "8201494e361a3eb64bcef9eb099c5fcee4344cfb1cee1d49406970e7e5e05bdf",
+          "blocking_unit": "corridor",
+          "blocks_tied_to": "splits",
+          "detail": "",
+          "draws": 4000,
+          "n_blocks_in_arm": 4,
+          "n_groups_in_splits": 4,
+          "n_rows": 12,
+          "n_rows_panel": 84,
+          "n_units_in_arm": 4,
+          "policy": "corridor_blocked_split",
+          "procedure": "block bootstrap",
+          "refusal": "NA",
+          "relation": "UNIT_IS_THE_BLOCK",
+          "row_digest": "b872f51a425921caca2de27372d7ed5e1d515aedc742ae681baa52094845c316",
+          "unit": "corridor",
+          "unit_digest": "8201494e361a3eb64bcef9eb099c5fcee4344cfb1cee1d49406970e7e5e05bdf"
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "R3": {
+        "evidence": {
+          "n_test": 4,
+          "n_train": 20,
+          "n_val": 4
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "B_chokepoint_real_splits__block_unit"
+    },
+    {
+      "D6": {
+        "evidence": {
+          "arm": "val",
+          "block_digest": "8201494e361a3eb64bcef9eb099c5fcee4344cfb1cee1d49406970e7e5e05bdf",
+          "blocking_unit": "corridor",
+          "detail": "the block bootstrap resampled 12 'row' unit(s) inside arm 'val', but holdout policy 'corridor_blocked_split' keeps whole 'corridor' blocks in one partition and that arm holds 4 of them. 4 block(s) are split across units (e.g. \"chokepoint12\" spans 3 units). The policy declares rows inside a 'corridor' to be dependent -- that is why it refuses to separate them -- and this procedure drew them as independent replicates, so it manufactured more evidence out of the arm than the arm contains. Resample 'corridor', or declare a unit the split does not partition.",
+          "draws": 4000,
+          "n_blocks_in_arm": 4,
+          "n_rows": 12,
+          "n_rows_panel": 84,
+          "n_units_in_arm": 12,
+          "policy": "corridor_blocked_split",
+          "procedure": "block bootstrap",
+          "refusal": "DEPENDENCE_UNIT_TOO_FINE",
+          "relation": "UNIT_FINER_THAN_BLOCK",
+          "row_digest": "b872f51a425921caca2de27372d7ed5e1d515aedc742ae681baa52094845c316",
+          "unit": "row",
+          "unit_digest": "b872f51a425921caca2de27372d7ed5e1d515aedc742ae681baa52094845c316"
+        },
+        "reason": "DEPENDENCE_UNIT_TOO_FINE: the block bootstrap resampled 12 'row' unit(s) inside arm 'val', but holdout policy 'corridor_blocked_split' keeps whole 'corridor' blocks in one partition and that arm holds 4 of them. 4 block(s) are split across units (e.g. \"chokepoint12\" spans 3 units). The policy declares rows inside a 'corridor' to be dependent -- that is why it refuses to separate the \u2026[truncated]",
+        "status": "FAIL"
+      },
+      "R3": {
+        "evidence": {
+          "n_test": 4,
+          "n_train": 20,
+          "n_val": 4
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "B_chokepoint_real_splits__row_unit"
+    },
+    {
+      "D6": {
+        "evidence": {},
+        "reason": "fixturerepo: no 'resampling_declaration' binding declared in .mlkit/repo.toml; an interval or a promotion that rests on a resampling procedure must declare the unit that procedure drew. Declare `resampling_declaration` returning {procedure, draws, policy, blocking_unit, unit, arm, assignment}, where `assignment` is one mapping per panel row naming ['row_key', 'arm', 'block_key', 'unit_key'].",
+        "status": "NA"
+      },
+      "R3": {
+        "evidence": {
+          "n_test": 4,
+          "n_train": 20,
+          "n_val": 4
+        },
+        "reason": "",
+        "status": "PASS"
+      },
+      "case": "B_chokepoint_real_splits__no_binding"
+    }
+  ]
+}

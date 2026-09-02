@@ -128,6 +128,338 @@ true before the tag was cut. It is withdrawn here rather than quietly dropped,
 and `tests/test_version_declaration.py` now FIRES on it: the newest entry may
 not restate it, and must name at least one of the checks whose verdict moved.
 
+### Every report now names the mlkit that wrote it, and adopters can check it (E-M24)
+
+**Nothing in this section moves a check's verdict** — the release's verdict
+changes are the ones the sections below record, and this is not one of them.
+What it adds is a report header line, two keys in two machine payloads, one
+CLI subcommand and one public function. It deliberately does **not** add a
+readiness row: doing so would move every adopter's table, which is a decision
+for the signatory and not a side effect of a repair.
+
+**What was wrong.** `resilient-fray` pins mlkit by rev `c65b2e7`; mlkit main is
+`6921e9a`. Forty commits apart, nine source files different — `+50/-5` in
+`checks/readiness.py`, the file that emits R1–R12, and `+373/-13` in
+`core/served.py`, the promotion verdict — and **both trees declare
+`__version__ = "0.5.0"`**. Every adopter readiness table was therefore
+"readiness under whichever mlkit happened to be installed", with nothing in the
+report able to say which. `cli._self_sha()` did not close it: it shells `git
+rev-parse HEAD` in mlkit's own directory, which in an adopter's environment is
+`site-packages` and not a git worktree, so it returned `""` and the header read
+`NA (not a git worktree)` — empty in exactly the case that needed it.
+
+**What is new.** `resilient_mlkit.__build__`, e.g. `0.5.0+src.4f2a91c0be3d`: a
+length-framed sha256 over every file the running package was loaded from,
+excluding compiled bytecode. It moves iff the shipped source moves, and it is
+computable from a wheel, an sdist or an editable install. It lives **beside**
+`__version__` and never inside it — release naming and tag cutting stay the
+signatory's, and `tests/test_version_declaration.py` is untouched.
+
+**Where it appears.** `reports/readiness.md`, `reports/fabricated_defaults.md`,
+`reports/fabricated_targets.md`, `reports/served_contract.md`, the
+`*.UNMEASURABLE.md` refusal file, `portfolio/FLEET_VERDICTS.md` and the spine
+report each gain two header lines. Both `.json` twins, and both
+`scripts/*.py` payloads, gain `mlkit_build` beside `mlkit_version`
+(**additive**; `artifact_schema` is unchanged, so a consumer pinned to
+`resilient-mlkit/fleet-verdicts/1` keeps reading it).
+
+**For adopters.** `mlkit identity` says which build is installed;
+`mlkit identity --verify REPORT…` says whether a report was written by it —
+`MATCH` / `MISMATCH` / `UNSTAMPED` / `CONFLICTING` / `INDETERMINATE`, exiting
+`0` only on all-`MATCH`, `3` on any `MISMATCH`, `1` otherwise. Reports written
+before this exists verify `UNSTAMPED`, which is an absence and not a mismatch:
+the fact is not recoverable from the file, only from re-running the phase.
+Design note: `docs/BUILD_IDENTITY.md`.
+
+### The two builds E-M24 could still fail to tell apart (E-M25)
+
+Adversarial verification of the section above drove two ways an mlkit build
+still went unnamed. Both are closed; both carry a fires/silent pair and a
+revert that kills a named test.
+
+**A digest that covered none of the running code.** The digest excludes
+`__pycache__` and `*.pyc` — bytecode moves for reasons that are not source
+changes. In a *sourceless* install (`.py` compiled to `.pyc` in place and
+removed, which CPython still imports) that exclusion excludes every executing
+file and the digest falls through to whatever data the package ships. Measured
+2026-09-01 on two copies of `src/resilient_mlkit` differing only in
+`checks/readiness.py`: both digested `py.typed` alone, `files=1`, both stamped
+`0.5.0+src.5b9327f66528`, and a real R10 report written by the first verified
+**`MATCH`** against the second — the E-M24 defect inside the fix for it.
+`core/identity.py` now requires that the file `core/identity.py` was *actually
+loaded from* be one of the files hashed; where it is not, the build declines to
+name an identity (`+src.unknown`, every comparison `INDETERMINATE`) instead of
+naming a plausible one. Re-driven after the repair: `files=0`, `known False`,
+both trees. **A source-shipping install is unaffected**, including the
+existing rule that stray bytecode does not move the digest.
+
+**The one readiness table that is composed rather than measured.**
+`mlkit check --portfolio` renders R1–R12 out of `.mlkit/results/*.json` and
+exits on it. The store recorded the repo's git SHA and nothing about mlkit, and
+`store.load` staled only on the SHA. Measured 2026-09-01: 27 PASSes written by
+`0.5.0+src.b1686b22efc6` were read back at an unchanged repo SHA by
+`0.5.0+src.48480b572359` and rendered `R(9-12,1-8) PPPPPPPPPPPP` /
+`READY-TO-TRAIN` at exit 0, with nothing naming either build. `save()` now
+records `mlkit_build`, and `load()` stales a PASS whose stored build is absent,
+unknown, or different — the same rule, and the same PASS/ESCALATED-only scope,
+as the existing git-SHA rule, so a FAIL from another build is still reported
+rather than hidden. Re-driven after the repair: 27 `S`, `IN-PROGRESS`, exit 3;
+the same store read by the build that wrote it still resolves `READY-TO-TRAIN`.
+`render_portfolio` also emits the E-M24 header lines, so the table names the
+build that rendered it.
+
+**This one does move verdicts, and says so.** A stored PASS carrying no
+`mlkit_build` — which is every results file written before this — reads STALE
+until the phase is re-run. That is the same treatment a result with no git SHA
+has always had, for the same reason: it cannot be tied to anything. The
+portfolio legend now reads `S=stale(repo SHA or mlkit build moved)`, because
+`SHA moved` would send a reader looking at the wrong thing.
+
+### D6 `RESAMPLING_UNIT`, and the dependence unit inside `core.served`
+
+**New check, new gating check, and one contract surface widened.** Nothing here
+re-decides a comparison that carries no interval — measured, not asserted: the
+suite is 912 passed at `6921e9a` and 912 passed with these lanes added, and
+every existing lane of `challenger_decision` is unreachable-by-construction from
+the new ones.
+
+**What it is for.** Round-8 adjudication measured it in `resilient-fray`. That
+repo's holdout policy puts whole crop years in one partition, so the
+exchangeable unit is the crop year and its val arm has five of them. The run's
+bootstrap resampled 1,365 rows as if independent. On one identical set of rows:
+`[+16.016, +29.646]` under the unit the run resampled — clears zero — against
+`[-1.289, +41.704]` under the unit its own split implies — does not.
+`resilient-chokepoint` resamples its dependence unit (corridor block). **No gate
+had been edited by anyone**: fray's preregistration fixed the row bootstrap in
+advance and the run honoured it exactly. Two conventions, one fleet, and nothing
+in this instrument required either or required the choice to be stated.
+
+**What landed.**
+
+* `core.served.RowUnit` and `core.served.ResamplingDeclaration`. Six labels are
+  declared; the counts, three `row_set_digest` ties, the relation and the
+  refusal are all `init=False` and derived from an assignment covering the whole
+  panel. `ResamplingDeclaration(..., n_units_in_arm=5)` is a `TypeError` naming
+  the argument — `Comparison.row_matched` (M-06) one level up.
+* `Comparison` gains `skill_interval_low` / `skill_interval_high` /
+  `resampling`. An interval with no declaration raises; a declaration with no
+  interval raises; an interval that does not contain its own point estimate
+  raises.
+* `challenger_decision` gains `RESAMPLING_ROWS_UNTIED` (NA),
+  `DEPENDENCE_UNIT_CONTRADICTS_POLICY` (NA) and `INTERVAL_COVERS_ZERO` (FAIL,
+  asked only after the point estimate has already cleared).
+  `ChallengerDecision.to_dict()` emits a top-level `resampling` key that reads
+  `"NA"` when nobody declared one — a printed absence, not a missing key.
+* `D6 RESAMPLING_UNIT` in the decision phase, resolving a new
+  `resampling_declaration` binding and tying its declared blocks to the `splits`
+  binding R3 already reads. `checks.readiness.normalise_splits` is R3's parser
+  EXTRACTED, not copied; R3's verdicts are byte-identical across all eight repos
+  and ten synthetic edge cases, driven at both shas.
+
+**Consumer impact, measured.** `PHASE_ORDER["decision"]` goes from five ids to
+six, so the phase prints `0/6` where it printed `0/5`, and the gating set goes
+27 → 28 (`tests/test_promotion_state.py`'s deliberate tripwire, edited with the
+reason written in). D6 answers NA wherever the binding is absent, which is all
+eight repos today — driven directly against each of them, NA 8/8, PASS 0/8, and
+a PASS anywhere would have been evidence the check is blind. Every repo already
+carried several NAs, so no repo's terminal state moves; only the count in its
+message does.
+
+**One artifact's BYTES move, and no verdict does.**
+`ChallengerDecision.to_dict()` gains a top-level `resampling` key and each
+comparison in `evidence` gains three. Grepped across the fleet rather than
+assumed: `resilient-fray/src/registry/promotion_gate.py:360` embeds a decision
+dict inside the promotion record it writes at `:928` and the release bundle at
+`:910`, so fray's promotion records gain four keys reading `"NA"` the first time
+it repins. `resilient-chokepoint` serialises no `ChallengerDecision`. Nothing
+about `canonical_payload_sha256` or a served-model artifact's own hash changes;
+every committed `artifact_sha256` in the fleet is unaffected.
+
+**Adoption is a write into other repos and is not done here** — see
+`docs/ESCALATIONS.md` E-M30 and E-M31.
+
+### D6's crosscut carve-out is proportional and fail-closed, not existential
+
+**A verdict change inside a check that has not shipped yet, and the reason it is
+recorded here rather than folded into the entry below.** The dependence-unit
+contract as first written asked `if crosscutting:` — *does any unit key appear
+in more than one arm* — and one key answering yes silenced
+`DEPENDENCE_UNIT_TOO_FINE` for every other key in the arm. Its own adversarial
+verifier drove `resilient-fray`'s panel with COUNTY unit keys and recorded **D6
+PASS**, the wrong answer in the repo the finding came from, and then turned a
+FAIL into a PASS for 1,364 rows by editing the `unit_key` of **one**. Both
+drives are in `reports/D6_CROSSCUT_BASE.json`, taken at the base sha before a
+source file was edited.
+
+Each unit key is now classified on its own. A block of the holdout policy that
+is split with at least one **arm-local** piece refuses; `UNIT_CROSSCUTS_ARMS` is
+reported only when the arm-local mass is empty. Four counts join the record —
+`n_units_crosscutting_arms`, `n_units_local_to_arm`,
+`n_blocks_split_by_local_units`, `n_blocks_split_by_crosscutting_units` — so the
+carve-out is a proportion a reader can see rather than an existence claim.
+
+**chokepoint's convention is unchanged and that was the falsification
+condition**: 28 of 28 corridors cross every arm, so the carve-out covers the
+whole arm, relation `UNIT_CROSSCUTS_ARMS`, no refusal, `28` units still printed
+beside `20` blocks.
+
+**Measured, not asserted.** 209,952 assignments enumerated at the base sha and
+at the head and diffed by content: **0 cases that refuse at the base are silent
+at the head**, 6,912 silent cases now refuse, and 6,912 refuse on both sides
+under an earlier, more specific constant
+(`UNIT_LABEL_CONTRADICTS_CONTENT → DEPENDENCE_UNIT_TOO_FINE`). The
+preregistered claim that the constant would also be preserved is **falsified,
+and said so** in `reports/D6_CROSSCUT_RESULTS.md` §4.1. Suite 977 → 991 with no
+existing test edited.
+
+**One regression was found in this fix by attacking it, not by shipping it.**
+Making the relation proportional would on its own have loosened
+`UNIT_LABEL_CONTRADICTS_CONTENT`: with that half removed, 2,160 of the 209,952
+cases go from refusing to silent (`reports/D6_CROSSCUT_CONTAINMENT_NOT_DEAD.json`).
+
+**What is still not closed, named rather than left to be found**: a unit that
+crosscuts *every* arm remains refusal-free even when it is finer than the
+policy's blocks inside the arm. chokepoint's endorsed bootstrap has that exact
+shape, and nothing measured in this round tells the two apart.
+
+#### Amendment: `splits` may declare PER-TRACK partitions, and D6 judges each track against its own
+
+Written on `feat/track-aware-splits-contract`, branched from this same
+`feat/dependence-unit-contract` head. **This is what "adoption is more than a
+`repo.toml` line" turned out to mean**, and it was measured rather than
+argued: `resilient-fray` runs TWO holdout policies over ONE county-year panel —
+`county_label_splits` (unseen COUNTY, groups = 0.5° spatial block ids) and
+`county_year_splits` (unseen future YEAR, groups = crop years) — and the repo's
+own source says so. With one `splits` key holding one partition, D6 compared
+the crop-year declaration's five blocks against the county track's **133**
+groups and returned `BLOCKS_CONTRADICT_SPLITS`, for a partition the
+declaration was never taken under. The reverse was equally true. **There was no
+wiring of `splits` under which both of fray's tracks could be judged**, so the
+contract above was structurally unadoptable by the repo whose row bootstrap
+motivated it.
+
+* `checks.readiness.normalise_tracked_splits`: `splits` may return
+  `{"tracks": {name: {train, val, test}}}`. The envelope is recognised only
+  when `tracks` is the mapping's **only** key — never by "the values look
+  nested", because `{"train": {"a": 1}}` is a flat splits whose group ids are
+  that dict's keys. A mapping carrying both shapes is refused by name.
+* `R3` runs **every existing clause on every track**, through the same
+  `_judge_one_partition` code, at the same `MIN_HOLDOUT_GROUPS`. One clause is
+  new and exists only under tracks: `TRACKS_ARE_THE_SAME_PARTITION`.
+* `ResamplingDeclaration` gains a seventh **declared** field, `track` — a
+  pointer into another binding, which is why it is declared rather than
+  derived. `to_dict()` emits it only when set.
+* `resampling_declaration` may return a **sequence** of declarations, one per
+  track; the worst verdict is D6's. New refusals: `TRACK_UNDECLARED`,
+  `TRACK_NOT_IN_SPLITS`, `DUPLICATE_TRACK_DECLARATION`.
+
+**No verdict moves for a single-track adopter, and this one is a byte
+comparison rather than a reading.** Every check in this package that reads
+`splits` (grepped: R3 and D6, and no third) was driven at both shas against the
+REAL split membership `resilient-torrent` (211/71/70 basins) and
+`resilient-chokepoint` (20/4/4 corridors) publish from their own
+`mlkit_bindings:splits`, in six cases covering the block unit, the row unit and
+an absent binding. The two result files hash to the same sha256
+(`28e0db98fc879445cf0c7d88456bd2acdb46b2867b7bc6ed678ff6762342f3ef`). Suite:
+977 passed at the base commit, 1,017 at this one, 0 failed.
+
+**What is NOT closed, named rather than left to be found.**
+`UNIT_CROSSCUTS_ARMS` still silences `DEPENDENCE_UNIT_TOO_FINE`
+unconditionally, so a COUNTY unit on fray's crop-year track — a county
+contributes rows to all three arms there — is judged PASS at this head. That
+ladder belongs to a separate item and this branch does not touch it; the
+outcome was pre-registered as expected before it was measured. See
+`docs/ESCALATIONS.md` E-M34.
+
+### D2 and E1 became bindable: the halt region and the fraction ladder are DECLARED data
+
+**Neither check changes verdict on unchanged repo code, in any of the eight
+repos, and that is measured rather than asserted.** `grep -c '^\[placebo\]|^\[scaling\]'`
+over all eight `.mlkit/repo.toml` files returns **0** for every one, and so
+does `grep -c '^placebo_test =|^scaling_probe ='` — so D2 and E1 are NA
+everywhere in the fleet today, and both stay NA on this release. What moves is
+that they can now be *armed*.
+
+**What was wrong.** Round 8's adjudication measured `resilient-fray`'s D2 and E1
+as NA at head and at main, and found the reason was mlkit's contract, not
+fray's wiring:
+
+* D2 halted on `lo > 0 or hi < 0` — a two-sided interval around a literal zero.
+  fray's placebo estimand is *skill against the persistence floor*, whose
+  no-signal value is not zero: a shuffled-target run is expected to land far
+  below the floor, and fray's placebo CI is `[-71.998, -53.146]`. Binding that
+  honest surrogate under `placebo_test` would have tripped a **spurious
+  fleet-wide hard stop**, so fray did not bind it.
+* E1 required the fractions `{0.01, 0.10, 0.25}` and nothing else. fray's probe
+  ran 10% and 25%. Under mlkit's own **relative** rule that curve is comfortably
+  not flat — `(-138.13969 − −151.29137) / |−151.29137|` = `+0.08693`, against a
+  1% bar — so E1 would have **failed on contract, not on substance**.
+
+A hard stop nobody can arm reads as coverage and is not coverage. Both repos'
+hard stops that round were the trainers' own in-script constructions: genuine,
+honestly computed, and not the fleet's gates.
+
+**What changed.** Two optional sections of `.mlkit/repo.toml`, read **from the
+blob at HEAD** through `core.artifact` — the discipline E-M21/E-M23 forced on
+D3's nominal level, for the same reason:
+
+```toml
+[placebo]  estimand / null_value / indicts     # D2's halt region
+[scaling]  fractions                            # E1's ladder
+```
+
+**What pays for the widening.** None of it optional:
+
+* **Undeclared is unchanged.** Defaults are `0.0`/`"either"` and
+  `(0.01, 0.10, 0.25)`. Every fallback — absent section, malformed working-tree
+  config, dirty tree with the section deleted — lands on the strictest setting,
+  so a repo cannot loosen anything by breaking something.
+* **Committed or it does not exist.** A section in the working tree and not at
+  HEAD is NA naming the file; malformed is FAIL; an unknown key is FAIL naming
+  it. A binding that rewrites the config from its own module body cannot move
+  the standard.
+* **A moved halt region cannot be anonymous.** Shifting `null_value` off zero or
+  `indicts` off `"either"` requires a written `estimand` in the same table, and
+  that sentence rides in the verdict's evidence.
+* **The exemption must point the same way as the claim.** Under a one-sided
+  region the sign of `reference_effect` — the real run's effect, already
+  required, already measured from the same null — must lie on the *indicting*
+  side. A repo that exempts the direction its product's claim lives in has
+  exempted the only direction D2 was testing, and that is a FAIL.
+* **A declared ladder cannot buy a pass.** Its top rung may not sit below 0.25,
+  and its top two rungs may be no further apart than mlkit's own
+  `0.25 / 0.10 = 2.5` — the one way widening a ladder could make a flat curve
+  look steep. At least three rungs, strictly increasing, each in `(0, 1]`.
+* **No threshold moved.** `FLATNESS_EPSILON`, the D2 power bar and its strict
+  boundary, and every non-finite refusal and its ordering are untouched. No test
+  that existed on `main` was edited; `tests/test_declared_hard_stops.py` adds 45
+  controls and `tests/test_spine_seed_is_adoptable.py` adds 4, so the suite goes
+  **909 → 958**. *(The 39/948 first written here was typed before the three
+  `indicts = "below"` controls and the two F811-renamed duplicates were counted;
+  both figures are now `grep -c '^def test_'` and `pytest -q`, re-measured, and
+  the earlier pair is withdrawn rather than quietly overwritten — a count nobody
+  re-ran is the same defect class as a restated benchmark figure.)*
+* **The seed file was refusing the adopter, and that was found by driving it.**
+  `spine/mlkit/repo.toml` shipped `[placebo]` and `[scaling]` as live tables
+  with every key commented out. `read_fraction_ladder` refuses a `[scaling]`
+  with no `fractions` — deliberately — so a repo that adopted the seed verbatim
+  and bound `scaling_probe` got `E1 FAIL SCALING_MALFORMED: [scaling] fractions
+  is absent` on a curve E1 never read: a FAIL ON CONTRACT, the exact failure
+  mode this whole entry exists to remove, reintroduced by its own template. The
+  empty `[placebo]` was wrong in the same direction and milder — `declared` is
+  True for an empty table, so `placebo_declared_in` rode in the evidence of a
+  repo that had declared nothing. Both headers are commented out now, and
+  `tests/test_spine_seed_is_adoptable.py` drives the real seed bytes through D2
+  and E1 and requires them to agree with a minimal config, with both halves
+  computed rather than typed, plus two check-not-dead controls that re-arm each
+  header. No check, threshold or existing test moved.
+
+`evidence["gain_10_to_25"]` is now emitted **only** when the ladder really is
+`(0.10, 0.25)`; `gain_top_two`, `from_fraction` and `to_fraction` are always
+emitted. A key naming two fractions that were not the ones measured is a
+fabricated label on a real number, which is the one thing a reader does not
+check.
+
 ### R10 `absence adjudicated as a pass` fired on honest NA-reporting guards (E-M19)
 
 **R10 changes verdict on unchanged repo code in one repo**, in the direction

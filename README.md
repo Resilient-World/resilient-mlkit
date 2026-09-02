@@ -9,10 +9,11 @@ that did not come out of a run of this CLI does not exist.
 
 ## Layout
 
-- `src/resilient_mlkit/` — the package. 27 gating checks across 4 phases, plus
-  5 diagnostic triage checks: 32 in the registry. Counted, not remembered —
-  `len(gating_ids())` and `len(all_check_ids())` on 2026-08-29, which is the
-  same discipline `checks/__init__.py` states in its own docstring.
+- `src/resilient_mlkit/` — the package. 28 gating checks across 4 phases, plus
+  5 diagnostic triage checks: 33 in the registry. Counted, not remembered —
+  `len(gating_ids())` and `len(all_check_ids())` on 2026-09-01, which is the
+  same discipline `checks/__init__.py` states in its own docstring, and which
+  `tests/test_promotion_state.py` now holds this file to.
 - `src/resilient_mlkit/measurement.py` — **the import that replaces the hand
   copies.** The repo-facing `Measured` / `Unmeasured` gate vocabulary, over the
   canonical six-state `Status` re-exported from `core.result` (identity, not a
@@ -48,6 +49,38 @@ that did not come out of a run of this CLI does not exist.
 | `mlkit keys` | credentials the portfolio is waiting on |
 | `mlkit notice` | regenerate `NOTICE.md` from the allowlist |
 | `mlkit allowlist verify` | allowlist structure and signature |
+| `mlkit identity` | which mlkit build this is; `--verify REPORT…` checks a report was written by it |
+
+## Which mlkit measured this?
+
+`--version` cannot answer that. fray runs mlkit `c65b2e7` and mlkit main is
+`6921e9a` — forty commits apart, nine source files different, `+50/-5` in
+`checks/readiness.py` and `+373/-13` in `core/served.py` — and **both declare
+`0.5.0`** (`docs/ESCALATIONS.md` E-M24). A readiness table measured under one
+of them is not a readiness table under the other, and the version string cannot
+tell a reader which they are holding.
+
+So every report mlkit writes now carries the build that wrote it, on its own
+line, and an adopter can check it:
+
+```
+mlkit identity                                   # which build is installed here
+mlkit identity --verify reports/readiness.md     # was this report written by it
+```
+
+The identity is a length-framed sha256 over the files the running package was
+loaded from — `0.5.0+src.4f2a91c0be3d`. It moves when mlkit's shipped source
+moves, which is the only way its gate semantics can move, and it is present in
+an adopter's `site-packages`, where `git rev-parse` has nothing to say. It sits
+**beside** `__version__` and never inside it: release naming and tag cutting
+stay with the human signatory.
+
+Verdicts are `MATCH`, `MISMATCH`, `UNSTAMPED` (a report written before this
+existed — an absence, not a mismatch, and not recoverable by editing the file),
+`CONFLICTING` (two stamps, one file) and `INDETERMINATE` (a digest that could
+not be read; no equality is asserted from an unknown operand). Exit `0` only on
+all-`MATCH`, `3` on any `MISMATCH`, `1` otherwise. Design note:
+`docs/BUILD_IDENTITY.md`.
 
 `mlkit portfolio` and `mlkit check --portfolio` are different questions.
 The first is model quality — does this thing beat its baseline. The second is
@@ -103,10 +136,34 @@ the same name and different SHAs whose gates return opposite verdicts on a
 zero baseline. R12's exemption is an **import**, so adopting `core.served` is
 what clears it; renaming is not.
 
-`READY-TO-TRAIN` requires all 27 gating checks to pass. Six of them (S5, D1, D4, D5,
+D6 is the same argument applied to an interval. A promotion that rests on a
+resampling procedure has to declare the unit that procedure drew, and mlkit
+refuses a declaration that contradicts the holdout policy the same artifact
+declares — rows resampled inside an arm whose partitions are blocks, naming
+both. Round-8 adjudication measured what that is worth: on one identical set of
+1,365 rows, `[+16.016, +29.646]` under the unit the run resampled and
+`[-1.289, +41.704]` under the unit its own split implies.
+
+A repo may run more than one holdout policy over one panel — `resilient-fray`
+runs two, unseen COUNTY and unseen future YEAR, over the same county-year rows.
+`splits` may therefore return `{"tracks": {name: {train, val, test}}}` instead
+of one flat partition; R3 applies every clause to every track, and a
+declaration says which `track` it was taken under so that D6 judges it against
+that partition and no other. A declaration that names none, in a repo that
+declares several, is `TRACK_UNDECLARED` — mlkit will not pick the track whose
+blocks happen to match. A repo with one policy declares no track and nothing
+about its verdicts, reasons or evidence changes.
+
+`READY-TO-TRAIN` requires all 28 gating checks to pass. Six of them (S5, D1, D4, D5,
 E4, E5) are human-only and always report `ESCALATED`, so **an agent cannot
 drive a repo to READY-TO-TRAIN**. That is deliberate: those six are legal and
 billing exposures, not code changes.
+
+*(That count was `27` until D6 joined the decision phase on 2026-09-01. It is a
+second copy of a number `checks.PHASE_ORDER` already holds, and unlike the copy
+in `portfolio.py` nothing in the suite compares it — found while adding D6, and
+recorded in `docs/ESCALATIONS.md` E-M32 rather than fixed here, because the fix
+is a doc-generation change with its own control pair.)*
 
 ## Installing it into a model repo
 

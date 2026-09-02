@@ -118,24 +118,37 @@ import math
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from copy import deepcopy as _deepcopy
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from typing import Any
 
 from .result import Status
 
 __all__ = [
+    "BLOCKS_STRADDLE_ARMS",
+    "DEPENDENCE_UNIT_CONTRADICTS_POLICY",
+    "DEPENDENCE_UNIT_TOO_FINE",
     "DOMAINS",
     "HASH_KEY",
     "HIGHER_IS_BETTER",
     "IMPOSSIBLE_MEASUREMENT",
+    "INTERVAL_COVERS_ZERO",
     "LOWER_IS_BETTER",
     "NONNEGATIVE",
     "POLARITIES",
     "POLARITY_UNDECLARED",
     "REAL",
+    "RELATIONS",
+    "RESAMPLING_ROWS_UNTIED",
     "ROW_SET_MISMATCH",
     "ROW_SET_UNTIED",
+    "SINGLE_UNIT",
+    "UNIT_COARSER_THAN_BLOCK",
+    "UNIT_CROSSCUTS_ARMS",
+    "UNIT_CROSSCUTS_BLOCK",
+    "UNIT_FINER_THAN_BLOCK",
+    "UNIT_IS_THE_BLOCK",
+    "UNIT_LABEL_CONTRADICTS_CONTENT",
     "UNMEASURED",
     "ArtifactIntegrityError",
     "ChallengerDecision",
@@ -145,6 +158,8 @@ __all__ = [
     "Measurement",
     "ProvenanceMismatch",
     "RecordedBar",
+    "ResamplingDeclaration",
+    "RowUnit",
     "ServeArms",
     "ServedContractError",
     "ServedModel",
@@ -300,6 +315,522 @@ def seal(payload: Mapping[str, Any], *, hash_key: str = HASH_KEY) -> dict[str, A
     """
     body = {k: v for k, v in payload.items() if k != hash_key}
     return {**body, hash_key: canonical_payload_sha256(body, hash_key=hash_key)}
+
+
+# ---------------------------------------------------------------------------
+# The dependence unit
+# ---------------------------------------------------------------------------
+# WHY THIS EXISTS, and what it is not.
+#
+# Round-8 adjudication measured this in `resilient-fray`. Its holdout policy,
+# in its own words, puts WHOLE CROP YEARS in one partition, so the exchangeable
+# unit is the crop year and VAL has five of them. The run's bootstrap resampled
+# 1,365 ROWS as if independent:
+#
+#     resampling unit          point       95% CI                 clears zero
+#     ROW (what was reported)  +22.811     [+16.016, +29.646]     yes
+#     CROP-YEAR block (5)      +22.811     [-1.289, +41.704]      NO
+#
+# No gate was edited by anyone. fray's preregistration fixed the row bootstrap
+# in advance and the run honoured it exactly. `resilient-chokepoint` resamples
+# its dependence unit (corridor block, 28 clusters, predictions held fixed).
+# Two repos, two conventions, one fleet -- and NOTHING IN MLKIT REQUIRED EITHER
+# ONE, or required the choice to be stated at all. An interval could rest on a
+# resampling unit nobody declared, and no instrument compared that unit to the
+# holdout policy the same artifact declares.
+#
+# THE RULE, in one sentence:
+#
+#     A resampling procedure draws units and treats them as exchangeable. A
+#     holdout policy that keeps a block whole has asserted that the block's
+#     rows are NOT exchangeable -- that is the entire reason it refuses to
+#     split them. So if the unit the procedure drew STAYS INSIDE THE DECIDING
+#     ARM and SPLITS at least one of the policy's blocks, the procedure has
+#     manufactured independent replicates out of exactly the rows the policy
+#     refused to separate.
+#
+# WHAT THIS DOES NOT ESTABLISH, said here rather than left to be assumed.
+# `UNIT_CROSSCUTS_ARMS` -- a unit whose keys appear in more than one arm, which
+# is chokepoint's corridor -- is RECORDED, not blessed. A corridor bootstrap
+# does not account for the temporal axis a time-blocked split partitions, and
+# nothing here claims it does. What this type does is force both numbers into
+# the record side by side: the units resampled, and the blocks in the arm that
+# were not. Refusing the crosscutting case as well would make the fleet's
+# CORRECT convention unadoptable, on a standard no measurement in this round
+# supports, which is the R12 failure mode ("adopting the check would not clear
+# it") one layer up.
+#
+# THE CARVE-OUT IS PROPORTIONAL AND FAIL-CLOSED, NOT EXISTENTIAL. Amendment 1
+# (`reports/DEPENDENCE_UNIT_PREREGISTRATION_AMENDMENT_1.md`, which quotes the
+# superseded rule in full). As first written the carve-out asked whether ANY
+# unit key appeared in two arms, and one key that did silenced
+# `DEPENDENCE_UNIT_TOO_FINE` for every other key in the arm. Driven, at the
+# sha that shipped it: fray's panel with COUNTY units -> D6 PASS, and fray's
+# panel as run with ONE of 1,365 val `unit_key`s collided into a train key ->
+# D6 PASS, from a FAIL. Each unit key is now classified on its own, and a
+# block of the policy that is split with even one ARM-LOCAL piece refuses.
+# `UNIT_CROSSCUTS_ARMS` is reported only when the arm-local mass is empty.
+# What this still does NOT close, named rather than hidden: a declaration in
+# which EVERY unit crosscuts every arm remains refusal-free even though its
+# units may be finer than the policy's blocks inside the arm -- chokepoint's
+# corridor is exactly that shape and is endorsed, so nothing measured here
+# tells the two apart. `n_blocks_split_by_crosscutting_units` prints how many
+# blocks such a pass is carrying.
+
+
+#: The unit is exactly the unit the holdout policy keeps whole. fray's repair.
+UNIT_IS_THE_BLOCK = "UNIT_IS_THE_BLOCK"
+#: Whole blocks nest inside the resampled units. Conservative: the procedure
+#: draws fewer, larger clusters than the policy's partitions.
+UNIT_COARSER_THAN_BLOCK = "UNIT_COARSER_THAN_BLOCK"
+#: The unit splits a block and stays inside the arm. The fray shape.
+UNIT_FINER_THAN_BLOCK = "UNIT_FINER_THAN_BLOCK"
+#: The unit splits a block AND a block splits a unit, both inside the arm.
+#: Neither refines the other; still manufactures replicates out of blocks.
+UNIT_CROSSCUTS_BLOCK = "UNIT_CROSSCUTS_BLOCK"
+#: EVERY resampled unit in the deciding arm has rows in more than one arm, so
+#: the unit is an axis the split does not partition. chokepoint's corridor.
+#:
+#: Amendment 1 to the preregistration narrowed this from "at least one" to
+#: "every one", and those first four words were the escape: a declaration in
+#: which 1,364 row units stayed inside the arm and ONE collided with a train
+#: key reported this relation and no refusal at all. The carve-out is a
+#: statement about a unit, so it applies only where there is no other kind of
+#: unit for it to be read as covering.
+UNIT_CROSSCUTS_ARMS = "UNIT_CROSSCUTS_ARMS"
+
+RELATIONS = (
+    UNIT_IS_THE_BLOCK,
+    UNIT_COARSER_THAN_BLOCK,
+    UNIT_FINER_THAN_BLOCK,
+    UNIT_CROSSCUTS_BLOCK,
+    UNIT_CROSSCUTS_ARMS,
+)
+
+#: The declared policy says whole blocks go to one partition; the assignment
+#: says a block's rows are in two arms. The declaration describes a policy the
+#: content does not have, and every later statement rests on it.
+BLOCKS_STRADDLE_ARMS = "BLOCKS_STRADDLE_ARMS"
+#: One unit cannot be resampled. Not a threshold -- arithmetic.
+SINGLE_UNIT = "SINGLE_UNIT"
+#: The refusal this whole section exists for.
+DEPENDENCE_UNIT_TOO_FINE = "DEPENDENCE_UNIT_TOO_FINE"
+#: The unit is LABELLED as the blocking unit and the assignment says it is
+#: something else. A name is not a tie; the content is.
+UNIT_LABEL_CONTRADICTS_CONTENT = "UNIT_LABEL_CONTRADICTS_CONTENT"
+
+
+@dataclass(frozen=True)
+class RowUnit:
+    """One row of the panel, and the three groupings it belongs to.
+
+    Four fields and no more, because the declaration below derives everything
+    else from them and a fifth would be a place to put an assertion.
+
+    * ``row_key`` — what identifies this row. The same identifier
+      :func:`row_set_digest` takes, so a comparison's row digest and a
+      declaration's row digest are computable to the same value.
+    * ``arm`` — which partition the holdout policy put it in.
+    * ``block_key`` — the key of the group the policy keeps WHOLE. fray: the
+      crop year. chokepoint's daily-flow split: the date block.
+    * ``unit_key`` — the key of the unit the resampling procedure DREW. fray as
+      run: the row itself. chokepoint: the corridor.
+    """
+
+    row_key: Any
+    arm: str
+    block_key: Any
+    unit_key: Any
+
+    def __post_init__(self) -> None:
+        if not str(self.arm).strip():
+            raise ServedContractError(
+                f"row {self.row_key!r} names no arm; a row that is in no partition "
+                "cannot say anything about a holdout policy"
+            )
+
+
+def _canonical(key: Any) -> str:
+    """The one spelling of a grouping key, so two of them compare by content."""
+    try:
+        return json.dumps(key, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise ServedContractError(
+            f"grouping key {key!r} is not JSON-serialisable ({exc}); a key that "
+            "cannot be written down cannot be digested, and two keys that fall "
+            "back to repr() compare by memory address"
+        ) from exc
+
+
+@dataclass(frozen=True)
+class ResamplingDeclaration:
+    """What a resampling procedure drew, and whether that contradicts the split.
+
+    SIX THINGS ARE DECLARED and everything else is DERIVED. The declared six
+    are labels and provenance — the procedure, its draws, the policy's name,
+    the name of the unit the policy keeps whole, the name of the unit the
+    procedure drew, and the arm. The counts, the three digests, the relation
+    between the unit and the blocks, and the refusal are all computed here from
+    ``assignment`` and are ``init=False``.
+
+    That split is the point, and it is ``Comparison.row_matched``'s (M-06)
+    applied one level up: **there is no spelling of the derived facts.**
+    ``ResamplingDeclaration(..., n_units=5)`` is a ``TypeError`` naming the
+    argument, and so are ``unit_digest=``, ``relation=`` and ``refusal=``. A
+    caller who wants the answer to be "the unit is the block" has to hand over
+    an assignment in which it is.
+
+    ``assignment`` is the WHOLE panel, not the arm. Two of the derived facts
+    are statements about arms other than the deciding one — whether the policy
+    really keeps its blocks whole, and whether the resampled unit crosscuts the
+    split — and neither is computable from the arm alone. That is also what
+    separates chokepoint's corridor (present in train, val and test) from
+    fray's row (present in exactly one), which is the distinction the whole
+    refusal turns on.
+    """
+
+    procedure: str
+    draws: int
+    policy: str
+    blocking_unit: str
+    unit: str
+    arm: str
+    assignment: InitVar[Iterable[RowUnit]]
+    #: WHICH of the repo's holdout policies this declaration was taken under,
+    #: by the name the ``splits`` binding gives it. ``""`` — the default, and
+    #: what every current adopter carries — means "this repo has one, unnamed,
+    #: track", and on that path nothing below changes.
+    #:
+    #: THIS ONE IS DECLARED, NOT DERIVED, AND THAT IS NOT AN EXCEPTION TO THE
+    #: RULE ABOVE. The counts, the digests, the relation and the refusal are
+    #: facts ABOUT the assignment, and the assignment is their only admissible
+    #: source; spelling them would be spelling the verdict. ``track`` is not a
+    #: fact about the assignment at all — it is a POINTER INTO ANOTHER BINDING,
+    #: and the assignment does not contain, and cannot contain, the name a
+    #: different callable gave a partition. Deriving it would mean mlkit
+    #: guessing which of a repo's partitions this declaration meant, which is a
+    #: check choosing the operand of its own verdict (E-M21's shape). D6
+    #: refuses the ambiguity instead: see ``TRACK_UNDECLARED``.
+    track: str = ""
+
+    # -- derived; see the class docstring. None of these is settable. --------
+    n_rows: int = field(init=False, default=0)
+    n_blocks_in_arm: int = field(init=False, default=0)
+    n_units_in_arm: int = field(init=False, default=0)
+    n_rows_panel: int = field(init=False, default=0)
+    #: The four proportions the crosscut carve-out turns on, in the record
+    #: rather than only in the branch. Amendment 1 to the preregistration: the
+    #: carve-out was applied EXISTENTIALLY -- one unit key in two arms silenced
+    #: the refusal for every other key -- so the counts that make it a
+    #: proportion are derived and printed. ``n_units_local_to_arm == 0`` is the
+    #: only shape that reports ``UNIT_CROSSCUTS_ARMS``;
+    #: ``n_blocks_split_by_crosscutting_units`` is how many of the policy's
+    #: blocks a passing carve-out is carrying, which is the residual the
+    #: amendment declines to close and therefore prints.
+    n_units_crosscutting_arms: int = field(init=False, default=0)
+    n_units_local_to_arm: int = field(init=False, default=0)
+    n_blocks_split_by_local_units: int = field(init=False, default=0)
+    n_blocks_split_by_crosscutting_units: int = field(init=False, default=0)
+    row_digest: str = field(init=False, default="")
+    block_digest: str = field(init=False, default="")
+    unit_digest: str = field(init=False, default="")
+    #: The policy's block keys present in the deciding arm, as strings, sorted.
+    #: Kept because this is the set a SECOND declaration of the same partition
+    #: — the ``splits`` binding R3 already reads — can be compared against, and
+    #: a declaration that is only ever compared to itself is not compared.
+    block_keys_in_arm: tuple[str, ...] = field(init=False, default=())
+    relation: str = field(init=False, default="")
+    refusal: str = field(init=False, default="")
+    detail: str = field(init=False, default="")
+
+    def __post_init__(self, assignment: Iterable[RowUnit]) -> None:
+        for name in ("procedure", "policy", "blocking_unit", "unit", "arm"):
+            if not str(getattr(self, name)).strip():
+                raise ServedContractError(
+                    f"a resampling declaration must name its {name}; an unnamed "
+                    "resampling procedure is the state this contract exists to end"
+                )
+        # `track` is optional, so it is checked for being WRITEABLE rather than
+        # for being present: an unset track is a repo with one partition, and a
+        # track that is a non-string or is only whitespace is a pointer that
+        # cannot be matched against any name `splits` can produce
+        # (`normalise_tracked_splits` refuses a blank track name on that side).
+        if not isinstance(self.track, str):
+            raise ServedContractError(
+                f"a resampling declaration's track is a {type(self.track).__name__}; "
+                "it names one of the holdout policies the `splits` binding "
+                "declares, and a name that is not a string cannot be that"
+            )
+        if self.track and not self.track.strip():
+            raise ServedContractError(
+                f"a resampling declaration's track is {self.track!r} -- whitespace. "
+                "An unset track means this repo has one partition; a blank one "
+                "means it has several and this declaration points at none of them"
+            )
+        draws = self.draws
+        if isinstance(draws, bool) or not isinstance(draws, int) or draws < 1:
+            raise ServedContractError(
+                f"resampling declares {draws!r} draws; a procedure that drew nothing "
+                "produced no interval, and `True` is not a count"
+            )
+
+        rows = list(assignment)
+        bad = [r for r in rows if not isinstance(r, RowUnit)]
+        if bad:
+            raise ServedContractError(
+                f"assignment carries {type(bad[0]).__name__} entries; pass "
+                "core.served.RowUnit, whose four fields are named. A bare tuple can "
+                "be handed over with the block and the unit the wrong way round, and "
+                "every verdict below would be exactly reversed with nothing to see."
+            )
+        if not rows:
+            raise ServedContractError(
+                "a resampling declaration over an empty assignment describes no rows; "
+                "two of them would be equal to each other and read as matched"
+            )
+
+        seen: set[str] = set()
+        duplicates: list[str] = []
+        for r in rows:
+            key = _canonical(r.row_key)
+            if key in seen:
+                duplicates.append(key)
+            seen.add(key)
+        if duplicates:
+            raise ServedContractError(
+                f"assignment repeats row key(s) {sorted(set(duplicates))[:3]}; a row "
+                "listed twice is either two rows wearing one identifier or one row "
+                "counted twice, and the two are not distinguishable from here"
+            )
+
+        in_arm = [r for r in rows if r.arm == self.arm]
+        if not in_arm:
+            raise ServedContractError(
+                f"the assignment holds no row in arm {self.arm!r} (arms present: "
+                f"{sorted({r.arm for r in rows})}); the interval was computed on rows "
+                "that are not in this assignment"
+            )
+
+        arms_of_block: dict[str, set[str]] = {}
+        arms_of_unit: dict[str, set[str]] = {}
+        for r in rows:
+            arms_of_block.setdefault(_canonical(r.block_key), set()).add(r.arm)
+            arms_of_unit.setdefault(_canonical(r.unit_key), set()).add(r.arm)
+
+        units_of_block: dict[str, set[str]] = {}
+        blocks_of_unit: dict[str, set[str]] = {}
+        raw_block: dict[str, Any] = {}
+        raw_unit: dict[str, Any] = {}
+        for r in in_arm:
+            b, u = _canonical(r.block_key), _canonical(r.unit_key)
+            raw_block.setdefault(b, r.block_key)
+            raw_unit.setdefault(u, r.unit_key)
+            units_of_block.setdefault(b, set()).add(u)
+            blocks_of_unit.setdefault(u, set()).add(b)
+
+        object.__setattr__(self, "n_rows_panel", len(rows))
+        object.__setattr__(self, "n_rows", len(in_arm))
+        object.__setattr__(self, "n_blocks_in_arm", len(units_of_block))
+        object.__setattr__(self, "n_units_in_arm", len(blocks_of_unit))
+        # Digested over the RAW keys, through the fleet's one row-set digest, so
+        # that a repo which computes "the digest of the blocks" elsewhere lands
+        # on the same hex string. Digesting the canonical strings instead would
+        # encode them twice and tie only to this function's own private
+        # spelling.
+        object.__setattr__(self, "row_digest", row_set_digest(r.row_key for r in in_arm))
+        object.__setattr__(self, "block_digest", row_set_digest(raw_block.values()))
+        object.__setattr__(self, "unit_digest", row_set_digest(raw_unit.values()))
+        object.__setattr__(
+            self, "block_keys_in_arm", tuple(sorted(str(k) for k in raw_block.values()))
+        )
+
+        straddling = sorted(b for b, arms in arms_of_block.items() if len(arms) > 1)
+
+        # PER KEY, NOT PER DECLARATION. Amendment 1 to the preregistration
+        # (`reports/DEPENDENCE_UNIT_PREREGISTRATION_AMENDMENT_1.md`), which
+        # quotes the superseded rule in full. What it replaced asked
+        # `if crosscutting:` -- does ANY key appear in two arms -- and let one
+        # key that did re-label every other key in the arm. The wave-1 verifier
+        # drove fray with COUNTY units, got `UNIT_CROSSCUTS_ARMS`, no refusal
+        # and D6 PASS; then flipped ONE val row's `unit_key` to collide with a
+        # train row and the refusal vanished for the other 1,364. The carve-out
+        # below is a statement about a UNIT -- an axis the split does not
+        # partition is not manufactured out of the holdout's own blocks -- and
+        # that justification does not transfer to the keys which are not on
+        # that axis. So each key is classified on its own.
+        crosscutting = sorted(
+            u for u in blocks_of_unit if len(arms_of_unit.get(u, set())) > 1
+        )
+        crosscut_keys = set(crosscutting)
+        local_units = sorted(u for u in blocks_of_unit if u not in crosscut_keys)
+
+        split_blocks = sorted(b for b, units in units_of_block.items() if len(units) > 1)
+
+        # A split block is carried by the CARVE-OUT only when every piece of it
+        # is on the crosscutting axis. One arm-local piece and it is not: that
+        # piece lives entirely inside the deciding arm, which is the shape
+        # DEPENDENCE_UNIT_TOO_FINE exists for, whatever the other pieces do.
+        split_by_local = [b for b in split_blocks if units_of_block[b] - crosscut_keys]
+        split_by_crosscut = [
+            b for b in split_blocks if not (units_of_block[b] - crosscut_keys)
+        ]
+        local_split_units = [u for u in local_units if len(blocks_of_unit[u]) > 1]
+
+        object.__setattr__(self, "n_units_crosscutting_arms", len(crosscutting))
+        object.__setattr__(self, "n_units_local_to_arm", len(local_units))
+        object.__setattr__(self, "n_blocks_split_by_local_units", len(split_by_local))
+        object.__setattr__(
+            self, "n_blocks_split_by_crosscutting_units", len(split_by_crosscut)
+        )
+
+        # The relation is the relation of the ARM-LOCAL mass, so that a single
+        # colliding key cannot change the answer the other keys produce.
+        # `UNIT_CROSSCUTS_ARMS` is reported only when there is no arm-local
+        # mass at all -- every unit resampled in this arm crosscuts the split,
+        # which is chokepoint's corridor bootstrap and keeps its documented
+        # behaviour exactly.
+        if not local_units:
+            relation = UNIT_CROSSCUTS_ARMS
+        elif split_by_local and local_split_units:
+            relation = UNIT_CROSSCUTS_BLOCK
+        elif split_by_local:
+            relation = UNIT_FINER_THAN_BLOCK
+        elif local_split_units:
+            relation = UNIT_COARSER_THAN_BLOCK
+        else:
+            relation = UNIT_IS_THE_BLOCK
+        object.__setattr__(self, "relation", relation)
+
+        # The ladder. Order is the order the questions have to be answered:
+        # a policy whose blocks straddle arms is not the policy that was
+        # declared, so nothing computed against its blocks means anything yet.
+        refusal, detail = "", ""
+        if straddling:
+            refusal = BLOCKS_STRADDLE_ARMS
+            detail = (
+                f"policy {self.policy!r} is declared to keep whole "
+                f"{self.blocking_unit!r} blocks in one partition, but "
+                f"{len(straddling)} of them appear in more than one arm "
+                f"(e.g. {straddling[0]} in "
+                f"{sorted(arms_of_block[straddling[0]])}). The declaration "
+                "describes a policy this assignment does not have."
+            )
+        elif self.n_units_in_arm < 2:
+            refusal = SINGLE_UNIT
+            detail = (
+                f"the {self.procedure} drew {self.unit!r} and arm {self.arm!r} "
+                f"contains one of them ({self.n_rows} rows). A procedure that "
+                "resamples a single unit resamples the same thing every draw; the "
+                "interval it produces has no width that came from the data."
+            )
+        elif split_by_local:
+            refusal = DEPENDENCE_UNIT_TOO_FINE
+            detail = (
+                f"the {self.procedure} resampled {self.n_units_in_arm} "
+                f"{self.unit!r} unit(s) inside arm {self.arm!r}, but holdout policy "
+                f"{self.policy!r} keeps whole {self.blocking_unit!r} blocks in one "
+                f"partition and that arm holds {self.n_blocks_in_arm} of them. "
+                f"{len(split_by_local)} block(s) are split across units (e.g. "
+                f"{split_by_local[0]} spans "
+                f"{len(units_of_block[split_by_local[0]])} units). The policy declares "
+                f"rows inside a {self.blocking_unit!r} to be dependent -- that is why "
+                "it refuses to separate them -- and this procedure drew them as "
+                "independent replicates, so it manufactured more evidence out of the "
+                f"arm than the arm contains. Resample {self.blocking_unit!r}, or "
+                "declare a unit the split does not partition."
+                # Said only when there IS a crosscutting mass, because that is
+                # the case in which a reader would otherwise expect the
+                # carve-out to have applied, and the proportion is the reason
+                # it did not.
+                + (
+                    f" {len(crosscutting)} of the {self.n_units_in_arm} unit(s) in "
+                    f"this arm do cross the split and {len(local_units)} do not; the "
+                    "carve-out covers a unit the split never partitioned, and it "
+                    "does not extend to the units beside it that live entirely "
+                    f"inside {self.arm!r}."
+                    if crosscutting
+                    else ""
+                )
+            )
+        # The `or crosscutting` half is Amendment 1's, and it is here because
+        # making the relation proportional would otherwise have LOOSENED this
+        # clause. Before the amendment, one crosscutting key forced the
+        # relation to `UNIT_CROSSCUTS_ARMS`, which is `!= UNIT_IS_THE_BLOCK`,
+        # so this fired. Now the relation is read off the arm-local mass, and
+        # an assignment whose local units happen to sit one-per-block reports
+        # `UNIT_IS_THE_BLOCK` while some OTHER unit key lives in two arms --
+        # which would have gone silent. It must not: `straddling` is empty by
+        # the time control reaches here, so every block of this policy is in
+        # exactly one arm, and a unit key with rows in two arms therefore
+        # CANNOT be one of the policy's blocks whatever it is labelled.
+        elif self.unit == self.blocking_unit and (
+            relation != UNIT_IS_THE_BLOCK or crosscutting
+        ):
+            refusal = UNIT_LABEL_CONTRADICTS_CONTENT
+            detail = (
+                f"the unit resampled is LABELLED {self.unit!r}, the same name as the "
+                f"policy's blocking unit, and the assignment says the relation is "
+                f"{relation}. Two things called by one name are not tied to each "
+                "other by being called that; the assignment is the tie and it "
+                "disagrees."
+                + (
+                    f" {len(crosscutting)} of the {self.n_units_in_arm} unit(s) in "
+                    f"arm {self.arm!r} have rows in another arm, and no "
+                    f"{self.blocking_unit!r} block of policy {self.policy!r} does -- "
+                    "the policy keeps them whole and this assignment agrees, so "
+                    "those units are not blocks."
+                    if crosscutting
+                    else ""
+                )
+            )
+        object.__setattr__(self, "refusal", refusal)
+        object.__setattr__(self, "detail", detail)
+
+    @property
+    def contradicts_policy(self) -> bool:
+        """True when this declaration refuses itself against its own policy."""
+        return bool(self.refusal)
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "procedure": self.procedure,
+            "draws": self.draws,
+            "policy": self.policy,
+            "blocking_unit": self.blocking_unit,
+            "unit": self.unit,
+            "arm": self.arm,
+            "n_rows": self.n_rows,
+            "n_rows_panel": self.n_rows_panel,
+            # Reported TOGETHER, always. The number of units resampled means
+            # nothing without the number of blocks the arm holds that were not,
+            # and a table carrying only the first is how a five-year holdout
+            # reads as 1,365 independent draws.
+            "n_units_in_arm": self.n_units_in_arm,
+            "n_blocks_in_arm": self.n_blocks_in_arm,
+            # And the four that make the crosscut carve-out a PROPORTION rather
+            # than an existence claim. A reader of a passing declaration can see
+            # how much of the arm the carve-out is carrying, which is the whole
+            # difference between chokepoint's 28-of-28 and fray's 48-of-285.
+            "n_units_crosscutting_arms": self.n_units_crosscutting_arms,
+            "n_units_local_to_arm": self.n_units_local_to_arm,
+            "n_blocks_split_by_local_units": self.n_blocks_split_by_local_units,
+            "n_blocks_split_by_crosscutting_units": (
+                self.n_blocks_split_by_crosscutting_units
+            ),
+            "row_digest": self.row_digest,
+            "block_digest": self.block_digest,
+            "unit_digest": self.unit_digest,
+            "relation": self.relation,
+            "refusal": self.refusal or UNMEASURED,
+            "detail": self.detail,
+        }
+        # Emitted ONLY when set. A repo with one partition declares no track,
+        # and its evidence bytes are the bytes it had before tracks existed --
+        # which is what makes the single-track control a byte comparison rather
+        # than a reading.
+        if self.track:
+            out["track"] = self.track
+        return out
 
 
 # ---------------------------------------------------------------------------
@@ -733,6 +1264,21 @@ class Comparison:
     #: can make these equal are the same rows on both sides.
     candidate_row_digest: str = ""
     reference_row_digest: str = ""
+    #: Bounds on THIS comparison's ``skill`` — the same quantity :attr:`skill`
+    #: computes, not a bound on the candidate's raw metric and not a bound on a
+    #: difference of metrics. An interval on a different quantity than the one
+    #: the gate decides is untied while looking tied, so ``__post_init__``
+    #: refuses an interval that does not contain its own point estimate.
+    skill_interval_low: float | None = None
+    skill_interval_high: float | None = None
+    #: What produced that interval, and what it drew. An interval is the output
+    #: of a resampling procedure, so there is no way to declare one here
+    #: without declaring the unit: an interval with no declaration raises, and a
+    #: declaration with no interval raises. That is the whole of "an adopter
+    #: cannot silently use the weaker convention" at this layer — the weaker
+    #: convention is still spellable, but it is no longer silent, because the
+    #: unit it drew is in the record and is compared to the policy beside it.
+    resampling: ResamplingDeclaration | None = None
     #: DERIVED in ``__post_init__``, never passed in. ``init=False`` is the
     #: point: ``Comparison(..., row_matched=True)`` is a TypeError naming the
     #: argument, so the assertion the gate used to rest on cannot be spelled at
@@ -780,6 +1326,80 @@ class Comparison:
         else:
             derived = None
         object.__setattr__(self, "row_matched", derived)
+        self._check_interval()
+
+    def _check_interval(self) -> None:
+        """Refuse an interval and a declaration that are not each other's.
+
+        Five refusals, all at construction, because each is a malformed
+        declaration rather than a verdict about evidence — there is nothing for
+        a reader to weigh in "one endpoint without the other".
+        """
+        lo, hi = self.skill_interval_low, self.skill_interval_high
+        has_interval = lo is not None or hi is not None
+        if has_interval and (lo is None or hi is None):
+            raise ServedContractError(
+                f"comparison on {self.metric!r} declares one interval endpoint and not "
+                "the other; half an interval bounds nothing"
+            )
+        if has_interval and self.resampling is None:
+            raise ServedContractError(
+                f"comparison on {self.metric!r} carries the interval "
+                f"[{lo!r}, {hi!r}] and no resampling declaration. An interval is the "
+                "output of a resampling procedure, and the unit that procedure drew is "
+                "the difference between [+16.016, +29.646] and [-1.289, +41.704] on "
+                "one identical set of 1,365 rows (round-8 adjudication 2.1). Declare "
+                "it with core.served.ResamplingDeclaration."
+            )
+        if self.resampling is not None and not has_interval:
+            raise ServedContractError(
+                f"comparison on {self.metric!r} carries a resampling declaration and "
+                "no interval. A declaration about nothing declares nothing, and it "
+                "would render in the record beside comparisons that do carry one."
+            )
+        if not has_interval:
+            return
+
+        low, high = float(lo), float(hi)  # type: ignore[arg-type]
+        nonfinite = [
+            name for name, v in (("low", low), ("high", high)) if not math.isfinite(v)
+        ]
+        if nonfinite:
+            raise ServedContractError(
+                f"comparison on {self.metric!r} declares a non-finite interval "
+                f"endpoint ({', '.join(nonfinite)}); an infinity is not a bound and a "
+                "NaN compares False to zero in both directions, which is the one "
+                "question an interval is asked"
+            )
+        if low > high:
+            raise ServedContractError(
+                f"comparison on {self.metric!r} declares the interval [{low!r}, "
+                f"{high!r}], whose lower bound is above its upper one"
+            )
+        declaration = self.resampling
+        assert declaration is not None  # narrowed by has_interval above
+        if not self.arm:
+            raise ServedContractError(
+                f"comparison on {self.metric!r} carries a resampling declaration for "
+                f"arm {declaration.arm!r} and names no arm of its own; there is "
+                "nothing to tie the declaration to"
+            )
+        if declaration.arm != self.arm:
+            raise ServedContractError(
+                f"comparison on {self.metric!r} was measured on arm {self.arm!r} and "
+                f"its interval was resampled on arm {declaration.arm!r}; a bound taken "
+                "on other rows is not a bound on this figure"
+            )
+        point = self.skill
+        if point is not None and not (low <= point <= high):
+            raise ServedContractError(
+                f"comparison on {self.metric!r} declares the interval [{low!r}, "
+                f"{high!r}], which does not contain its own point estimate {point!r}. "
+                "These fields bound THIS comparison's skill — 1 - candidate/reference "
+                "for a lower-is-better metric — and an interval on some other "
+                "quantity (a difference in the metric's own units, say) ties to "
+                "nothing here while reading as though it does."
+            )
 
     @property
     def declared(self) -> bool:
@@ -805,6 +1425,29 @@ class Comparison:
             domain=self.domain,
         )
 
+    @property
+    def has_interval(self) -> bool:
+        """True when this comparison carries a bound AND what produced it.
+
+        One property rather than two reads, because ``__post_init__`` has
+        already refused every state in which the endpoints and the declaration
+        disagree about whether an interval exists.
+        """
+        return self.skill_interval_low is not None
+
+    @property
+    def interval_clears_zero(self) -> bool | None:
+        """True when the whole interval is above zero. ``None`` when untied.
+
+        Above zero, not away from zero: :func:`skill` is already signed so that
+        positive means the candidate won, whichever direction the metric runs
+        in, so "clears" is one comparison and not two.
+        """
+        low = self.skill_interval_low
+        if low is None:
+            return None
+        return float(low) > 0.0
+
     def to_dict(self) -> dict[str, Any]:
         measured = self.skill
         return {
@@ -824,6 +1467,23 @@ class Comparison:
             # who cannot tell them apart will read the first as the second and
             # go looking for a split that is not there.
             "row_matched": UNMEASURED if self.row_matched is None else self.row_matched,
+            # UNMEASURED rather than null, for the reason `row_matched` is:
+            # "this figure carries no interval" and "this interval is null" are
+            # different facts, and only one of them is a state a resampling
+            # procedure can be in.
+            "skill_interval": (
+                UNMEASURED
+                if not self.has_interval
+                else [self.skill_interval_low, self.skill_interval_high]
+            ),
+            "interval_clears_zero": (
+                UNMEASURED
+                if self.interval_clears_zero is None
+                else self.interval_clears_zero
+            ),
+            "resampling": (
+                UNMEASURED if self.resampling is None else self.resampling.to_dict()
+            ),
             "unmeasured_reason": self.unmeasured_reason,
         }
 
@@ -851,6 +1511,18 @@ POLARITY_UNDECLARED = "POLARITY_UNDECLARED"
 #: 2026-08-31 the second condition silently reported the strongest form of the
 #: opposite (``row_matched: bool = True``).
 ROW_SET_UNTIED = "ROW_SET_UNTIED"
+#: The interval was resampled over rows that are not the rows the point
+#: estimate was computed over. Kept apart from ``ROW_SET_MISMATCH``, which is
+#: about the candidate and the reference: this one is about the point and its
+#: own interval, and the two send a reader to different places.
+RESAMPLING_ROWS_UNTIED = "RESAMPLING_ROWS_UNTIED"
+#: The unit the interval's procedure drew contradicts the holdout policy the
+#: same comparison declares. See :class:`ResamplingDeclaration`.
+DEPENDENCE_UNIT_CONTRADICTS_POLICY = "DEPENDENCE_UNIT_CONTRADICTS_POLICY"
+#: The point estimate cleared the bar and the interval around it does not.
+#: This is a FAIL and not an NA: the comparison WAS measured, and what it
+#: measured is a margin that its own resampling cannot distinguish from zero.
+INTERVAL_COVERS_ZERO = "INTERVAL_COVERS_ZERO"
 
 
 @dataclass(frozen=True)
@@ -985,9 +1657,34 @@ class ChallengerDecision:
         """False for NA. "Not measured" is the question this answers, not "lost"."""
         return self.status is not Status.NA
 
+    def declared_resampling(self) -> list[dict[str, Any]]:
+        """Every resampling declaration this decision actually looked at.
+
+        Read out of the evidence the decision already carries rather than
+        stored as a field of its own, so there is no second place to write one
+        and no way for the summary to disagree with the comparisons it
+        summarises.
+        """
+        found: list[dict[str, Any]] = []
+        for key in ("comparisons", "resampling"):
+            for entry in self.evidence.get(key) or ():
+                if not isinstance(entry, Mapping):
+                    continue
+                declaration = entry.get("resampling")
+                if isinstance(declaration, Mapping):
+                    found.append(dict(declaration))
+        return found
+
     def to_dict(self) -> dict[str, Any]:
+        declarations = self.declared_resampling()
         return {
             "status": self.status.value,
+            # A PRINTED absence, not a missing key. A promotion that rests on
+            # an interval and reports `"resampling": "NA"` has said, in the
+            # record a person reads, that nobody declared what was resampled --
+            # which is the state round-8 adjudication had to reconstruct by
+            # hand from a trainer's source.
+            "resampling": declarations or UNMEASURED,
             "promotable": self.promotable,
             "measured": self.measured,
             "recorded_bar": self.recorded_bar,
@@ -1035,11 +1732,26 @@ def challenger_decision(
        declared — NA. chokepoint's val-only refusal
        (``daily_flow_forecaster.py:527-570``): a challenger with a val margin
        has not been measured on the terms the champion was promoted on.
-    5. any declared metric's skill is **unmeasured** — NA.
-    6. any declared metric's skill is measured and **not strictly positive** —
+    5. the interval was resampled over **different rows** than the figure it
+       bounds — NA. Only reachable for a comparison that carries an interval.
+    6. the interval's **resampling unit contradicts the holdout policy** the
+       same comparison declares — NA. See :class:`ResamplingDeclaration`; this
+       is the round-8 finding, and it is NA rather than FAIL because the
+       candidate may be perfectly good and the evidence about it is what cannot
+       be adjudicated.
+    7. any declared metric's skill is **unmeasured** — NA.
+    8. any declared metric's skill is measured and **not strictly positive** —
        FAIL.
+    9. the skill is strictly positive and **its own interval does not exclude
+       zero** — FAIL. Asked last, and only of comparisons carrying an interval,
+       so that nothing without one changes verdict and a point-estimate loss
+       still reports ``NO_SKILL``.
 
     Otherwise PASS.
+
+    Lanes 5, 6 and 9 are unreachable for a :class:`Comparison` with no
+    interval, which is every comparison this function decided before
+    2026-09-01. Adding them moved no existing verdict.
     """
     metrics = tuple(metrics)
     if not metrics:
@@ -1204,6 +1916,84 @@ def challenger_decision(
                 refusal_class=ARM_MISMATCH,
             )
 
+    # -- the dependence unit ------------------------------------------------
+    #
+    # Both lanes are skipped entirely by a comparison carrying no interval, so
+    # every verdict this function gave before 2026-09-01 is unchanged. What
+    # they close is the case the round-8 adjudication measured: a promotion
+    # conditioned on an interval, where the unit the interval's procedure drew
+    # was nobody's declared decision and no instrument compared it to the
+    # holdout policy sitting beside it in the same artifact.
+    with_interval = [m for m in metrics if by_metric[m].has_interval]
+
+    rows_untied = [
+        m
+        for m in with_interval
+        if by_metric[m].candidate_row_digest
+        and by_metric[m].resampling is not None
+        and by_metric[m].resampling.row_digest != by_metric[m].candidate_row_digest  # type: ignore[union-attr]
+    ]
+    if rows_untied:
+        detail = "; ".join(
+            f"{m}: point over {by_metric[m].candidate_row_digest[:12]}…, interval over "
+            f"{by_metric[m].resampling.row_digest[:12]}…"  # type: ignore[union-attr]
+            for m in rows_untied
+        )
+        return ChallengerDecision(
+            status=Status.NA,
+            reason=(
+                f"the interval against {recorded_bar!r} was resampled over a different "
+                f"row set than the figure it bounds on {rows_untied} ({detail}). A "
+                "bound taken on other rows is not a bound on this number."
+            ),
+            recorded_bar=recorded_bar,
+            metrics=metrics,
+            skill=none_skill,
+            n_rows=n_rows,
+            refusal_class=RESAMPLING_ROWS_UNTIED,
+            # EVERY declared metric, not only the offending ones, under the same
+            # key a PASS uses. A reader who sees one comparison here and three
+            # metrics in `decision_metrics` will read the other two as
+            # uncompared, which is a different and worse fact than the one being
+            # reported. `offending` names which.
+            evidence={
+                "comparisons": [by_metric[m].to_dict() for m in metrics],
+                "arm": by_metric[metrics[0]].arm,
+                "offending": rows_untied,
+            },
+        )
+
+    contradicting = [
+        m
+        for m in with_interval
+        if by_metric[m].resampling is not None
+        and by_metric[m].resampling.contradicts_policy  # type: ignore[union-attr]
+    ]
+    if contradicting:
+        detail = " | ".join(
+            f"{m}: {by_metric[m].resampling.refusal} — "  # type: ignore[union-attr]
+            f"{by_metric[m].resampling.detail}"  # type: ignore[union-attr]
+            for m in contradicting
+        )
+        return ChallengerDecision(
+            status=Status.NA,
+            reason=(
+                f"the interval against {recorded_bar!r} rests on a resampling unit "
+                f"that contradicts the holdout policy this comparison declares, on "
+                f"{contradicting}. {detail}"
+            ),
+            recorded_bar=recorded_bar,
+            metrics=metrics,
+            skill=none_skill,
+            n_rows=n_rows,
+            refusal_class=DEPENDENCE_UNIT_CONTRADICTS_POLICY,
+            evidence={
+                "comparisons": [by_metric[m].to_dict() for m in metrics],
+                "arm": by_metric[metrics[0]].arm,
+                "offending": contradicting,
+            },
+        )
+
     measured: dict[str, float | None] = {m: by_metric[m].skill for m in metrics}
     unmeasured = [m for m in metrics if measured[m] is None]
     if unmeasured:
@@ -1242,6 +2032,37 @@ def challenger_decision(
             skill=measured,
             n_rows=n_rows,
             refusal_class=NO_SKILL,
+            evidence=evidence,
+        )
+
+    # Asked LAST, and only of comparisons that carry one, so that a comparison
+    # with no interval reaches PASS by exactly the path it always did and a
+    # point-estimate loss still reports NO_SKILL rather than being re-labelled.
+    # This is the fray case: point +22.811 clears the floor, and the interval
+    # its own holdout policy implies is [-1.289, +41.704].
+    covering = [m for m in with_interval if by_metric[m].interval_clears_zero is False]
+    if covering:
+        detail = ", ".join(
+            f"{m} {float(measured[m] or 0.0):+.6f} in "
+            f"[{by_metric[m].skill_interval_low!r}, {by_metric[m].skill_interval_high!r}] "
+            f"({by_metric[m].resampling.procedure} over "  # type: ignore[union-attr]
+            f"{by_metric[m].resampling.n_units_in_arm} "  # type: ignore[union-attr]
+            f"{by_metric[m].resampling.unit!r} unit(s))"  # type: ignore[union-attr]
+            for m in covering
+        )
+        return ChallengerDecision(
+            status=Status.FAIL,
+            reason=(
+                f"skill against {recorded_bar!r} is positive and its own interval does "
+                f"not exclude zero on {detail} over {n_rows} rows. The point estimate "
+                "is the number; the interval is whether the number is distinguishable "
+                "from no effect, and promotion rests on the second."
+            ),
+            recorded_bar=recorded_bar,
+            metrics=metrics,
+            skill=measured,
+            n_rows=n_rows,
+            refusal_class=INTERVAL_COVERS_ZERO,
             evidence=evidence,
         )
 

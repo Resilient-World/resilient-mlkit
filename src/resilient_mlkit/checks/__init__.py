@@ -1,6 +1,6 @@
 """The check registry.
 
-Thirty-two checks across five phases. The registry is the single place that
+Thirty-three checks across five phases. The registry is the single place that
 knows what exists, what phase it belongs to, and -- importantly -- what order
 it runs in, because for readiness that order is not numerical.
 
@@ -101,7 +101,10 @@ PHASE_ORDER: dict[str, list[str]] = {
     "readiness": [
         "R9", "R10", "R11", "R12", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8",
     ],
-    "decision": ["D1", "D2", "D3", "D4", "D5"],
+    # D6 is appended, not inserted. Every existing decision id keeps its
+    # position, so the only movement in the phase is one row at the end and a
+    # denominator of six.
+    "decision": ["D1", "D2", "D3", "D4", "D5", "D6"],
     "economics": ["E1", "E2", "E3", "E4", "E5"],
 }
 
