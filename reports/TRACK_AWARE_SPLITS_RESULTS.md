@@ -242,3 +242,42 @@ bullet; the implementation has both as distinct named constants, which is what
 the table said. No control pair was added, removed or weakened. The nine
 declared control pairs are all driven: A-1..A-3 in §1, B-1/B-2 in §2, and
 B-3..B-9 as the named tests in `tests/test_track_aware_splits.py`.
+
+## 7. Adversarial verification (item I1-M2 verifier, 2026-09-01)
+
+Re-driven in a detached worktree at `1896184`, base `24f23b8`, with
+`module.__file__` asserted, from a 336-case differential corpus built
+independently of this branch's own drivers (16 `splits` shapes x 21
+`resampling_declaration` shapes, R3 and D6 at both shas). CONTROL A, CONTROL B
+and the suite counts reproduced exactly — the committed
+`reports/track_aware_splits/controlA_{base,head}.json` are byte-identical to
+the verifier's re-drive, `controlB_*` re-hash to
+`28e0db98fc879445cf0c7d88456bd2acdb46b2867b7bc6ed678ff6762342f3ef`, and
+collection is 977 at `24f23b8` and 1,017 here. Four single-fact remutations
+(`TRACK_UNDECLARED` disabled; R3 judging only the first track; D6 tying to the
+first track rather than the declared one; `TRACKS_MIXED_WITH_FLAT` resolved by
+preference) each failed named tests, so none of the new clauses is dead.
+
+Two corrections, neither of which moves a verdict:
+
+1. **The CHANGELOG's suite figure was `1,016` and the measured value is
+   `1,017`** (`pytest --collect-only -q`, both shas, this worktree). §2 of this
+   file already said 1,017; the two disagreed. The CHANGELOG is corrected.
+2. **§3's strictly-stricter claim holds at the REPO level, not per check.** Of
+   336 cases, the only ones where a base FAIL is not a head FAIL *somewhere in
+   the pair* are the six tracked-envelope cases §3 point 4 pre-registered. But
+   on the newly-refused mixed shape — `{"train": …, "val": …, "test": …,
+   "tracks": […]}`, which `24f23b8` silently read as a flat splits with a
+   fourth, unjudged key — **D6's FAIL becomes NA at this head** (7 cases), and
+   R3's PASS becomes FAIL on the same input. The repo still fails, and it fails
+   for the right reason, but the sentence "every input that produces FAIL at
+   `24f23b8` produces FAIL at this branch's head" is true of the pair and not
+   of D6 alone. Stated here rather than left for a reader to hit.
+
+One integration note, outside this branch's control: item I1-M1's branch
+`fix/m-d6-crosscut-proportional` (PR #37) was opened 19 minutes AFTER this
+branch's pre-registration commit, from the same `24f23b8`, and allocates
+**E-M33** to a different escalation. `src/resilient_mlkit/core/served.py`
+merges cleanly between the two branches (trial `git merge --no-commit`); only
+`docs/ESCALATIONS.md` conflicts, on that identifier. Whichever lands second
+renumbers.

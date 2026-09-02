@@ -129,7 +129,7 @@ REAL split membership `resilient-torrent` (211/71/70 basins) and
 `mlkit_bindings:splits`, in six cases covering the block unit, the row unit and
 an absent binding. The two result files hash to the same sha256
 (`28e0db98fc879445cf0c7d88456bd2acdb46b2867b7bc6ed678ff6762342f3ef`). Suite:
-977 passed at the base commit, 1,016 at this one, 0 failed.
+977 passed at the base commit, 1,017 at this one, 0 failed.
 
 **What is NOT closed, named rather than left to be found.**
 `UNIT_CROSSCUTS_ARMS` still silences `DEPENDENCE_UNIT_TOO_FINE`
