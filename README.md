@@ -49,6 +49,38 @@ that did not come out of a run of this CLI does not exist.
 | `mlkit keys` | credentials the portfolio is waiting on |
 | `mlkit notice` | regenerate `NOTICE.md` from the allowlist |
 | `mlkit allowlist verify` | allowlist structure and signature |
+| `mlkit identity` | which mlkit build this is; `--verify REPORT…` checks a report was written by it |
+
+## Which mlkit measured this?
+
+`--version` cannot answer that. fray runs mlkit `c65b2e7` and mlkit main is
+`6921e9a` — forty commits apart, nine source files different, `+50/-5` in
+`checks/readiness.py` and `+373/-13` in `core/served.py` — and **both declare
+`0.5.0`** (`docs/ESCALATIONS.md` E-M24). A readiness table measured under one
+of them is not a readiness table under the other, and the version string cannot
+tell a reader which they are holding.
+
+So every report mlkit writes now carries the build that wrote it, on its own
+line, and an adopter can check it:
+
+```
+mlkit identity                                   # which build is installed here
+mlkit identity --verify reports/readiness.md     # was this report written by it
+```
+
+The identity is a length-framed sha256 over the files the running package was
+loaded from — `0.5.0+src.4f2a91c0be3d`. It moves when mlkit's shipped source
+moves, which is the only way its gate semantics can move, and it is present in
+an adopter's `site-packages`, where `git rev-parse` has nothing to say. It sits
+**beside** `__version__` and never inside it: release naming and tag cutting
+stay with the human signatory.
+
+Verdicts are `MATCH`, `MISMATCH`, `UNSTAMPED` (a report written before this
+existed — an absence, not a mismatch, and not recoverable by editing the file),
+`CONFLICTING` (two stamps, one file) and `INDETERMINATE` (a digest that could
+not be read; no equality is asserted from an unknown operand). Exit `0` only on
+all-`MATCH`, `3` on any `MISMATCH`, `1` otherwise. Design note:
+`docs/BUILD_IDENTITY.md`.
 
 `mlkit portfolio` and `mlkit check --portfolio` are different questions.
 The first is model quality — does this thing beat its baseline. The second is

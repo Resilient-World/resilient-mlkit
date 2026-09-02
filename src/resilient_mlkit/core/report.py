@@ -37,6 +37,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import identity
 from .environment import EnvironmentProbe
 
 #: Suffix for the file that records a refusal. Deliberately not ``.md`` alone.
@@ -144,6 +145,11 @@ def _render_refusal(
         "",
         f"- run nonce: `{nonce or 'NA (not supplied)'}`",
         f"- git SHA: `{git_sha or 'NA (not a git worktree)'}`",
+        # The refusal is stamped for the same reason the report is (E-M24):
+        # "which mlkit declined to overwrite this" is as much a fact about a
+        # build as "which mlkit measured it", and a reader comparing this file
+        # against the report beside it needs both to name their author.
+        *identity.header_lines(),
         f"- interpreter: python {probe.python or 'NA'}",
         f"- verdict: **{probe.verdict}**",
         "",
