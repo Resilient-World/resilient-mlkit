@@ -359,6 +359,23 @@ def seal(payload: Mapping[str, Any], *, hash_key: str = HASH_KEY) -> dict[str, A
 # CORRECT convention unadoptable, on a standard no measurement in this round
 # supports, which is the R12 failure mode ("adopting the check would not clear
 # it") one layer up.
+#
+# THE CARVE-OUT IS PROPORTIONAL AND FAIL-CLOSED, NOT EXISTENTIAL. Amendment 1
+# (`reports/DEPENDENCE_UNIT_PREREGISTRATION_AMENDMENT_1.md`, which quotes the
+# superseded rule in full). As first written the carve-out asked whether ANY
+# unit key appeared in two arms, and one key that did silenced
+# `DEPENDENCE_UNIT_TOO_FINE` for every other key in the arm. Driven, at the
+# sha that shipped it: fray's panel with COUNTY units -> D6 PASS, and fray's
+# panel as run with ONE of 1,365 val `unit_key`s collided into a train key ->
+# D6 PASS, from a FAIL. Each unit key is now classified on its own, and a
+# block of the policy that is split with even one ARM-LOCAL piece refuses.
+# `UNIT_CROSSCUTS_ARMS` is reported only when the arm-local mass is empty.
+# What this still does NOT close, named rather than hidden: a declaration in
+# which EVERY unit crosscuts every arm remains refusal-free even though its
+# units may be finer than the policy's blocks inside the arm -- chokepoint's
+# corridor is exactly that shape and is endorsed, so nothing measured here
+# tells the two apart. `n_blocks_split_by_crosscutting_units` prints how many
+# blocks such a pass is carrying.
 
 
 #: The unit is exactly the unit the holdout policy keeps whole. fray's repair.
@@ -371,8 +388,15 @@ UNIT_FINER_THAN_BLOCK = "UNIT_FINER_THAN_BLOCK"
 #: The unit splits a block AND a block splits a unit, both inside the arm.
 #: Neither refines the other; still manufactures replicates out of blocks.
 UNIT_CROSSCUTS_BLOCK = "UNIT_CROSSCUTS_BLOCK"
-#: At least one resampled unit's rows appear in more than one arm, so the unit
-#: is an axis the split does not partition. chokepoint's corridor.
+#: EVERY resampled unit in the deciding arm has rows in more than one arm, so
+#: the unit is an axis the split does not partition. chokepoint's corridor.
+#:
+#: Amendment 1 to the preregistration narrowed this from "at least one" to
+#: "every one", and those first four words were the escape: a declaration in
+#: which 1,364 row units stayed inside the arm and ONE collided with a train
+#: key reported this relation and no refusal at all. The carve-out is a
+#: statement about a unit, so it applies only where there is no other kind of
+#: unit for it to be read as covering.
 UNIT_CROSSCUTS_ARMS = "UNIT_CROSSCUTS_ARMS"
 
 RELATIONS = (
@@ -494,6 +518,19 @@ class ResamplingDeclaration:
     n_blocks_in_arm: int = field(init=False, default=0)
     n_units_in_arm: int = field(init=False, default=0)
     n_rows_panel: int = field(init=False, default=0)
+    #: The four proportions the crosscut carve-out turns on, in the record
+    #: rather than only in the branch. Amendment 1 to the preregistration: the
+    #: carve-out was applied EXISTENTIALLY -- one unit key in two arms silenced
+    #: the refusal for every other key -- so the counts that make it a
+    #: proportion are derived and printed. ``n_units_local_to_arm == 0`` is the
+    #: only shape that reports ``UNIT_CROSSCUTS_ARMS``;
+    #: ``n_blocks_split_by_crosscutting_units`` is how many of the policy's
+    #: blocks a passing carve-out is carrying, which is the residual the
+    #: amendment declines to close and therefore prints.
+    n_units_crosscutting_arms: int = field(init=False, default=0)
+    n_units_local_to_arm: int = field(init=False, default=0)
+    n_blocks_split_by_local_units: int = field(init=False, default=0)
+    n_blocks_split_by_crosscutting_units: int = field(init=False, default=0)
     row_digest: str = field(init=False, default="")
     block_digest: str = field(init=False, default="")
     unit_digest: str = field(init=False, default="")
@@ -608,19 +645,57 @@ class ResamplingDeclaration:
         )
 
         straddling = sorted(b for b, arms in arms_of_block.items() if len(arms) > 1)
+
+        # PER KEY, NOT PER DECLARATION. Amendment 1 to the preregistration
+        # (`reports/DEPENDENCE_UNIT_PREREGISTRATION_AMENDMENT_1.md`), which
+        # quotes the superseded rule in full. What it replaced asked
+        # `if crosscutting:` -- does ANY key appear in two arms -- and let one
+        # key that did re-label every other key in the arm. The wave-1 verifier
+        # drove fray with COUNTY units, got `UNIT_CROSSCUTS_ARMS`, no refusal
+        # and D6 PASS; then flipped ONE val row's `unit_key` to collide with a
+        # train row and the refusal vanished for the other 1,364. The carve-out
+        # below is a statement about a UNIT -- an axis the split does not
+        # partition is not manufactured out of the holdout's own blocks -- and
+        # that justification does not transfer to the keys which are not on
+        # that axis. So each key is classified on its own.
         crosscutting = sorted(
             u for u in blocks_of_unit if len(arms_of_unit.get(u, set())) > 1
         )
-        split_blocks = sorted(b for b, units in units_of_block.items() if len(units) > 1)
-        split_units = sorted(u for u, blocks in blocks_of_unit.items() if len(blocks) > 1)
+        crosscut_keys = set(crosscutting)
+        local_units = sorted(u for u in blocks_of_unit if u not in crosscut_keys)
 
-        if crosscutting:
+        split_blocks = sorted(b for b, units in units_of_block.items() if len(units) > 1)
+
+        # A split block is carried by the CARVE-OUT only when every piece of it
+        # is on the crosscutting axis. One arm-local piece and it is not: that
+        # piece lives entirely inside the deciding arm, which is the shape
+        # DEPENDENCE_UNIT_TOO_FINE exists for, whatever the other pieces do.
+        split_by_local = [b for b in split_blocks if units_of_block[b] - crosscut_keys]
+        split_by_crosscut = [
+            b for b in split_blocks if not (units_of_block[b] - crosscut_keys)
+        ]
+        local_split_units = [u for u in local_units if len(blocks_of_unit[u]) > 1]
+
+        object.__setattr__(self, "n_units_crosscutting_arms", len(crosscutting))
+        object.__setattr__(self, "n_units_local_to_arm", len(local_units))
+        object.__setattr__(self, "n_blocks_split_by_local_units", len(split_by_local))
+        object.__setattr__(
+            self, "n_blocks_split_by_crosscutting_units", len(split_by_crosscut)
+        )
+
+        # The relation is the relation of the ARM-LOCAL mass, so that a single
+        # colliding key cannot change the answer the other keys produce.
+        # `UNIT_CROSSCUTS_ARMS` is reported only when there is no arm-local
+        # mass at all -- every unit resampled in this arm crosscuts the split,
+        # which is chokepoint's corridor bootstrap and keeps its documented
+        # behaviour exactly.
+        if not local_units:
             relation = UNIT_CROSSCUTS_ARMS
-        elif split_blocks and split_units:
+        elif split_by_local and local_split_units:
             relation = UNIT_CROSSCUTS_BLOCK
-        elif split_blocks:
+        elif split_by_local:
             relation = UNIT_FINER_THAN_BLOCK
-        elif split_units:
+        elif local_split_units:
             relation = UNIT_COARSER_THAN_BLOCK
         else:
             relation = UNIT_IS_THE_BLOCK
@@ -648,23 +723,49 @@ class ResamplingDeclaration:
                 "resamples a single unit resamples the same thing every draw; the "
                 "interval it produces has no width that came from the data."
             )
-        elif not crosscutting and split_blocks:
+        elif split_by_local:
             refusal = DEPENDENCE_UNIT_TOO_FINE
             detail = (
                 f"the {self.procedure} resampled {self.n_units_in_arm} "
                 f"{self.unit!r} unit(s) inside arm {self.arm!r}, but holdout policy "
                 f"{self.policy!r} keeps whole {self.blocking_unit!r} blocks in one "
                 f"partition and that arm holds {self.n_blocks_in_arm} of them. "
-                f"{len(split_blocks)} block(s) are split across units (e.g. "
-                f"{split_blocks[0]} spans "
-                f"{len(units_of_block[split_blocks[0]])} units). The policy declares "
+                f"{len(split_by_local)} block(s) are split across units (e.g. "
+                f"{split_by_local[0]} spans "
+                f"{len(units_of_block[split_by_local[0]])} units). The policy declares "
                 f"rows inside a {self.blocking_unit!r} to be dependent -- that is why "
                 "it refuses to separate them -- and this procedure drew them as "
                 "independent replicates, so it manufactured more evidence out of the "
                 f"arm than the arm contains. Resample {self.blocking_unit!r}, or "
                 "declare a unit the split does not partition."
+                # Said only when there IS a crosscutting mass, because that is
+                # the case in which a reader would otherwise expect the
+                # carve-out to have applied, and the proportion is the reason
+                # it did not.
+                + (
+                    f" {len(crosscutting)} of the {self.n_units_in_arm} unit(s) in "
+                    f"this arm do cross the split and {len(local_units)} do not; the "
+                    "carve-out covers a unit the split never partitioned, and it "
+                    "does not extend to the units beside it that live entirely "
+                    f"inside {self.arm!r}."
+                    if crosscutting
+                    else ""
+                )
             )
-        elif self.unit == self.blocking_unit and relation != UNIT_IS_THE_BLOCK:
+        # The `or crosscutting` half is Amendment 1's, and it is here because
+        # making the relation proportional would otherwise have LOOSENED this
+        # clause. Before the amendment, one crosscutting key forced the
+        # relation to `UNIT_CROSSCUTS_ARMS`, which is `!= UNIT_IS_THE_BLOCK`,
+        # so this fired. Now the relation is read off the arm-local mass, and
+        # an assignment whose local units happen to sit one-per-block reports
+        # `UNIT_IS_THE_BLOCK` while some OTHER unit key lives in two arms --
+        # which would have gone silent. It must not: `straddling` is empty by
+        # the time control reaches here, so every block of this policy is in
+        # exactly one arm, and a unit key with rows in two arms therefore
+        # CANNOT be one of the policy's blocks whatever it is labelled.
+        elif self.unit == self.blocking_unit and (
+            relation != UNIT_IS_THE_BLOCK or crosscutting
+        ):
             refusal = UNIT_LABEL_CONTRADICTS_CONTENT
             detail = (
                 f"the unit resampled is LABELLED {self.unit!r}, the same name as the "
@@ -672,6 +773,15 @@ class ResamplingDeclaration:
                 f"{relation}. Two things called by one name are not tied to each "
                 "other by being called that; the assignment is the tie and it "
                 "disagrees."
+                + (
+                    f" {len(crosscutting)} of the {self.n_units_in_arm} unit(s) in "
+                    f"arm {self.arm!r} have rows in another arm, and no "
+                    f"{self.blocking_unit!r} block of policy {self.policy!r} does -- "
+                    "the policy keeps them whole and this assignment agrees, so "
+                    "those units are not blocks."
+                    if crosscutting
+                    else ""
+                )
             )
         object.__setattr__(self, "refusal", refusal)
         object.__setattr__(self, "detail", detail)
@@ -697,6 +807,16 @@ class ResamplingDeclaration:
             # reads as 1,365 independent draws.
             "n_units_in_arm": self.n_units_in_arm,
             "n_blocks_in_arm": self.n_blocks_in_arm,
+            # And the four that make the crosscut carve-out a PROPORTION rather
+            # than an existence claim. A reader of a passing declaration can see
+            # how much of the arm the carve-out is carrying, which is the whole
+            # difference between chokepoint's 28-of-28 and fray's 48-of-285.
+            "n_units_crosscutting_arms": self.n_units_crosscutting_arms,
+            "n_units_local_to_arm": self.n_units_local_to_arm,
+            "n_blocks_split_by_local_units": self.n_blocks_split_by_local_units,
+            "n_blocks_split_by_crosscutting_units": (
+                self.n_blocks_split_by_crosscutting_units
+            ),
             "row_digest": self.row_digest,
             "block_digest": self.block_digest,
             "unit_digest": self.unit_digest,

@@ -2663,7 +2663,59 @@ rewrote its own past counts would be worse than one that goes stale.
 
 ---
 
-## E-M33 — `UNIT_CROSSCUTS_ARMS` silences `DEPENDENCE_UNIT_TOO_FINE`, and a county unit on a crop-year track walks through it
+## E-M33 — the crosscut carve-out was existential, and its own verifier drove the escape
+
+**Closed on `fix/m-d6-crosscut-proportional`, recorded here because the shape of
+the miss is the reusable part.**
+
+The dependence-unit contract (E-M30's branch, PR #32) classified the whole
+declaration from a quantifier over keys: `if crosscutting:` — does **any** unit
+key appear in more than one arm — set the relation to `UNIT_CROSSCUTS_ARMS`, and
+the refusal below it read `elif not crosscutting and split_blocks:`. The
+carve-out's justification is a statement about **a unit** (an axis the split
+does not partition is not manufactured out of the holdout's own blocks) and it
+was implemented as a statement about **a declaration**. One key carried it for
+all of them.
+
+The wave-1 adversarial verifier of that PR measured both halves and the PR's own
+residuals did not name either: `resilient-fray`'s panel driven with COUNTY unit
+keys reached **D6 PASS**, and flipping **one** of 1,365 val `unit_key`s to
+collide with a train key turned a FAIL into a PASS for the other 1,364. Both are
+re-driven in `reports/D6_CROSSCUT_BASE.json`.
+
+**What is worth carrying beyond this fix.** A carve-out written as `if any(...)`
+over the same objects the check classifies is an escape by construction, and it
+does not read like one — `crosscutting` is a true fact about that assignment.
+The tell is the mismatch of scope: the *justification* quantified over a unit,
+the *code* quantified over the declaration, and nothing tied the two. Other
+gates in this repo with the same shape have not been swept for it, and that
+sweep is not attempted here.
+
+**Also worth carrying: a proportional rewrite can loosen a sibling clause.**
+Making the relation describe the arm-local mass moved some assignments to
+relation `UNIT_IS_THE_BLOCK`, and `UNIT_LABEL_CONTRADICTS_CONTENT` was written
+as `relation != UNIT_IS_THE_BLOCK`, so it would have gone silent on 2,160 of
+209,952 enumerated cases that the base refuses
+(`reports/D6_CROSSCUT_CONTAINMENT_NOT_DEAD.json`). Found by enumerating base
+against head, not by reading the diff.
+
+**Left open deliberately, and NOT fixed here** — a unit key that crosscuts
+*every* arm is still refusal-free even when it is finer than the policy's blocks
+inside the deciding arm. chokepoint's endorsed corridor bootstrap is that exact
+shape, so refusing it would make the fleet's correct convention unadoptable
+(the R12 failure mode), and nothing measured in this round distinguishes the
+two. `n_blocks_split_by_crosscutting_units` now prints how many of the policy's
+blocks a passing carve-out is carrying — 20 of 20 for chokepoint's fixture —
+which is disclosure, not a verdict.
+
+**Cannot be done from here**: deciding whether a crosscutting bootstrap accounts
+for the axis a blocked split partitions. That needs a measurement in an adopter
+repo, on an arm nobody has spent, and a signatory decision about what standard
+the fleet holds. Proposed as the next question rather than answered.
+
+---
+
+## E-M34 — `UNIT_CROSSCUTS_ARMS` silences `DEPENDENCE_UNIT_TOO_FINE`, and a county unit on a crop-year track walks through it
 
 Recorded from `feat/track-aware-splits-contract`, and **pre-registered as an
 expected outcome before it was measured**
