@@ -19,8 +19,12 @@ GLYPH = {
     Status.ESCALATED: "E",
 }
 
+#: `S` no longer means only "the tree moved". `core/store.py` also stales a
+#: PASS whose stored mlkit build is not the one reading it (E-M24 residual), so
+#: a legend saying "SHA moved" would send a reader looking at the wrong thing;
+#: the per-result reason names which of the two it was.
 LEGEND = ("P=pass  F=fail  -=NA(reason given)  K=deferred(wired, awaiting a key)  "
-          "S=stale(SHA moved)  E=escalated(human sign-off)")
+          "S=stale(repo SHA or mlkit build moved)  E=escalated(human sign-off)")
 
 
 def render(rows: list[list[str]], headers: list[str]) -> str:

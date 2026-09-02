@@ -294,4 +294,13 @@ def render_portfolio(states: list[RepoState], nonce: str) -> str:
         lines.append(f"  {st.repo.name:<11} {st.state:<16} {st.reason}")
     lines.append("")
     lines.append(f"run nonce: {nonce}")
+    # E-M24 residual. This IS a readiness table -- the `R(9-12,1-8)` column is
+    # R1-R12 -- and it is the one that is COMPOSED from `.mlkit/results/*.json`
+    # rather than measured in the process that prints it. So it needs both
+    # halves of "which mlkit": this line names the build that RENDERED it, and
+    # `core/store.py` stales any PASS whose stored build is not this one, which
+    # is what stops the table from carrying another build's verdicts silently.
+    from .core import identity
+
+    lines.extend(identity.header_lines())
     return "\n".join(lines)

@@ -192,6 +192,11 @@ class Repo:
         """
         self._evict_repo_modules(set(sys.modules) - self._imported)
         self._imported.clear()
+        # Eviction drops entries from sys.modules but leaves importlib's finder
+        # cache stale. A second binding module in the same directory then raises
+        # ModuleNotFoundError until the cache is cleared — see
+        # tests/test_economics_controls.py (two _run_e1 calls, one tmp_path).
+        importlib.invalidate_caches()
 
     #: Path fragments marking installed dependencies rather than repo source.
     #: Several repos keep their virtualenv inside the checkout, so "lives under
