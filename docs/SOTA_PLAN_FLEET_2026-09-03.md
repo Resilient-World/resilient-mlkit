@@ -22,7 +22,7 @@ review or with a standing fleet finding it says so and by how much (§3).
 | CI on main | fray, chokepoint, torrent: **every workflow red except fray License Boundary**; mlkit green. Cause unchanged: `MLKIT_READ_TOKEN` not minted | `gh run list` |
 | hard-stop arming, from each repo's own `.mlkit/repo.toml` on main | **fray**: `placebo_test` (l.129) and `scaling_probe` (l.164) both declared · **chokepoint**: both declared (l.74, l.107) plus `[placebo] null_value = 0.0, indicts = "above"` (l.180–183) · **torrent**: **NEITHER**; only `coverage` (l.126) and `[coverage] nominal = 0.90` (l.148–149) | `gh api …/contents/.mlkit/repo.toml?ref=main` |
 | mlkit pins | fray `c65b2e7` (0.5.0) · chokepoint `9d4e8780` (0.6.0) · torrent `3df724d5` | `pyproject.toml` on main |
-| the in-flight chokepoint fine-tune | PID 16223, `run_foundation_finetune.py --stage val --fit-device mps`, launched 22:51:14Z on tree `b834437` == main, first log line `[hard-stops] {"D2": "ARMED/PASS", "E1": "ARMED/PASS"}`, C1 78/78, licence `sha256:ddcda3c7508b`. Alive at 34m35s (state UN, low CPU — consistent with GPU-bound work); `models/foundation_finetune/chronos2-ft-lr1e-6/` exists and is **empty**; no artifact written. **Outcome unknown.** It crosses the 60-minute mark at 23:51Z. | `ps`, `ls`, log tail |
+| the in-flight chokepoint fine-tune | PID 16223, `run_foundation_finetune.py --stage val --fit-device mps`, launched 22:51:14Z on tree `b834437` == main, first log line `[hard-stops] {"D2": "ARMED/PASS", "E1": "ARMED/PASS"}`, C1 78/78, licence `sha256:ddcda3c7508b`. Alive at 34m35s and **still alive at 1h02m55s (23:54:09Z), reparented to init (PPID 1)** — so **the 60-minute kill is not global to this machine; it is scoped to the agent harness** (two subagent-launched cpu attempts and a 1 MB shell loop all died at ~60 min; a `nohup` process launched from the main session does not). `models/foundation_finetune/chronos2-ft-lr1e-6/` exists and is **empty**; no artifact written; whether the fit is *progressing* is **NA** until the first checkpoint appears (by the measured mps rate, ~1.58 h per configuration → around 00:25–00:30Z if the rate holds; state UN, 18% CPU, RSS 57 MB is consistent with GPU-bound work and also with a stall — the checkpoint is the only witness). **Outcome unknown.** | `ps` at 23:25Z and 23:54Z, `ls`, log tail |
 | pinned chronos-2 inference API | `predict_df` documents `target` ("Column(s) with time series values to predict"), `future_df` ("future values of covariates"), `id_column` ("Column identifying different time series"); the capability table lists multivariate forecasting, cross-learning across items, past-only covariates, known future covariates, max context 8192. Licence Apache-2.0. — https://huggingface.co/amazon/chronos-2/raw/29ec3766d36d6f73f0696f85560a422f50e8498c/README.md, retrieved 2026-09-03 | WebFetch |
 
 Two corrections to the brief I was handed: fray now has **three** open PRs, not two; chokepoint
@@ -691,7 +691,7 @@ Nothing below is agent-executable, and each blocks a ranked item. Listed with wh
 | **S-12** | rule 15: fray's three `baselines/*.pt` (R1 FAIL) — provenance or removal | R1 | remove; they are not on the record's path |
 | **S-13** | rule 14: chokepoint's `commercial-ais`/`customer-network` and torrent's six BLOCKED sources in the manifests — allowlist or remove | R9 in both repos; "9/12" can never be "12/12" without this | remove unless a licence URL exists |
 | **S-14** | **E-051 / E-055**: durable storage of the two panel files every committed verdict rests on (chokepoint `daily_chokepoints.parquet` sha `8644a58e…`, 77,980 rows; fray NASS extract sha `5c80c0d3…`, 141,304,960 bytes) — a `us-west-2` bucket / DVC remote is a cost-incurring resource (rule 12) | reproducibility of everything; RANK 2(c) | do it before anything else in chokepoint; if the laptop goes, the measurements go with it |
-| **S-15** | the 60-minute harness ceiling: if the in-flight test shows it is global, either you run the single command in your own terminal or you authorise a **preregistered** mid-fit checkpoint/resume in the runner (whole-config granularity today) | any run longer than an hour | decide after 23:51Z tonight (§7.2) |
+| **S-15** | the 60-minute harness ceiling — **resolved by measurement at 23:54Z: it is harness-scoped, not machine-scoped** (PID 16223 alive at 1h02m55s, PPID 1). What remains is a rule: runs of record longer than an hour are launched detached from the main session with PID + tree recorded in the PR *before* launch; no mid-fit resume needs to be built | any run longer than an hour | adopt the rule; no infrastructure decision needed (§7.2) |
 
 Also reserved and **not** requested by this plan: any allowlist addition (rule 14; none is
 needed — every source the plan uses is ALLOWED already), D1/D4/D5, E4/E5, IAM/billing.
@@ -722,16 +722,23 @@ stay refused (§5.3).
 
 ### 7.2 chokepoint — read the in-flight run first; then, almost certainly, do not train again
 
-The mps run (PID 16223) crosses the ceiling at **23:51Z**. Decision tree, written before the
-outcome is known:
+The mps run (PID 16223) **crossed the 60-minute mark alive** (1h02m55s at 23:54:09Z, §0), so
+the first branch below is now closed by measurement: **the ceiling is harness-scoped, not
+machine-scoped**, and a `nohup` launch from the main session is a sufficient execution context.
+S-15 reduces to a hygiene rule (record the PID and the tree in the PR before launching; never
+launch a run of record after the record is pushed without amending it). Decision tree for the
+outcome, written before it is known:
 
-- **It dies at ~60 min.** The ceiling is global to this machine's sessions, not subagent-scoped.
-  Then S-15: the user runs `scripts/run_foundation_finetune.py --stage val --fit-device mps
-  --cache-dir <outside the repo>` in their own terminal (~3.2 h for both configurations by the
-  measured mps rate), or authorises a preregistered mid-fit resume. **Nothing else about the run
+- ~~It dies at ~60 min.~~ Did not happen. If a *future* run is killed at 60 min, it was launched
+  from inside the harness; relaunch it detached from the main session with the PID recorded
+  (`scripts/run_foundation_finetune.py --stage val --fit-device mps --cache-dir <outside the
+  repo>`, ~3.2 h for both configurations by the measured mps rate). **Nothing else about the run
   changes** — 3,000 steps is the registered configuration; a shorter run is a different
-  experiment wearing the run of record's name. Clear the half-fit checkpoint before any relaunch
+  experiment wearing the run of record's name. Clear any half-fit checkpoint before a relaunch
   (a partial left in place is a trap for the resume cache).
+- **It is alive but not progressing** (no checkpoint by ~00:45Z, allowing for machine-state
+  variance in the 1.58 h/config rate). Kill it, record it, and relaunch once with the runner's
+  stderr captured; a second silent stall is a runner defect to escalate, not a third attempt.
 - **It completes with an empty verdict list.** That is the rule working. Close the fine-tune line
   (§5.1). The model of record remains zero-shot chronos-2. Everything in RANK 1, 2, 7, 13 proceeds
   unchanged — none of them depended on this outcome.
