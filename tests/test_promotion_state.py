@@ -101,7 +101,8 @@ def test_the_gating_set_is_the_four_non_triage_phases() -> None:
     of a count is how the version literal went stale in E-M08.
     """
     ids = gating_ids()
-    assert len(ids) == 28
+    # 28 -> 29 on 2026-09-04: R13 QUOTED_RULE_PARITY joined readiness (M-2).
+    assert len(ids) == 29
     assert set(PHASE_ORDER["triage"]).isdisjoint(ids), "triage diagnoses; it does not gate"
     for cid in HUMAN_ONLY:
         assert cid in ids, f"{cid} is reserved to the signatory and must still gate"

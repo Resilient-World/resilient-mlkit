@@ -9,11 +9,12 @@ that did not come out of a run of this CLI does not exist.
 
 ## Layout
 
-- `src/resilient_mlkit/` — the package. 28 gating checks across 4 phases, plus
-  5 diagnostic triage checks: 33 in the registry. Counted, not remembered —
-  `len(gating_ids())` and `len(all_check_ids())` on 2026-09-01, which is the
-  same discipline `checks/__init__.py` states in its own docstring, and which
-  `tests/test_promotion_state.py` now holds this file to.
+- `src/resilient_mlkit/` — the package. 29 gating checks across 4 phases, plus
+  5 diagnostic triage checks: 34 in the registry. Counted, not remembered —
+  `len(gating_ids())` and `len(all_check_ids())` on 2026-09-04 (28 and 33
+  until R13 joined readiness that day), which is the same discipline
+  `checks/__init__.py` states in its own docstring, and which
+  `tests/test_promotion_state.py` holds this file to.
 - `src/resilient_mlkit/measurement.py` — **the import that replaces the hand
   copies.** The repo-facing `Measured` / `Unmeasured` gate vocabulary, over the
   canonical seven-state `Status` (six until M-1) re-exported from `core.result` (identity, not a
@@ -145,6 +146,22 @@ returns `armed` (PASS/FAIL/UNMEASURABLE are all verdicts about an armed stop),
 `halt_required` (FAIL **and** UNMEASURABLE — a run taken now would run with a
 tripwire nobody could read) and `indicted` (FAIL only).
 
+**R13** `QUOTED_RULE_PARITY` (plan v3 M-2, 2026-09-04) is the fourth check that
+imports nothing: it reads `CLAUDE.md`'s `## Hard stops` bullets at HEAD, every
+prior bullet on the tree's own `git log -- CLAUDE.md`, and the S-5 register's
+vocabulary, and refuses a committed source file (the declared `[source] trees`
+plus `mlkit_bindings.py`) that carries a verbatim run of a **superseded** clause
+(`STALE_QUOTATION`, 4 tokens the current clause does not contain) or of the
+**current** one (`SECOND_COPY`, 8 tokens — a paraphrase naming the rule is not
+a copy). Sites the register lists are `REGISTERED` (disclosed, not failing);
+the register's own scanner is `ENFORCEMENT`. Artifacts under `reports/` are
+disclosed as `tied`/`untied`/`stale`, never failed — an artifact is repaired by
+regeneration. Nothing in it is a typed sentence: the next amendment to
+CLAUDE.md adds to the superseded set by being committed. torrent E-069 — a D2
+sentence true on its branch, stale on the merged tree, invisible to single-PR
+review — is the case; the drive of record on the three mains and on
+`cec1c48 ⊕ 5052c71` is `reports/R13_FLEET_DRIVE.md`.
+
 Three of the readiness checks import nothing and walk source with `ast`, which
 is what lets them see code no binding exposes: **R10** `FABRICATED_DEFAULTS`
 (a measured quantity given a plausible default that then satisfies the gate
@@ -181,7 +198,7 @@ declares several, is `TRACK_UNDECLARED` — mlkit will not pick the track whose
 blocks happen to match. A repo with one policy declares no track and nothing
 about its verdicts, reasons or evidence changes.
 
-`READY-TO-TRAIN` requires all 28 gating checks to pass. Six of them (S5, D1, D4, D5,
+`READY-TO-TRAIN` requires all 29 gating checks to pass. Six of them (S5, D1, D4, D5,
 E4, E5) are human-only and always report `ESCALATED`, so **an agent cannot
 drive a repo to READY-TO-TRAIN**. That is deliberate: those six are legal and
 billing exposures, not code changes.

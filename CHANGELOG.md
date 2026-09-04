@@ -98,6 +98,63 @@ and M-3 (and M-2 where it lands on the same line).
   `[head, base]`; A1–A3 ancestry both ways plus the unresolvable case.
   Prereg: `reports/M3_MERGED_TREE_DRIVE_PREREGISTRATION.md`.
 
+### M-2 — R13 `QUOTED_RULE_PARITY`: the stale-quotation scan as a fleet check (NEW CHECK; readiness 12 → 13)
+
+* **The defect (torrent E-069, 2026-09-04).** `src/torrent/mlops/hard_stops.py:48`
+  at `cec1c48` stored the D2 sentence; true on its branch, false at the merge
+  with S-5, "invisible to single-PR review by construction". Three repo copies
+  of `verify_one_sided_placebo_register.py --mode check` scan for one typed
+  phrase and exempt themselves by a typed path.
+* **What it reads, none of it typed.** Current clauses = `CLAUDE.md`'s
+  `## Hard stops` bullets at HEAD; superseded clauses = every prior bullet on
+  the tree's own `git log -- CLAUDE.md` ∪ the register's
+  `the_rule_it_replaces`, minus current; exemptions = the register's
+  `source_files_quoting_the_replaced_sentence` (`REGISTERED`, disclosed) and
+  `how_this_is_enforced.scanner` (`ENFORCEMENT`). Tokens are lowercase
+  alphanumeric runs and the clause digest is over tokens, so reflow and
+  re-quoting are silent (regenerate, never restamp).
+* **Discriminator, fixed by measurement before the code.** `STALE_QUOTATION`:
+  a 4-token window of a superseded clause absent from every current clause
+  (four is the register's own replaced phrase). `SECOND_COPY`: an 8-token
+  window of a current clause, excluding windows a superseded clause shares
+  (measured: torrent main's repaired module paraphrases the clause with a
+  5-token overlap; a paraphrase is not a copy). Verdict surface: committed
+  blobs under `[source] trees` + `mlkit_bindings.py`. `reports/` is disclosed
+  (`tied`/`untied`/`stale`), never failed.
+* **The drive of record** (`scripts/r13_fleet_drive.py` →
+  `reports/R13_FLEET_DRIVE.{json,md}`), on detached worktrees at the three
+  mains and on the historical merge built with M-3's machinery:
+  - torrent `d34649f`: **PASS**, 0 findings (the register's scanner exempt).
+  - torrent `cec1c48` alone: `SECOND_COPY` ×2, **no** `STALE_QUOTATION` — the
+    clause was current there.
+  - torrent `cec1c48 ⊕ 5052c71`: **`STALE_QUOTATION` at
+    `src/torrent/mlops/hard_stops.py:48`** — E-069 reproduced from git; the
+    `.gitignore` conflict on that pair was left UNRESOLVED (git's partial tree
+    driven; R13 never reads `.gitignore`).
+  - chokepoint `512ab25`: **FAIL, 1 finding** the prereg predicted at 0:
+    `scripts/run_foundation_full_val_ladder.py:227` keeps the superseded
+    prereg paragraph "verbatim as the historical record" in a docstring, and
+    it carries an 8-token run of the E1 clause. The two `hard_stops.py` sites
+    are `REGISTERED`.
+  - fray `76f0dde`: **FAIL, 2 findings** the prereg predicted at 1: the
+    predicted unlisted E1 copy at `scripts/measure_nass_condition_block.py:956`
+    (emitted into an artifact's `statement`), and a **stale D2 sentence the
+    S-5 scanner could not see**: `scripts/measure_avoided_loss_basis_risk.py:1278`
+    prints "D2 HARD STOP: the placebo estimate's confidence interval EXCLUDES
+    ZERO. The repo HALTS." — the pre-S-5 rule, capitalised past a
+    case-sensitive exact-string grep.
+  Both mispredictions are in the FIRING direction and both sites are the
+  defect class the check exists for; they are findings for the adopters, not
+  tuning targets. Neither adopter copy of the scanner is retired here (each
+  repo's own change, rule 7).
+* **Verdict change on unchanged adopter code: one new row per repo** (R13;
+  FAIL on fray and chokepoint main, PASS on torrent main). No existing row
+  moves; readiness denominator 12 → 13, gating checks 28 → 29, registry
+  33 → 34. Controls: `tests/test_quoted_rule_parity.py` (K3–K9 both ways,
+  including the reflow pair, the paraphrase falsifier, the register
+  check-not-dead pair, the disclosed-artifact surface, the working tree
+  ignored). Prereg: `reports/M2_QUOTED_RULE_PARITY_PREREGISTRATION.md`.
+
 ## v0.6.0 — 2026-09-01
 
 Not yet tagged. `v0.5.0` **is** tagged — annotated tag object `15a188b` on

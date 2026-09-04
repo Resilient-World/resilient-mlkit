@@ -1,0 +1,432 @@
+{
+ "artifact_schema": "resilient-mlkit/r13-fleet-drive/1",
+ "generated_by": "scripts/r13_fleet_drive.py",
+ "generated_at_utc": "2026-09-04T18:22:58+00:00",
+ "mlkit_version": "0.7.0",
+ "mlkit_build": {
+  "stamp": "0.7.0+src.4e61de85a381",
+  "version": "0.7.0",
+  "source_sha256": "4e61de85a3811319e6ea5347e66516917c6418b0477748bd261f93fad4f7929c",
+  "files": 36,
+  "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v3-m1m3/src/resilient_mlkit",
+  "vcs_commit": null,
+  "vcs_url": null,
+  "vcs_reason": "installed from `file:///private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v3-m1m3` as an editable directory, which records no vcs commit_id",
+  "unavailable": ""
+ },
+ "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v3-m1m3/src/resilient_mlkit/__init__.py",
+ "rows": [
+  {
+   "label": "fray@fray-main",
+   "repo": "fray",
+   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/fray-main",
+   "git_sha": "76f0ddebfd62931c8af37479e58b8957664c281e",
+   "status": "FAIL",
+   "reason": "2 quotation(s) of a hard-stop clause in committed source that the register does not list: scripts/measure_avoided_loss_basis_risk.py:1278 STALE_QUOTATION of the D2 clause (448dc718c32b) \u2014 \"confidence interval excludes zero\" (+1 more). A sentence about a rule, living in source and emitted into artifacts, goes stale the moment the rule moves (E-056, E-069). Read the document at run ti \u2026[truncated]",
+   "files_scanned": 282,
+   "findings": [
+    {
+     "path": "scripts/measure_avoided_loss_basis_risk.py",
+     "line": 1278,
+     "kind": "STALE_QUOTATION",
+     "clause": "D2",
+     "clause_source": "448dc718c32b9fd094df40f3b15fde2785261a16",
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "window": "confidence interval excludes zero"
+    },
+    {
+     "path": "scripts/measure_nass_condition_block.py",
+     "line": 956,
+     "kind": "SECOND_COPY",
+     "clause": "E1",
+     "clause_source": "HEAD",
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "window": "an e1 scaling curve that is flat between"
+    }
+   ],
+   "registered_sites": [
+    {
+     "path": "scripts/report_hard_stops.py",
+     "line": 30,
+     "kind": "STALE_QUOTATION",
+     "clause": "D2",
+     "clause_source": "448dc718c32b9fd094df40f3b15fde2785261a16",
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "window": "confidence interval excludes zero",
+     "site": "REGISTERED"
+    },
+    {
+     "path": "scripts/report_hard_stops.py",
+     "line": 31,
+     "kind": "SECOND_COPY",
+     "clause": "E1",
+     "clause_source": "HEAD",
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "window": "scaling curve that is flat between 10 and",
+     "site": "REGISTERED"
+    }
+   ],
+   "enforcement_sites": [
+    {
+     "path": "scripts/verify_one_sided_placebo_register.py",
+     "line": 4,
+     "kind": "STALE_QUOTATION",
+     "clause": "D2",
+     "clause_source": "448dc718c32b9fd094df40f3b15fde2785261a16",
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "window": "confidence interval excludes zero",
+     "site": "ENFORCEMENT"
+    },
+    {
+     "path": "scripts/verify_one_sided_placebo_register.py",
+     "line": 5,
+     "kind": "SECOND_COPY",
+     "clause": "D2",
+     "clause_source": "HEAD",
+     "clause_sha256": "77eb5d40e1a2ebc7fcaf3e86d7b2cc7be35c9f9009d50fba4804db96ec20cc9f",
+     "window": "excludes the declared null in the direction the",
+     "site": "ENFORCEMENT"
+    }
+   ],
+   "artifact_counts": {
+    "tied": 0,
+    "untied": 4,
+    "stale": 3
+   },
+   "superseded_clauses": [
+    {
+     "marker": "D2",
+     "text": "a D2 placebo estimate whose confidence interval excludes zero",
+     "tokens": 9,
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "source": "448dc718c32b9fd094df40f3b15fde2785261a16"
+    }
+   ],
+   "clauses": [
+    {
+     "marker": "D2",
+     "text": "a D2 placebo estimate whose confidence interval excludes the declared null in the direction the preregistered [placebo] declaration indicts (S-5)",
+     "tokens": 21,
+     "clause_sha256": "77eb5d40e1a2ebc7fcaf3e86d7b2cc7be35c9f9009d50fba4804db96ec20cc9f",
+     "source": "HEAD"
+    },
+    {
+     "marker": "E1",
+     "text": "an E1 scaling curve that is flat between 10% and 25% of the data",
+     "tokens": 14,
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "source": "HEAD"
+    }
+   ],
+   "claude_md_sha256": "b581079543d7c712a5c0c6aea57c3bdc2b3a47666e6f47c7920ddb06322d6e04"
+  },
+  {
+   "label": "chokepoint@cp-main",
+   "repo": "chokepoint",
+   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/cp-main",
+   "git_sha": "512ab25449bf573edded4d4ab7993a0bd8ed2c26",
+   "status": "FAIL",
+   "reason": "1 quotation(s) of a hard-stop clause in committed source that the register does not list: scripts/run_foundation_full_val_ladder.py:227 SECOND_COPY of the E1 clause (HEAD) \u2014 \"flat between 10 and 25 of the data\". A sentence about a rule, living in source and emitted into artifacts, goes stale the moment the rule moves (E-056, E-069). Read the document at run time; do not store the sentence",
+   "files_scanned": 324,
+   "findings": [
+    {
+     "path": "scripts/run_foundation_full_val_ladder.py",
+     "line": 227,
+     "kind": "SECOND_COPY",
+     "clause": "E1",
+     "clause_source": "HEAD",
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "window": "flat between 10 and 25 of the data"
+    }
+   ],
+   "registered_sites": [
+    {
+     "path": "src/resilient_chokepoint/mlops/hard_stops.py",
+     "line": 58,
+     "kind": "STALE_QUOTATION",
+     "clause": "D2",
+     "clause_source": "ed684673f15292cc45feea4f91fbe859cd108c8b",
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "window": "confidence interval excludes zero",
+     "site": "REGISTERED"
+    },
+    {
+     "path": "src/resilient_chokepoint/mlops/hard_stops.py",
+     "line": 59,
+     "kind": "SECOND_COPY",
+     "clause": "E1",
+     "clause_source": "HEAD",
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "window": "an e1 scaling curve that is flat between",
+     "site": "REGISTERED"
+    }
+   ],
+   "enforcement_sites": [
+    {
+     "path": "scripts/verify_one_sided_placebo_register.py",
+     "line": 4,
+     "kind": "STALE_QUOTATION",
+     "clause": "D2",
+     "clause_source": "ed684673f15292cc45feea4f91fbe859cd108c8b",
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "window": "confidence interval excludes zero",
+     "site": "ENFORCEMENT"
+    },
+    {
+     "path": "scripts/verify_one_sided_placebo_register.py",
+     "line": 5,
+     "kind": "SECOND_COPY",
+     "clause": "D2",
+     "clause_source": "HEAD",
+     "clause_sha256": "77eb5d40e1a2ebc7fcaf3e86d7b2cc7be35c9f9009d50fba4804db96ec20cc9f",
+     "window": "excludes the declared null in the direction the",
+     "site": "ENFORCEMENT"
+    }
+   ],
+   "artifact_counts": {
+    "tied": 0,
+    "untied": 9,
+    "stale": 5
+   },
+   "superseded_clauses": [
+    {
+     "marker": "D2",
+     "text": "a D2 placebo estimate whose confidence interval excludes zero",
+     "tokens": 9,
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "source": "ed684673f15292cc45feea4f91fbe859cd108c8b"
+    }
+   ],
+   "clauses": [
+    {
+     "marker": "D2",
+     "text": "a D2 placebo estimate whose confidence interval excludes the declared null in the direction the preregistered [placebo] declaration indicts (S-5)",
+     "tokens": 21,
+     "clause_sha256": "77eb5d40e1a2ebc7fcaf3e86d7b2cc7be35c9f9009d50fba4804db96ec20cc9f",
+     "source": "HEAD"
+    },
+    {
+     "marker": "E1",
+     "text": "an E1 scaling curve that is flat between 10% and 25% of the data",
+     "tokens": 14,
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "source": "HEAD"
+    }
+   ],
+   "claude_md_sha256": "b581079543d7c712a5c0c6aea57c3bdc2b3a47666e6f47c7920ddb06322d6e04"
+  },
+  {
+   "label": "torrent@tor-main",
+   "repo": "torrent",
+   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/tor-main",
+   "git_sha": "d34649f8e140637d8d8a7bc2d123f60b9e644ee2",
+   "status": "PASS",
+   "reason": "",
+   "files_scanned": 614,
+   "findings": [],
+   "registered_sites": [],
+   "enforcement_sites": [
+    {
+     "path": "scripts/verify_one_sided_placebo_register.py",
+     "line": 4,
+     "kind": "STALE_QUOTATION",
+     "clause": "D2",
+     "clause_source": "c1e965496b42b1fa4ea538aca1dae355590759f7",
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "window": "confidence interval excludes zero",
+     "site": "ENFORCEMENT"
+    },
+    {
+     "path": "scripts/verify_one_sided_placebo_register.py",
+     "line": 5,
+     "kind": "SECOND_COPY",
+     "clause": "D2",
+     "clause_source": "HEAD",
+     "clause_sha256": "77eb5d40e1a2ebc7fcaf3e86d7b2cc7be35c9f9009d50fba4804db96ec20cc9f",
+     "window": "excludes the declared null in the direction the",
+     "site": "ENFORCEMENT"
+    }
+   ],
+   "artifact_counts": {
+    "tied": 2,
+    "untied": 2,
+    "stale": 0
+   },
+   "superseded_clauses": [
+    {
+     "marker": "D2",
+     "text": "a D2 placebo estimate whose confidence interval excludes zero",
+     "tokens": 9,
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "source": "c1e965496b42b1fa4ea538aca1dae355590759f7"
+    }
+   ],
+   "clauses": [
+    {
+     "marker": "D2",
+     "text": "a D2 placebo estimate whose confidence interval excludes the declared null in the direction the preregistered [placebo] declaration indicts (S-5)",
+     "tokens": 21,
+     "clause_sha256": "77eb5d40e1a2ebc7fcaf3e86d7b2cc7be35c9f9009d50fba4804db96ec20cc9f",
+     "source": "HEAD"
+    },
+    {
+     "marker": "E1",
+     "text": "an E1 scaling curve that is flat between 10% and 25% of the data",
+     "tokens": 14,
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "source": "HEAD"
+    }
+   ],
+   "claude_md_sha256": "b581079543d7c712a5c0c6aea57c3bdc2b3a47666e6f47c7920ddb06322d6e04"
+  },
+  {
+   "label": "torrent@tor-cec1c48",
+   "repo": "torrent",
+   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/tor-cec1c48",
+   "git_sha": "cec1c48004831747968e7250b8d8cf51eb9c0030",
+   "status": "FAIL",
+   "reason": "2 quotation(s) of a hard-stop clause in committed source that the register does not list: src/torrent/mlops/hard_stops.py:4 SECOND_COPY of the E1 clause (HEAD) \u2014 \"an e1 scaling curve that is flat between\" (+1 more). A sentence about a rule, living in source and emitted into artifacts, goes stale the moment the rule moves (E-056, E-069). Read the document at run time; do not store the sentence",
+   "files_scanned": 609,
+   "findings": [
+    {
+     "path": "src/torrent/mlops/hard_stops.py",
+     "line": 4,
+     "kind": "SECOND_COPY",
+     "clause": "E1",
+     "clause_source": "HEAD",
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "window": "an e1 scaling curve that is flat between"
+    },
+    {
+     "path": "src/torrent/mlops/hard_stops.py",
+     "line": 48,
+     "kind": "SECOND_COPY",
+     "clause": "D2",
+     "clause_source": "HEAD",
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "window": "a d2 placebo estimate whose confidence interval excludes"
+    }
+   ],
+   "registered_sites": [],
+   "enforcement_sites": [],
+   "artifact_counts": {
+    "tied": 0,
+    "untied": 4,
+    "stale": 0
+   },
+   "superseded_clauses": [],
+   "clauses": [
+    {
+     "marker": "D2",
+     "text": "a D2 placebo estimate whose confidence interval excludes zero",
+     "tokens": 9,
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "source": "HEAD"
+    },
+    {
+     "marker": "E1",
+     "text": "an E1 scaling curve that is flat between 10% and 25% of the data",
+     "tokens": 14,
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "source": "HEAD"
+    }
+   ],
+   "claude_md_sha256": "5aa52879d78cbcadae9ded79afeea95bd4044d08b884af3907a8a709987f7a4b"
+  },
+  {
+   "label": "torrent@merge(cec1c48+5052c71)",
+   "repo": "torrent",
+   "path": "/var/folders/bv/c64zv7nj0x32wbcswjvxwnzr0000gn/T/mlkit-merged-l3txp2aw/resilient-torrent",
+   "git_sha": "b188d353aea907c077128e5988b5e4abac760d19",
+   "status": "FAIL",
+   "reason": "2 quotation(s) of a hard-stop clause in committed source that the register does not list: src/torrent/mlops/hard_stops.py:4 SECOND_COPY of the E1 clause (HEAD) \u2014 \"an e1 scaling curve that is flat between\" (+1 more). A sentence about a rule, living in source and emitted into artifacts, goes stale the moment the rule moves (E-056, E-069). Read the document at run time; do not store the sentence",
+   "files_scanned": 611,
+   "findings": [
+    {
+     "path": "src/torrent/mlops/hard_stops.py",
+     "line": 4,
+     "kind": "SECOND_COPY",
+     "clause": "E1",
+     "clause_source": "HEAD",
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "window": "an e1 scaling curve that is flat between"
+    },
+    {
+     "path": "src/torrent/mlops/hard_stops.py",
+     "line": 48,
+     "kind": "STALE_QUOTATION",
+     "clause": "D2",
+     "clause_source": "c1e965496b42b1fa4ea538aca1dae355590759f7",
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "window": "confidence interval excludes zero"
+    }
+   ],
+   "registered_sites": [],
+   "enforcement_sites": [
+    {
+     "path": "scripts/verify_one_sided_placebo_register.py",
+     "line": 4,
+     "kind": "STALE_QUOTATION",
+     "clause": "D2",
+     "clause_source": "c1e965496b42b1fa4ea538aca1dae355590759f7",
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "window": "confidence interval excludes zero",
+     "site": "ENFORCEMENT"
+    },
+    {
+     "path": "scripts/verify_one_sided_placebo_register.py",
+     "line": 5,
+     "kind": "SECOND_COPY",
+     "clause": "D2",
+     "clause_source": "HEAD",
+     "clause_sha256": "77eb5d40e1a2ebc7fcaf3e86d7b2cc7be35c9f9009d50fba4804db96ec20cc9f",
+     "window": "excludes the declared null in the direction the",
+     "site": "ENFORCEMENT"
+    }
+   ],
+   "artifact_counts": {
+    "tied": 0,
+    "untied": 2,
+    "stale": 2
+   },
+   "superseded_clauses": [
+    {
+     "marker": "D2",
+     "text": "a D2 placebo estimate whose confidence interval excludes zero",
+     "tokens": 9,
+     "clause_sha256": "3eac50b239d774194805b7c4ea4497f71ecbb89409f1d0fd51d65971f26e4a32",
+     "source": "c1e965496b42b1fa4ea538aca1dae355590759f7"
+    }
+   ],
+   "clauses": [
+    {
+     "marker": "D2",
+     "text": "a D2 placebo estimate whose confidence interval excludes the declared null in the direction the preregistered [placebo] declaration indicts (S-5)",
+     "tokens": 21,
+     "clause_sha256": "77eb5d40e1a2ebc7fcaf3e86d7b2cc7be35c9f9009d50fba4804db96ec20cc9f",
+     "source": "HEAD"
+    },
+    {
+     "marker": "E1",
+     "text": "an E1 scaling curve that is flat between 10% and 25% of the data",
+     "tokens": 14,
+     "clause_sha256": "dcf15ecb8f4942e19bb9149ed1a4d7fd163abe4db94b079a903a16a326e60127",
+     "source": "HEAD"
+    }
+   ],
+   "claude_md_sha256": "b581079543d7c712a5c0c6aea57c3bdc2b3a47666e6f47c7920ddb06322d6e04",
+   "merged_tree": {
+    "head_sha": "cec1c48004831747968e7250b8d8cf51eb9c0030",
+    "head_tree": "9419f4e3773d397ef02d45ee812d7474f39c6964",
+    "base_ref": "5052c71",
+    "base_sha": "5052c71faf5fa0b0602eeb4b2b5325115735bd9d",
+    "merge_tree": "03d23bb374a8fa586ac884687542aa6586ff3147",
+    "merge_commit": "b188d353aea907c077128e5988b5e4abac760d19",
+    "identical_to_head": false,
+    "conflicted_paths_left_unresolved": [
+     ".gitignore"
+    ]
+   }
+  }
+ ]
+}
