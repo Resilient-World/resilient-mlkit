@@ -1,0 +1,56 @@
+{
+ "artifact_schema": "resilient-mlkit/m5-offenders-drive/1",
+ "generated_by": "scripts/m5_offenders_drive.py",
+ "generated_at_utc": "2026-09-04T18:35:12+00:00",
+ "mlkit_version": "0.7.0",
+ "mlkit_build": {
+  "stamp": "0.7.0+src.684676356d4b",
+  "version": "0.7.0",
+  "source_sha256": "684676356d4ba9f2fc50c71631e6e4463d2ba2df72935b11756d97c0d8b23cbf",
+  "files": 37,
+  "root_kind": "checkout",
+  "root_name": "resilient_mlkit",
+  "vcs_commit": null,
+  "vcs_url": null,
+  "vcs_reason": "installed from a local `file://` directory as an editable install, which records no vcs commit_id",
+  "unavailable": ""
+ },
+ "rows": [
+  {
+   "label": "chokepoint-finetune",
+   "artifact_name": "foundation_finetune.json",
+   "artifact_sha256": "ff012e5d774c915ca23735c347fcd2b38132f5dce96c70d3f6bae2b78037c3e7",
+   "artifact_bytes": 279696,
+   "refused": true,
+   "machine_path_count": 7,
+   "pointers": [
+    "/hard_stops/mlkit_build/resolved_from",
+    "/hard_stops/modules_measured/resilient_mlkit",
+    "/hard_stops/pre_registration_statement/path",
+    "/provenance/modules_measured/resilient_mlkit",
+    "/modules_measured/resilient_mlkit",
+    "/fits/chronos2-ft-lr1e-6/checkpoint_dir",
+    "/fits/chronos2-ft-lr1e-5/checkpoint_dir"
+   ],
+   "machine_root_of_first": "private/tmp",
+   "message": "REFUSED to write reports/foundation_finetune.json: 7 value(s) name a path on THIS machine",
+   "written": false
+  },
+  {
+   "label": "chokepoint-cross-corridor",
+   "artifact_name": "foundation_cross_corridor_ladder.json",
+   "artifact_sha256": "b7fd66edb707c5ec2d140d1178f0facfecb8b14d6c10388956984b08620d6d95",
+   "artifact_bytes": 74535,
+   "refused": true,
+   "machine_path_count": 3,
+   "pointers": [
+    "/hard_stops/mlkit_build/resolved_from",
+    "/hard_stops/modules_measured/resilient_mlkit",
+    "/provenance/modules_measured/resilient_mlkit"
+   ],
+   "machine_root_of_first": "private/tmp",
+   "message": "REFUSED to write reports/foundation_cross_corridor_ladder.json: 3 value(s) name a path on THIS machine",
+   "written": false
+  }
+ ]
+}

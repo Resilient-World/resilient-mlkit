@@ -104,6 +104,24 @@ artifacts do not carry reports `NA` with the reason rather than being omitted.
 `mlkit portfolio --allow-dirty` reads the working tree for local diagnosis,
 writes nothing, and exits 2 — nothing read that way can reach a verdict row.
 
+## Writing an artifact that a reader can check
+
+`resilient_mlkit.core.artifact.write_artifact(root, relpath, payload)` (plan v3
+M-5, 2026-09-04) writes JSON atomically and **refuses**, listing every JSON
+pointer, a payload that names a **machine path** — an absolute path that exists
+on the writing machine or begins with a machine root (`/private/tmp`, `/Users`,
+`/home`, `/var/folders`, …). 42 committed fray artifacts and the two chokepoint
+run-of-record artifacts of 2026-09-04 name `/private/tmp/claude-501/…`, a
+directory on one machine for one day; a reader cannot resolve it, so cannot
+check it. The blessed shape: a repo module as repo-relative path + sha256
+(`resilient_mlkit.core.module_bindings.record`), mlkit by identity
+(`build_identity().to_dict()`: `stamp` / `source_sha256` / `vcs_commit` —
+`root` is gone; `root_kind`/`root_name` replace it), a data file by its
+repo-relative path and digest or its declared pin. A repo-relative binding that
+is not a file on the tree, or whose digest moved, is refused too. JSON pointers
+and URLs are not paths and pass. Stated boundary: the writer sees whole string
+values, not a path embedded in a sentence.
+
 ## Statuses
 
 | Status | Means |

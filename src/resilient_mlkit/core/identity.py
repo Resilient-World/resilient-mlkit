@@ -171,14 +171,42 @@ class BuildIdentity:
         """
         return f"{STAMP_PREFIX}`{self.stamp}`"
 
+    @property
+    def root_kind(self) -> str:
+        """Where the hashed tree lives, as a KIND rather than a directory (M-5).
+
+        ``site-packages`` (an installed distribution), ``checkout`` (a source
+        tree: the package dir sits under a ``src/`` beside a ``pyproject.toml``)
+        or ``other``. Every report mlkit writes used to render the absolute
+        directory here, so mlkit's own headers named one machine; the
+        directory is not part of the identity and no reader could resolve it.
+        """
+        parts = Path(self.root).parts
+        if "site-packages" in parts or "dist-packages" in parts:
+            return "site-packages"
+        p = Path(self.root)
+        if p.parent.name == "src" and (p.parent.parent / "pyproject.toml").is_file():
+            return "checkout"
+        return "other"
+
+    @property
+    def root_name(self) -> str:
+        """The package directory's basename: portable, and enough to name it."""
+        return Path(self.root).name
+
     def context_line(self) -> str:
-        """The human half: what the token was computed from, and the pin beside it."""
+        """The human half: what the token was computed from, and the pin beside it.
+
+        Carries no directory (M-5): ``root_kind`` and ``root_name`` say what
+        kind of tree was hashed; the sha256 says which bytes.
+        """
+        where = f"`{self.root_name}` ({self.root_kind})"
         if self.source_sha256 is None:
-            what = f"tree at `{self.root}` was NOT hashed — {self.unavailable}"
+            what = f"tree {where} was NOT hashed — {self.unavailable}"
         else:
             what = (
                 f"sha256 `{self.source_sha256}` over {self.files} shipped file(s) "
-                f"in `{self.root}`"
+                f"in {where}"
             )
         vcs = (
             f"installed from vcs `{self.vcs_commit}`"
@@ -192,12 +220,17 @@ class BuildIdentity:
         return [self.stamp_line(), self.context_line()]
 
     def to_dict(self) -> dict[str, object]:
+        # M-5: no absolute directory. `root` was here until 2026-09-04 and it
+        # put mlkit's own machine path into every artifact an adopter stamped
+        # with build_identity().to_dict() (both chokepoint run-of-record
+        # artifacts carry it under mlkit_build). The identity is the stamp.
         return {
             "stamp": self.stamp,
             "version": self.version,
             "source_sha256": self.source_sha256,
             "files": self.files,
-            "root": self.root,
+            "root_kind": self.root_kind,
+            "root_name": self.root_name,
             "vcs_commit": self.vcs_commit,
             "vcs_url": self.vcs_url,
             "vcs_reason": self.vcs_reason,
@@ -419,9 +452,14 @@ def _vcs_of_installed_dist(root: Path) -> tuple[str | None, str | None, str]:
         commit = info.get("commit_id")
         if not isinstance(commit, str) or not commit:
             editable = (payload.get("dir_info") or {}).get("editable")
+            # M-5: a `file://` URL is an absolute directory on this machine, and
+            # this sentence lands in every report header; name the KIND, not
+            # the directory.
+            url = str(payload.get("url") or "")
+            shown = "a local `file://` directory" if url.startswith("file:") else f"`{url}`"
             return None, None, (
-                f"installed from `{payload.get('url')}`"
-                + (" as an editable directory" if editable else " directly")
+                f"installed from {shown}"
+                + (" as an editable install" if editable else " directly")
                 + ", which records no vcs commit_id"
             )
         url = payload.get("url")
