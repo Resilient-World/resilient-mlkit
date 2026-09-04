@@ -17,14 +17,21 @@ GLYPH = {
     Status.DEFERRED: "K",
     Status.STALE: "S",
     Status.ESCALATED: "E",
+    Status.UNMEASURABLE: "U",
 }
 
 #: `S` no longer means only "the tree moved". `core/store.py` also stales a
 #: PASS whose stored mlkit build is not the one reading it (E-M24 residual), so
 #: a legend saying "SHA moved" would send a reader looking at the wrong thing;
 #: the per-result reason names which of the two it was.
+#:
+#: `U` (M-1) is the glyph a reader scanning a strip must be able to tell from
+#: `F` and from `-`: the check is armed and its declaration resolved, and this
+#: machine cannot supply the input it is declared over. Not indicted, not
+#: unarmed.
 LEGEND = ("P=pass  F=fail  -=NA(reason given)  K=deferred(wired, awaiting a key)  "
-          "S=stale(repo SHA or mlkit build moved)  E=escalated(human sign-off)")
+          "S=stale(repo SHA or mlkit build moved)  E=escalated(human sign-off)  "
+          "U=unmeasurable(armed; declared input absent here)")
 
 
 def render(rows: list[list[str]], headers: list[str]) -> str:

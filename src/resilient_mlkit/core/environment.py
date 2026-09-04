@@ -81,6 +81,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from .repo import BindingError, Repo
+from .result import INPUT_KEY, PIN_EXPECTED_KEY, PIN_OBSERVED_KEY, Status
 
 #: Python's own wording for a module it could not find, and the only thing
 #: ``from_results`` keys on. It is stable across every version this tool runs
@@ -241,6 +242,7 @@ def from_results(repo: Repo, results: Mapping[str, object]) -> EnvironmentProbe:
     missing: list[str] = []
     culprits: dict[str, str] = {}
     local: list[str] = []
+    unavailable: list[str] = []
     for check_id, result in results.items():
         reason = getattr(result, "reason", "") or ""
         for module in _MISSING_MODULE.findall(reason):
@@ -251,8 +253,38 @@ def from_results(repo: Repo, results: Mapping[str, object]) -> EnvironmentProbe:
             if module not in missing:
                 missing.append(module)
             culprits.setdefault(f"{check_id} (called)", f"missing:{module}")
+        # M-1: a check that resolved its declaration and stopped at an input
+        # this machine does not hold has performed the same experiment as a
+        # missing module, one level down -- the interpreter can import the
+        # repo; the disk cannot supply the bytes the repo is declared over.
+        # Both digests travel into the bindings map so the refusal file names
+        # the pin, not just the fact.
+        if getattr(result, "status", None) is Status.UNMEASURABLE:
+            evidence = getattr(result, "evidence", {}) or {}
+            what = str(evidence.get(INPUT_KEY, "") or "declared input")
+            expected = str(evidence.get(PIN_EXPECTED_KEY, "") or "NA")
+            observed = str(evidence.get(PIN_OBSERVED_KEY, "") or "NA (absent)")
+            unavailable.append(f"{check_id}:{what}")
+            culprits.setdefault(
+                f"{check_id} (input)",
+                f"input-unavailable:{what} expected={expected} observed={observed}",
+            )
 
-    if missing:
+    if missing or unavailable:
+        if not missing:
+            return EnvironmentProbe(
+                UNMEASURABLE,
+                f"this machine (python {python}) ran {len(unavailable)} armed check(s) "
+                "whose declaration resolved and whose declared input could not be "
+                "read here: " + ", ".join(unavailable[:5])
+                + "; the checks were called and stopped at the byte they are "
+                "declared over, so what they reported is a fact about this "
+                "machine's inputs, not about the repo (M-1)",
+                culprits,
+                (),
+                tuple(local),
+                python,
+            )
         return EnvironmentProbe(
             UNMEASURABLE,
             f"this interpreter (python {python}) ran {len(culprits)} check(s) that "

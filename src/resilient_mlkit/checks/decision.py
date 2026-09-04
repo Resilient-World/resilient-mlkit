@@ -42,7 +42,7 @@ from typing import Any
 
 from ..core import artifact, coverage_evidence, declaration
 from ..core.repo import BindingError, Repo
-from ..core.result import ALLOW_DIRTY_KEY, CheckResult, CredentialRequired, Status
+from ..core.result import ALLOW_DIRTY_KEY, CheckResult, CredentialRequired, InputUnavailable, Status
 from ..core.served import ResamplingDeclaration, RowUnit, ServedContractError
 from . import RunContext, check
 from .readiness import (
@@ -287,7 +287,7 @@ def d2_placebo_test(repo: Repo, ctx: RunContext) -> CheckResult:
 
     try:
         out = dict(fn())
-    except CredentialRequired:
+    except (CredentialRequired, InputUnavailable):
         raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("D2", PHASE, f"placebo_test raised {type(exc).__name__}: {exc}")
@@ -576,7 +576,7 @@ def d3_uncertainty_coverage(repo: Repo, ctx: RunContext) -> CheckResult:
         )
     try:
         out = dict(fn())
-    except CredentialRequired:
+    except (CredentialRequired, InputUnavailable):
         raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed("D3", PHASE, f"coverage raised {type(exc).__name__}: {exc}")
@@ -913,7 +913,7 @@ def _tracks_once(repo: Repo, cache: dict[str, Any]) -> tuple[Any, tuple[str, str
     except SplitsUnreadable as exc:
         cache["v"] = (None, ("unreadable", exc.reason, dict(exc.evidence)))
         return cache["v"]
-    except CredentialRequired:
+    except (CredentialRequired, InputUnavailable):
         raise
     except Exception as exc:  # noqa: BLE001
         cache["v"] = (None, ("raised", f"splits raised {type(exc).__name__}: {exc}", {}))
@@ -956,7 +956,7 @@ def _judge_declaration(
         return CheckResult.failed(
             "D6", PHASE, f"the resampling declaration is malformed: {exc}"
         )
-    except CredentialRequired:
+    except (CredentialRequired, InputUnavailable):
         raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed(
@@ -1149,7 +1149,7 @@ def d6_resampling_unit(repo: Repo, ctx: RunContext) -> CheckResult:
         )
     try:
         raw = fn()
-    except CredentialRequired:
+    except (CredentialRequired, InputUnavailable):
         raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed(

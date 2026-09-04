@@ -58,13 +58,15 @@ def redact(text: str) -> str:
 
 
 class Status(str, Enum):
-    """The six terminal statuses a check may report.
+    """The seven terminal statuses a check may report.
 
     There is deliberately no ``SKIP`` and no ``WARN``. A check either measured
     something and formed a verdict (PASS/FAIL), could not measure and says why
     (NA), was wired and exercised but stops at a credential the signatory will
     supply (DEFERRED), measured against a different tree than the one checked
-    out (STALE), or is reserved to a human signatory (ESCALATED).
+    out (STALE), is reserved to a human signatory (ESCALATED), or is ARMED and
+    resolved its declaration but the environment cannot supply the input it
+    is declared over (UNMEASURABLE).
 
     DEFERRED exists because collapsing it into NA makes the portfolio lie in
     the expensive direction. "The dataloader raises ImportError" and "the
@@ -72,6 +74,18 @@ class Status(str, Enum):
     distance from a productive training run, and a table that renders them
     identically cannot answer the only question that matters: how close is
     this repo to a real run.
+
+    UNMEASURABLE exists for the mirror-image lie, measured three ways on
+    2026-09-04 (plan v3 §7 M-1). torrent's D2 on ``main`` renders FAIL with the
+    reason "ENVIRONMENT REFUSAL, NOT A PLACEBO FINDING: the staged Caravan
+    subset could not be read"; chokepoint's R2/R3/R5/R6 refuse on pin mismatch
+    from any clone without the pinned parquet; fray's E1 raises when the NASS
+    extract's bytes differ from the pin. Each is correct fail-closed behaviour,
+    and each renders either as an indictment (FAIL) or as an unarmed stop (NA
+    is also what "no binding declared" renders as). A hard stop that is armed
+    but cannot read its inputs is a fourth thing: the run may not start, and
+    nothing about the pipeline is indicted. It is the word ``core.environment``
+    already uses for the interpreter-level fact, applied to one check.
     """
 
     PASS = "PASS"
@@ -80,6 +94,7 @@ class Status(str, Enum):
     DEFERRED = "DEFERRED"
     STALE = "STALE"
     ESCALATED = "ESCALATED"
+    UNMEASURABLE = "UNMEASURABLE"
 
     def __str__(self) -> str:  # pragma: no cover - trivial
         return self.value
@@ -89,6 +104,7 @@ class Status(str, Enum):
 #: no check at all: it looks like coverage and carries no information.
 _REASON_REQUIRED = {
     Status.FAIL, Status.NA, Status.DEFERRED, Status.STALE, Status.ESCALATED,
+    Status.UNMEASURABLE,
 }
 
 
@@ -309,6 +325,77 @@ class CredentialRequired(RuntimeError):
         self.detail = detail
         self.evidence = evidence or {}
         super().__init__(f"{credential} required: {detail}" if detail else f"{credential} required")
+
+
+#: The evidence keys an UNMEASURABLE result carries, named once so the runner
+#: that writes them and the probe that reads them (``core.environment``) agree.
+INPUT_KEY = "input"
+PIN_EXPECTED_KEY = "pin_expected"
+PIN_OBSERVED_KEY = "pin_observed"
+UNMEASURABLE_KEY = "unmeasurable"
+
+
+class InputUnavailable(RuntimeError):
+    """Raised by a binding that resolved its declaration and cannot read its input.
+
+    The ``CredentialRequired`` discipline, applied to bytes instead of keys. A
+    binding raises this ONLY after it has done everything the declaration asks
+    of it -- imported cleanly, read the pin it is declared over, and reached
+    the byte it cannot read (an absent staged panel, a digest that does not
+    match the pin). Raising it earlier -- at import time, or to dodge a check
+    that would have failed for another reason -- is refused BY NAME by
+    ``core.repo.Repo.resolve`` (:class:`PrematureInputRefusal`) and renders
+    FAIL, because converting a real defect into "the environment could not
+    supply it" is the exact overwrite this status exists to avoid
+    (``core/environment.py``, the suppression-in-the-other-direction trap).
+
+    Rendered by the runner as ``Status.UNMEASURABLE`` with ``input``,
+    ``pin_expected`` and ``pin_observed`` in evidence. Nothing about the
+    pipeline is indicted (no ``halt`` key is ever attached); the run may not
+    start (the portfolio reads it as unmeasured, never READY).
+
+    Args:
+        reason: what could not be read, in the binding's own words.
+        input: the declared input, e.g. "data/processed/panel.parquet".
+        pin_expected: the digest the declaration pins, or "" when unpinned.
+        pin_observed: the digest found on this machine, or "" when absent.
+        evidence: measurements taken before the boundary was hit.
+    """
+
+    def __init__(
+        self,
+        reason: str,
+        *,
+        input: str = "",
+        pin_expected: str = "",
+        pin_observed: str = "",
+        evidence: dict[str, Any] | None = None,
+    ) -> None:
+        self.reason = reason
+        self.input = input
+        self.pin_expected = pin_expected
+        self.pin_observed = pin_observed
+        self.evidence = dict(evidence or {})
+        super().__init__(reason)
+
+    def to_evidence(self) -> dict[str, Any]:
+        """The evidence an UNMEASURABLE result built from this exception carries."""
+        out = dict(self.evidence)
+        out[UNMEASURABLE_KEY] = True
+        out[INPUT_KEY] = self.input
+        out[PIN_EXPECTED_KEY] = self.pin_expected
+        out[PIN_OBSERVED_KEY] = self.pin_observed
+        return out
+
+
+class PrematureInputRefusal(RuntimeError):
+    """An ``InputUnavailable`` raised before the binding's declaration was resolved.
+
+    Deliberately NOT a ``BindingError``: every check turns a ``BindingError``
+    into NA ("no binding declared"), and NA is the second of the two faces this
+    refusal must not wear. The runner renders it FAIL, naming
+    ``PREMATURE_INPUT_REFUSAL``.
+    """
 
 
 @dataclass
@@ -538,6 +625,40 @@ class CheckResult:
     ) -> CheckResult:
         """Reserved to a human signatory. Drives AWAITING-SIGNOFF."""
         return cls(check_id, phase, Status.ESCALATED, reason, evidence or {})
+
+    @classmethod
+    def unmeasurable(
+        cls,
+        check_id: str,
+        phase: str,
+        exc: InputUnavailable,
+    ) -> CheckResult:
+        """Armed, declaration resolved, and the input is not on this machine.
+
+        Not a pass, not a failure, and not NA: the binding exists, imported,
+        read its pin and stopped at the byte it could not read. The reason
+        names the input and both digests so a reader scanning a table can tell
+        an absent panel from an indicted pipeline without opening the
+        evidence. No ``halt`` key is attached, ever: nothing is indicted.
+        """
+        detail = exc.reason.strip() or "the declared input could not be read"
+        pins = ""
+        if exc.pin_expected or exc.pin_observed:
+            pins = (
+                f" (pin expected {exc.pin_expected or 'NA'}, observed "
+                f"{exc.pin_observed or 'NA (absent)'})"
+            )
+        target = f" {exc.input}" if exc.input else ""
+        return cls(
+            check_id,
+            phase,
+            Status.UNMEASURABLE,
+            f"UNMEASURABLE HERE, NOT A FINDING:{target} {detail}{pins}. The check is "
+            "armed and its declaration resolved; this machine cannot supply the "
+            "input it is declared over. The run may not start, and nothing about "
+            "the pipeline is indicted",
+            exc.to_evidence(),
+        )
 
     # -- serialisation ----------------------------------------------------
 

@@ -16,7 +16,7 @@ that did not come out of a run of this CLI does not exist.
   `tests/test_promotion_state.py` now holds this file to.
 - `src/resilient_mlkit/measurement.py` — **the import that replaces the hand
   copies.** The repo-facing `Measured` / `Unmeasured` gate vocabulary, over the
-  canonical six-state `Status` re-exported from `core.result` (identity, not a
+  canonical seven-state `Status` (six until M-1) re-exported from `core.result` (identity, not a
   fourth definition). blackout's `validation/unmeasured.py`, triage's
   `measurement.py` and choco's `promotion_gate.py` / `validation/_report.py`
   each wrote this out by hand in three states, because until now there was
@@ -111,12 +111,37 @@ writes nothing, and exits 2 — nothing read that way can reach a verdict row.
 | `DEFERRED` | Wired and exercised; stops at a credential the signatory supplies. Never a pass. |
 | `STALE` | Measured at a different git SHA than the one checked out. |
 | `ESCALATED` | Reserved to the human signatory. |
+| `UNMEASURABLE` | **Armed**, declaration resolved, and this machine cannot supply the input the check is declared over (an absent staged panel, a digest that does not match the pin). Nothing is indicted; the run may not start. Never a pass, never a failure, never "unarmed". |
 
 `DEFERRED` was missing from this table while `core/result.py` defined six
 statuses and its docstring argued at length for why the sixth must not be
 folded into `NA`. Added when `measurement.py` was exported, because the
 document a repo reads before adopting the vocabulary should not describe five
 sixths of it.
+
+`UNMEASURABLE` (plan v3 M-1, 2026-09-04) is the mirror image of `DEFERRED`.
+Measured three ways in the adopters: torrent's D2 on `main` rendered **FAIL**
+with the reason "ENVIRONMENT REFUSAL, NOT A PLACEBO FINDING: the staged Caravan
+subset could not be read" — because a binding that raised had no other channel;
+chokepoint's R2/R3/R5/R6 refuse on pin mismatch from any clone without the
+pinned parquet; fray's E1 raises when the NASS extract's bytes differ from the
+pin. Each is correct fail-closed behaviour, and each rendered either as an
+indictment or as an unarmed stop. A binding now raises
+`resilient_mlkit.InputUnavailable(reason, input=…, pin_expected=…,
+pin_observed=…)` **only after** it has resolved its declaration and reached the
+byte it cannot read — the `CredentialRequired` discipline for bytes. Raised
+earlier (at import time) it is refused by name as `PREMATURE_INPUT_REFUSAL` and
+renders `FAIL`, because dodging a check is the other face of the same trap.
+`mlkit check` exits `3` on it (unmeasured, not red), `check --portfolio` reads
+the repo as in progress, and `report.guarded_write` refuses to overwrite a
+binding-dependent report from a run that carried one — the readiness rule, now
+also the hard-stops rule.
+
+An adopter's hard-stops module renders the three facts per stop through one
+function rather than typing them: `resilient_mlkit.arm_state(declared, status)`
+returns `armed` (PASS/FAIL/UNMEASURABLE are all verdicts about an armed stop),
+`halt_required` (FAIL **and** UNMEASURABLE — a run taken now would run with a
+tripwire nobody could read) and `indicted` (FAIL only).
 
 Three of the readiness checks import nothing and walk source with `ast`, which
 is what lets them see code no binding exposes: **R10** `FABRICATED_DEFAULTS`

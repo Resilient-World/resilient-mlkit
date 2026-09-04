@@ -214,7 +214,16 @@ def resolve(repo: Repo, results: dict[str, CheckResult]) -> RepoState:
     escalated = [
         results[c] for c in all_ids if c in results and results[c].status is Status.ESCALATED
     ]
-    na = [results[c] for c in all_ids if c in results and results[c].status is Status.NA]
+    # UNMEASURABLE (M-1) is unmeasured, and it is listed FIRST among the
+    # unmeasured rows: "the check is armed and this machine cannot supply its
+    # declared input" is more actionable than "no binding declared", and the
+    # portfolio line quotes the first unmeasured row it finds. It never reaches
+    # BLOCKED (nothing is indicted) and never reaches READY (nothing was
+    # measured).
+    na = [
+        results[c] for c in all_ids
+        if c in results and results[c].status is Status.UNMEASURABLE
+    ] + [results[c] for c in all_ids if c in results and results[c].status is Status.NA]
     deferred = [
         results[c] for c in all_ids if c in results and results[c].status is Status.DEFERRED
     ]
