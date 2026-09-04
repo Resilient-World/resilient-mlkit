@@ -21,6 +21,7 @@ from . import __version__
 from . import checks as checks_pkg
 from .checks import PHASES, RunContext, for_phase, phase_ids
 from .core import identity as identity_mod
+from .core import merged as merged_mod
 from .core import nonce as nonce_mod
 from .core import policy, store
 from .core.repo import PORTFOLIO, Repo, discover, find_root
@@ -198,6 +199,16 @@ def cmd_check(args: argparse.Namespace) -> int:
     agg: dict[str, int] = {}
     last_line = ""
 
+    # M-3. `--merged-with <base-ref>` drives the phase on the MERGE of each
+    # repo's HEAD with the base, built as a synthetic commit in a temporary
+    # detached worktree. A conflict is refused (exit 2), never resolved. The
+    # results are stamped with both parents and the merge tree, printed, and
+    # optionally written to --json-out; they are NOT saved into the real
+    # repo's `.mlkit/results/` -- a verdict about a tree that is on no branch
+    # must not sit in the store the branch's own verdicts are read from.
+    merged_with = getattr(args, "merged_with", None)
+    merged_payload: list[dict] = []
+
     for repo in repos:
         ctx = RunContext(
             nonce=run_nonce,
@@ -206,17 +217,45 @@ def cmd_check(args: argparse.Namespace) -> int:
             timeout=args.timeout,
             allow_dirty=bool(getattr(args, "allow_dirty", False)),
         )
-        try:
-            results = _run_phase(repo, phase, ctx)
-        finally:
-            # Drop this repo's modules before touching the next one. Every repo
-            # names its adapter `mlkit_bindings`, so skipping this would serve
-            # repo A's cached module to repo B and report A's numbers as B's.
-            repo.release()
-        store.save(repo, phase, results)
+        if merged_with:
+            try:
+                merged = merged_mod.build(repo.path, merged_with)
+            except merged_mod.MergeConflict as exc:
+                print(f"--- resilient-{repo.name}  {exc}", file=sys.stderr)
+                return 2
+            except merged_mod.GitUnavailable as exc:
+                print(f"--- resilient-{repo.name}  REFUSED: {exc}", file=sys.stderr)
+                return 2
+            worktree = merged_mod.checkout(merged)
+            drive = Repo(repo.name, worktree)
+            try:
+                results = _run_phase(drive, phase, ctx)
+            finally:
+                drive.release()
+                merged_mod.remove(merged, worktree)
+            print(f"--- resilient-{repo.name}  sha={repo.short_sha}  branch={repo.branch}"
+                  f"{'  DIRTY' if repo.is_dirty else ''}")
+            for line in merged.header_lines():
+                print(line)
+            print("  (results NOT saved to .mlkit/results/: this tree is on no branch)")
+            merged_payload.append({
+                "repo": repo.name,
+                **merged.stamp(),
+                "results": [r.to_dict() for r in results],
+            })
+        else:
+            try:
+                results = _run_phase(repo, phase, ctx)
+            finally:
+                # Drop this repo's modules before touching the next one. Every
+                # repo names its adapter `mlkit_bindings`, so skipping this
+                # would serve repo A's cached module to repo B and report A's
+                # numbers as B's.
+                repo.release()
+            store.save(repo, phase, results)
 
-        print(f"--- resilient-{repo.name}  sha={repo.short_sha}  branch={repo.branch}"
-              f"{'  DIRTY' if repo.is_dirty else ''}")
+            print(f"--- resilient-{repo.name}  sha={repo.short_sha}  branch={repo.branch}"
+                  f"{'  DIRTY' if repo.is_dirty else ''}")
         print(phase_table(results, declared_ids))
 
         counts: dict[str, int] = {}
@@ -276,6 +315,22 @@ def cmd_check(args: argparse.Namespace) -> int:
     # `check_id` (a copy-paste inside a check module -- `_run_phase` does not
     # overwrite the id) leaves a declared id unproduced, gets a backfilled FAIL
     # for it, and arrives here with one row too many.
+    if merged_with and getattr(args, "json_out", None):
+        out = Path(args.json_out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps({
+            "artifact_schema": "resilient-mlkit/merged-tree-drive/1",
+            "generated_by": "mlkit check --merged-with",
+            "mlkit_version": __version__,
+            "mlkit_build": identity_mod.build_identity().to_dict(),
+            "generated_at_utc": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
+            "run_nonce": run_nonce,
+            "phase": phase,
+            "base_ref": merged_with,
+            "repos": merged_payload,
+        }, indent=1) + "\n")
+        print(f"wrote {out}", file=sys.stderr)
+
     expected = total * len(repos)
     observed = sum(agg.values())
     if observed != expected:
@@ -900,6 +955,67 @@ def cmd_env(args: argparse.Namespace) -> int:
     return 1 if unmeasurable else 0
 
 
+#: Exit code for `mlkit ancestry` when a ref did not resolve. Distinct from 1
+#: ("not contained") because "the question could not be asked" must never
+#: read as either answer.
+ANCESTRY_UNRESOLVABLE_EXIT = 2
+
+
+def cmd_ancestry(args: argparse.Namespace) -> int:
+    """Is each commit actually IN the base ref? ``git merge-base --is-ancestor``.
+
+    "MERGED" is a status word. Three times this week (STATE.md 2026-09-04) a
+    stacked PR reported MERGED while ``main`` was unchanged, because its base
+    was another feature branch. The fact a lander needs is this one, per PR,
+    after any merge -- and it was being run by hand each time.
+
+    Exit 0 only when every commit is contained; 1 when any is not; 2 when a
+    ref did not resolve (nothing asserted).
+    """
+    if getattr(args, "path", None):
+        path = Path(args.path).resolve()
+        label = path.name
+    else:
+        root = Path(args.root).resolve() if args.root else find_root()
+        repos = _select_repos(args, root)
+        if len(repos) != 1:
+            print(
+                "ancestry needs exactly one repo: pass --path DIR, or --repo NAME "
+                f"under --root ({len(repos)} found)", file=sys.stderr,
+            )
+            return ANCESTRY_UNRESOLVABLE_EXIT
+        path = repos[0].path
+        label = f"resilient-{repos[0].name}"
+
+    rows = []
+    try:
+        for commit in args.commits:
+            rows.append(merged_mod.contained(path, args.base, commit))
+    except merged_mod.GitUnavailable as exc:
+        print(f"{label}: REFUSED: {exc}", file=sys.stderr)
+        return ANCESTRY_UNRESOLVABLE_EXIT
+
+    if args.json:
+        print(json.dumps({"repo": label, "base_ref": args.base,
+                          "rows": [r.to_dict() for r in rows]}, indent=1))
+    else:
+        from .core.table import render
+
+        print(render(
+            [[r.commit, r.commit_sha[:12], "CONTAINED" if r.contained else "NOT CONTAINED",
+              f"{r.base_ref}@{r.base_sha[:12]}"] for r in rows],
+            ["COMMIT", "SHA", "VERDICT", "IN"],
+        ))
+        missing = [r for r in rows if not r.contained]
+        if missing:
+            print(
+                f"\n{len(missing)} of {len(rows)} commit(s) are NOT in {args.base}. Whatever "
+                "a PR status page says, they are not on that ref; a stacked PR merges into "
+                "its BASE BRANCH, and that is where they went.", file=sys.stderr,
+            )
+    return 0 if all(r.contained for r in rows) else 1
+
+
 def cmd_allowlist(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve() if args.root else find_root()
     repos = _select_repos(args, root)
@@ -1000,7 +1116,33 @@ def build_parser() -> argparse.ArgumentParser:
             "flag buys a diagnosis and cannot buy a verdict"
         ),
     )
+    p_check.add_argument(
+        "--merged-with", metavar="BASE-REF",
+        help=(
+            "M-3: drive the phase on the MERGE of each repo's HEAD with BASE-REF, "
+            "built as a synthetic commit in a temporary worktree (git merge-tree "
+            "--write-tree; git >= 2.38). A conflict is REFUSED (exit 2), never "
+            "resolved. Results are stamped with both parents and the merge tree "
+            "and are NOT saved to .mlkit/results/. Required for any PR whose base "
+            "is not main or whose files intersect another open PR's"
+        ),
+    )
+    p_check.add_argument(
+        "--json-out", metavar="PATH",
+        help="with --merged-with: write the stamped results (both parents, merge tree) here",
+    )
     p_check.set_defaults(func=cmd_check)
+
+    p_anc = sub.add_parser(
+        "ancestry",
+        help="is each commit actually IN a ref (git merge-base --is-ancestor); MERGED is a status word",
+    )
+    common(p_anc)
+    p_anc.add_argument("--path", help="a git worktree to ask (instead of --root/--repo)")
+    p_anc.add_argument("--base", required=True, metavar="REF", help="the ref that must contain them, e.g. origin/main")
+    p_anc.add_argument("--json", action="store_true", help="machine-readable output")
+    p_anc.add_argument("commits", nargs="+", metavar="COMMIT", help="commit(s) or ref(s) to test")
+    p_anc.set_defaults(func=cmd_ancestry)
 
     p_fleet = sub.add_parser(
         "portfolio",
