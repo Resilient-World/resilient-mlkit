@@ -227,7 +227,15 @@ def cmd_check(args: argparse.Namespace) -> int:
                 print(f"--- resilient-{repo.name}  REFUSED: {exc}", file=sys.stderr)
                 return 2
             worktree = merged_mod.checkout(merged)
-            drive = Repo(repo.name, worktree)
+            # `require_declared_inputs`: the worktree is built from tree
+            # objects, so it holds COMMITTED content only -- no gitignored
+            # staged panel travels with it. A data-bearing binding driven here
+            # reaches a byte that is not present, and before this the generic
+            # handler rendered that FAIL ("check raised an unhandled
+            # exception"), which is an environment failure wearing a verdict's
+            # face. With this set, `Repo.resolve` refuses first and the row
+            # renders UNMEASURABLE -- never FAIL, never PASS. See `core.inputs`.
+            drive = Repo(repo.name, worktree, require_declared_inputs=True)
             try:
                 results = _run_phase(drive, phase, ctx)
             finally:
@@ -238,6 +246,8 @@ def cmd_check(args: argparse.Namespace) -> int:
             for line in merged.header_lines():
                 print(line)
             print("  (results NOT saved to .mlkit/results/: this tree is on no branch)")
+            print("  (committed content only: a binding whose declared inputs this tree "
+                  "does not carry renders UNMEASURABLE, never FAIL and never PASS)")
             merged_payload.append({
                 "repo": repo.name,
                 **merged.stamp(),

@@ -47,6 +47,23 @@ name = "torrent"
 
 [source]
 trees = ["src"]
+
+# core.inputs: on a MERGED-TREE drive a binding must declare what it reads
+# outside the committed tree, or the row renders UNMEASURABLE rather than a
+# verdict (the merged worktree is built from tree objects and carries no
+# gitignored file). `[]` is the positive declaration "reads nothing outside the
+# committed tree", which is true of this fixture's binding -- it returns four
+# literals. Without this line every T1 row below would render UNMEASURABLE
+# instead of the E-069 verdict, and `test_t6_*` drives exactly that.
+[inputs]
+placebo_test = []
+
+# padding so an edit to the [inputs] line above and base's appended [placebo]
+# table below are never adjacent hunks (test_merged_tree_input_guard.py's cost
+# arm edits the one and appends the other, and adjacent hunks would conflict)
+# padding line 2
+# padding line 3
+# padding line 4
 """
 
 PLACEBO_TABLE = """

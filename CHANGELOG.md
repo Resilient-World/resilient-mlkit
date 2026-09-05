@@ -246,6 +246,54 @@ and M-3 (and M-2 where it lands on the same line).
   same silent record makes the writer refuse it.
 
 
+### REPAIR (2026-09-05) — `--merged-with` renders UNMEASURABLE instead of guessing
+
+* **The defect, found by the v3 adjudicator.** `core.merged.checkout` builds its
+  worktree from tree objects, so it holds **committed content only** — a limit
+  disclosed in `merged.py:32` and in `docs/MERGED_TREE_DRIVE.md`, and enforced
+  nowhere. Every data-bearing check in the fleet (chokepoint D2/D6/E1, fray
+  D2/D3/D6/E1, torrent D2/E1) resolves a binding that reads a gitignored panel.
+  **Measured on a real fray clone at `a18c447`, before this change:** the merged
+  decision phase rendered `D2 PASS -0.945 [-4.239, +2.441]` and `D3 PASS
+  0.7944664031620553` off committed evidence whose inputs were never
+  established, and `D6 FAIL` / `E1 FAIL` reading *"scaling_probe raised
+  TemporalSplitIdentityMismatch"* — an environment failure in the shape each
+  repo's own `hard_stops.py` reads as a fired stop. That is the conflation M-1
+  exists to end, reappearing inside the tool meant to end it, and the same class
+  of defect fray #115 landed.
+* **New `core.inputs`, and an optional `[inputs]` table in `.mlkit/repo.toml`**
+  keyed by binding name, listing the repo-relative paths that binding reads.
+  `[]` is a **positive** declaration ("reads nothing outside the committed
+  tree"), not an absence — the distinction `core.declaration` had to make for
+  `[placebo]`. A malformed table answers "undeclared", which REFUSES: a repo
+  cannot reach a looser outcome by breaking the file.
+* **`Repo.require_declared_inputs`**, set by `mlkit check --merged-with` on the
+  temporary worktree and by nothing else. `Repo.resolve` then raises
+  `InputUnavailable` — before the subject's module is imported, so it is never a
+  `PrematureInputRefusal` — and the row renders **UNMEASURABLE**: never FAIL,
+  never PASS, no `halt` key, exit 3.
+* **The fail-closed direction, and its price.** A binding that declares
+  *nothing* also renders UNMEASURABLE: the tree provably holds committed content
+  only, whether a binding needs more is a fact only the repo knows, and an input
+  mlkit has not established may be rendered unmeasured but never as a verdict.
+  The price is that a real merged-tree finding on an undeclared binding —
+  E-069's own shape — renders UNMEASURABLE until the repo adds one line of TOML,
+  and `test_b6_the_undeclared_refusal_masks_a_merge_defect_and_names_the_remedy`
+  drives exactly that rather than describing it. `--merged-with` has never
+  landed, so no existing verdict moves.
+* **Driven on a real repo clone, not asserted.** fray at `a18c447` +
+  `--merged-with main`: decision renders D2/D3/D6 **UNMEASURABLE** (undeclared),
+  then UNMEASURABLE naming `data/cache/nass_yields.json` once fray declares it;
+  economics renders E1 **UNMEASURABLE** where it read FAIL before.
+  Check-not-dead: declare a committed input (`config/commercial_sources.json`)
+  and D2/D3 run again and render the *same* figures as the pre-repair drive.
+  Silence: pre- and post-repair PLAIN drives of `selection`, `readiness`,
+  `decision` and `economics` are row-for-row identical. Recorded in
+  `reports/validation/M3_INPUT_GUARD_FRAY_DRIVE.json`.
+* Seven suite controls in `tests/test_merged_tree_input_guard.py` (B1–B7).
+  `docs/MERGED_TREE_DRIVE.md` states the rule, the table and the adoption recipe.
+
+
 ## v0.6.0 — 2026-09-01
 
 Not yet tagged. `v0.5.0` **is** tagged — annotated tag object `15a188b` on

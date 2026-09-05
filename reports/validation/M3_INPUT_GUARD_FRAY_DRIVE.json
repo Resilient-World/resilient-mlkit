@@ -1,0 +1,419 @@
+{
+ "artifact_schema": "resilient-mlkit/m3-input-guard-drive/1",
+ "generated_by": "scripts/m3_input_guard_drive.py",
+ "generated_at_utc": "2026-09-05T14:01:21+00:00",
+ "mlkit_version": "0.7.0",
+ "mlkit_build": {
+  "stamp": "0.7.0+src.8dd1b5f6046d",
+  "version": "0.7.0",
+  "source_sha256": "8dd1b5f6046d723459ade8137fb499fdf9a5510f2e4cecf7d6a69321bc67d141",
+  "files": 38,
+  "root_kind": "checkout",
+  "root_name": "resilient_mlkit",
+  "vcs_commit": null,
+  "vcs_url": null,
+  "vcs_reason": "2 installed resilient-mlkit distribution(s) were found and none of them describes the running tree `resilient_mlkit` (checkout); the metadata on this machine belongs to some other mlkit, so it is not reported as this one's",
+  "unavailable": ""
+ },
+ "subject": {
+  "repo": "fray",
+  "head_sha": "3145e403026c7aa34e9d2b31365e3511a5c01947",
+  "head_ref": "m3-drive-head",
+  "base_ref": "main",
+  "base_sha": "a18c447d5674e82deb75e17aef71463351df281d",
+  "note": "the clone's scratch branches are cut from head_sha, committed and deleted by this script, and are NEVER pushed; every arm's TOML fragment is carried verbatim so a reader can rebuild it from the public base_sha"
+ },
+ "merged_arms": [
+  {
+   "arm": "BEFORE (merged, mlkit at --baseline)",
+   "merged_with": "main",
+   "head_sha": "3145e403026c7aa34e9d2b31365e3511a5c01947",
+   "phases": {
+    "decision": [
+     {
+      "check": "D1",
+      "status": "ESCALATED",
+      "detail": "D1 specifies what the counterfactual means commercially and is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D2",
+      "status": "PASS",
+      "detail": "estimate=-0.9450351694980542, ci_low=-4.238569043465931, ci_high=2.4411951675170287"
+     },
+     {
+      "check": "D3",
+      "status": "PASS",
+      "detail": "nominal=0.8, empirical=0.7944664031620553, n=253"
+     },
+     {
+      "check": "D4",
+      "status": "ESCALATED",
+      "detail": "D4 is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D5",
+      "status": "ESCALATED",
+      "detail": "D5 is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D6",
+      "status": "FAIL",
+      "detail": "resampling_declaration raised TemporalSplitIdentityMismatch: the year split about to be scored is not the year split that was recorded; an unseen-year figure from it would be measured partly on years the model was fitted on. Differences:"
+     }
+    ],
+    "economics": [
+     {
+      "check": "E1",
+      "status": "FAIL",
+      "detail": "scaling_probe raised TemporalSplitIdentityMismatch: the year split about to be scored is not the year split that was recorded; an unseen-year figure from it would be measured partly on years the model was fitted on. Differences:"
+     },
+     {
+      "check": "E2",
+      "status": "NA",
+      "detail": "fray: no 'hparam_sanity' binding declared in .mlkit/repo.toml; the sweep runs on SageMaker AMT and the training plane has not been bootstrapped"
+     },
+     {
+      "check": "E3",
+      "status": "NA",
+      "detail": "fray: no 'efficiency' binding declared in .mlkit/repo.toml; utilisation is measured on a SageMaker job and the training plane has not been bootstrapped"
+     },
+     {
+      "check": "E4",
+      "status": "ESCALATED",
+      "detail": "E4 allocates credits and wires a Budgets alarm \u2014 a billing action reserved to the signatory"
+     },
+     {
+      "check": "E5",
+      "status": "ESCALATED",
+      "detail": "E5 states what each run will teach and what would change your mind; it is human-written by design"
+     }
+    ]
+   }
+  },
+  {
+   "arm": "UNDECLARED (merged, mlkit repaired)",
+   "merged_with": "main",
+   "head_sha": "3145e403026c7aa34e9d2b31365e3511a5c01947",
+   "phases": {
+    "decision": [
+     {
+      "check": "D1",
+      "status": "ESCALATED",
+      "detail": "D1 specifies what the counterfactual means commercially and is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D2",
+      "status": "UNMEASURABLE",
+      "detail": "UNMEASURABLE HERE, NOT A FINDING: [inputs].placebo_test (undeclared) fray: binding 'placebo_test' declares no inputs, and this drive is over a MERGED WORKTREE, which holds committed content only. mlkit cannot establish that 'placebo_test' c"
+     },
+     {
+      "check": "D3",
+      "status": "UNMEASURABLE",
+      "detail": "UNMEASURABLE HERE, NOT A FINDING: [inputs].coverage (undeclared) fray: binding 'coverage' declares no inputs, and this drive is over a MERGED WORKTREE, which holds committed content only. mlkit cannot establish that 'coverage' can read what"
+     },
+     {
+      "check": "D4",
+      "status": "ESCALATED",
+      "detail": "D4 is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D5",
+      "status": "ESCALATED",
+      "detail": "D5 is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D6",
+      "status": "UNMEASURABLE",
+      "detail": "UNMEASURABLE HERE, NOT A FINDING: [inputs].resampling_declaration (undeclared) fray: binding 'resampling_declaration' declares no inputs, and this drive is over a MERGED WORKTREE, which holds committed content only. mlkit cannot establish t"
+     }
+    ],
+    "economics": [
+     {
+      "check": "E1",
+      "status": "UNMEASURABLE",
+      "detail": "UNMEASURABLE HERE, NOT A FINDING: [inputs].scaling_probe (undeclared) fray: binding 'scaling_probe' declares no inputs, and this drive is over a MERGED WORKTREE, which holds committed content only. mlkit cannot establish that 'scaling_probe"
+     },
+     {
+      "check": "E2",
+      "status": "NA",
+      "detail": "fray: no 'hparam_sanity' binding declared in .mlkit/repo.toml; the sweep runs on SageMaker AMT and the training plane has not been bootstrapped"
+     },
+     {
+      "check": "E3",
+      "status": "NA",
+      "detail": "fray: no 'efficiency' binding declared in .mlkit/repo.toml; utilisation is measured on a SageMaker job and the training plane has not been bootstrapped"
+     },
+     {
+      "check": "E4",
+      "status": "ESCALATED",
+      "detail": "E4 allocates credits and wires a Budgets alarm \u2014 a billing action reserved to the signatory"
+     },
+     {
+      "check": "E5",
+      "status": "ESCALATED",
+      "detail": "E5 states what each run will teach and what would change your mind; it is human-written by design"
+     }
+    ]
+   }
+  },
+  {
+   "arm": "declared-absent (merged, mlkit repaired)",
+   "merged_with": "main",
+   "head_sha": "fc86ca9f92da4d4547d1fa49e0ef611a841cab6b",
+   "toml_fragment": "\n# ARM: declared-and-absent. Every path below is DERIVED and gitignored in fray\n# (.gitignore `/data/*`), so no tree object carries it and a merged worktree\n# cannot either.\n[inputs]\nplacebo_test = [\"data/cache/nass_yields.json\", \"data/cache/nass_bulk_cotton_county.tsv\"]\ncoverage = [\"data/cache/nass_yields.json\"]\nresampling_declaration = [\"data/cache/nass_yields.json\"]\nscaling_probe = [\"data/cache/nass_yields.json\"]\n",
+   "phases": {
+    "decision": [
+     {
+      "check": "D1",
+      "status": "ESCALATED",
+      "detail": "D1 specifies what the counterfactual means commercially and is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D2",
+      "status": "UNMEASURABLE",
+      "detail": "UNMEASURABLE HERE, NOT A FINDING: data/cache/nass_yields.json fray: binding 'placebo_test' declares 2 input(s) and this MERGED WORKTREE does not carry 2 of them: data/cache/nass_yields.json, data/cache/nass_bulk_cotton_county.tsv. Declare w"
+     },
+     {
+      "check": "D3",
+      "status": "UNMEASURABLE",
+      "detail": "UNMEASURABLE HERE, NOT A FINDING: data/cache/nass_yields.json fray: binding 'coverage' declares 1 input(s) and this MERGED WORKTREE does not carry 1 of them: data/cache/nass_yields.json. Declare what this binding reads in the [inputs] table"
+     },
+     {
+      "check": "D4",
+      "status": "ESCALATED",
+      "detail": "D4 is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D5",
+      "status": "ESCALATED",
+      "detail": "D5 is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D6",
+      "status": "UNMEASURABLE",
+      "detail": "UNMEASURABLE HERE, NOT A FINDING: data/cache/nass_yields.json fray: binding 'resampling_declaration' declares 1 input(s) and this MERGED WORKTREE does not carry 1 of them: data/cache/nass_yields.json. Declare what this binding reads in the "
+     }
+    ],
+    "economics": [
+     {
+      "check": "E1",
+      "status": "UNMEASURABLE",
+      "detail": "UNMEASURABLE HERE, NOT A FINDING: data/cache/nass_yields.json fray: binding 'scaling_probe' declares 1 input(s) and this MERGED WORKTREE does not carry 1 of them: data/cache/nass_yields.json. Declare what this binding reads in the [inputs] "
+     },
+     {
+      "check": "E2",
+      "status": "NA",
+      "detail": "fray: no 'hparam_sanity' binding declared in .mlkit/repo.toml; the sweep runs on SageMaker AMT and the training plane has not been bootstrapped"
+     },
+     {
+      "check": "E3",
+      "status": "NA",
+      "detail": "fray: no 'efficiency' binding declared in .mlkit/repo.toml; utilisation is measured on a SageMaker job and the training plane has not been bootstrapped"
+     },
+     {
+      "check": "E4",
+      "status": "ESCALATED",
+      "detail": "E4 allocates credits and wires a Budgets alarm \u2014 a billing action reserved to the signatory"
+     },
+     {
+      "check": "E5",
+      "status": "ESCALATED",
+      "detail": "E5 states what each run will teach and what would change your mind; it is human-written by design"
+     }
+    ]
+   }
+  },
+  {
+   "arm": "declared-present (merged, mlkit repaired)",
+   "merged_with": "main",
+   "head_sha": "7ee7730522bc6b76a6736ec0e618683928de7cc6",
+   "toml_fragment": "\n# ARM: check-not-dead. coverage and placebo_test declare inputs the COMMITTED\n# tree does carry (config/commercial_sources.json), and an empty list, so both\n# rows must be DRIVEN and render exactly what a plain drive renders.\n[inputs]\nplacebo_test = []\ncoverage = [\"config/commercial_sources.json\"]\nresampling_declaration = [\"data/cache/nass_yields.json\"]\nscaling_probe = [\"data/cache/nass_yields.json\"]\n",
+   "phases": {
+    "decision": [
+     {
+      "check": "D1",
+      "status": "ESCALATED",
+      "detail": "D1 specifies what the counterfactual means commercially and is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D2",
+      "status": "PASS",
+      "detail": "estimate=-0.9450351694980542, ci_low=-4.238569043465931, ci_high=2.4411951675170287"
+     },
+     {
+      "check": "D3",
+      "status": "PASS",
+      "detail": "nominal=0.8, empirical=0.7944664031620553, n=253"
+     },
+     {
+      "check": "D4",
+      "status": "ESCALATED",
+      "detail": "D4 is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D5",
+      "status": "ESCALATED",
+      "detail": "D5 is reserved to the signatory; the agent may not write it"
+     },
+     {
+      "check": "D6",
+      "status": "UNMEASURABLE",
+      "detail": "UNMEASURABLE HERE, NOT A FINDING: data/cache/nass_yields.json fray: binding 'resampling_declaration' declares 1 input(s) and this MERGED WORKTREE does not carry 1 of them: data/cache/nass_yields.json. Declare what this binding reads in the "
+     }
+    ],
+    "economics": [
+     {
+      "check": "E1",
+      "status": "UNMEASURABLE",
+      "detail": "UNMEASURABLE HERE, NOT A FINDING: data/cache/nass_yields.json fray: binding 'scaling_probe' declares 1 input(s) and this MERGED WORKTREE does not carry 1 of them: data/cache/nass_yields.json. Declare what this binding reads in the [inputs] "
+     },
+     {
+      "check": "E2",
+      "status": "NA",
+      "detail": "fray: no 'hparam_sanity' binding declared in .mlkit/repo.toml; the sweep runs on SageMaker AMT and the training plane has not been bootstrapped"
+     },
+     {
+      "check": "E3",
+      "status": "NA",
+      "detail": "fray: no 'efficiency' binding declared in .mlkit/repo.toml; utilisation is measured on a SageMaker job and the training plane has not been bootstrapped"
+     },
+     {
+      "check": "E4",
+      "status": "ESCALATED",
+      "detail": "E4 allocates credits and wires a Budgets alarm \u2014 a billing action reserved to the signatory"
+     },
+     {
+      "check": "E5",
+      "status": "ESCALATED",
+      "detail": "E5 states what each run will teach and what would change your mind; it is human-written by design"
+     }
+    ]
+   }
+  }
+ ],
+ "plain_drive_silence": {
+  "BEFORE": {
+   "decision": [
+    {
+     "check": "D1",
+     "status": "ESCALATED",
+     "detail": "D1 specifies what the counterfactual means commercially and is reserved to the signatory; the agent may not write it"
+    },
+    {
+     "check": "D2",
+     "status": "PASS",
+     "detail": "estimate=-0.9450351694980542, ci_low=-4.238569043465931, ci_high=2.4411951675170287"
+    },
+    {
+     "check": "D3",
+     "status": "PASS",
+     "detail": "nominal=0.8, empirical=0.7944664031620553, n=253"
+    },
+    {
+     "check": "D4",
+     "status": "ESCALATED",
+     "detail": "D4 is reserved to the signatory; the agent may not write it"
+    },
+    {
+     "check": "D5",
+     "status": "ESCALATED",
+     "detail": "D5 is reserved to the signatory; the agent may not write it"
+    },
+    {
+     "check": "D6",
+     "status": "FAIL",
+     "detail": "resampling_declaration raised TemporalSplitIdentityMismatch: the year split about to be scored is not the year split that was recorded; an unseen-year figure from it would be measured partly on years the model was fitted on. Differences:"
+    }
+   ],
+   "economics": [
+    {
+     "check": "E1",
+     "status": "FAIL",
+     "detail": "scaling_probe raised TemporalSplitIdentityMismatch: the year split about to be scored is not the year split that was recorded; an unseen-year figure from it would be measured partly on years the model was fitted on. Differences:"
+    },
+    {
+     "check": "E2",
+     "status": "NA",
+     "detail": "fray: no 'hparam_sanity' binding declared in .mlkit/repo.toml; the sweep runs on SageMaker AMT and the training plane has not been bootstrapped"
+    },
+    {
+     "check": "E3",
+     "status": "NA",
+     "detail": "fray: no 'efficiency' binding declared in .mlkit/repo.toml; utilisation is measured on a SageMaker job and the training plane has not been bootstrapped"
+    },
+    {
+     "check": "E4",
+     "status": "ESCALATED",
+     "detail": "E4 allocates credits and wires a Budgets alarm \u2014 a billing action reserved to the signatory"
+    },
+    {
+     "check": "E5",
+     "status": "ESCALATED",
+     "detail": "E5 states what each run will teach and what would change your mind; it is human-written by design"
+    }
+   ]
+  },
+  "REPAIRED": {
+   "decision": [
+    {
+     "check": "D1",
+     "status": "ESCALATED",
+     "detail": "D1 specifies what the counterfactual means commercially and is reserved to the signatory; the agent may not write it"
+    },
+    {
+     "check": "D2",
+     "status": "PASS",
+     "detail": "estimate=-0.9450351694980542, ci_low=-4.238569043465931, ci_high=2.4411951675170287"
+    },
+    {
+     "check": "D3",
+     "status": "PASS",
+     "detail": "nominal=0.8, empirical=0.7944664031620553, n=253"
+    },
+    {
+     "check": "D4",
+     "status": "ESCALATED",
+     "detail": "D4 is reserved to the signatory; the agent may not write it"
+    },
+    {
+     "check": "D5",
+     "status": "ESCALATED",
+     "detail": "D5 is reserved to the signatory; the agent may not write it"
+    },
+    {
+     "check": "D6",
+     "status": "FAIL",
+     "detail": "resampling_declaration raised TemporalSplitIdentityMismatch: the year split about to be scored is not the year split that was recorded; an unseen-year figure from it would be measured partly on years the model was fitted on. Differences:"
+    }
+   ],
+   "economics": [
+    {
+     "check": "E1",
+     "status": "FAIL",
+     "detail": "scaling_probe raised TemporalSplitIdentityMismatch: the year split about to be scored is not the year split that was recorded; an unseen-year figure from it would be measured partly on years the model was fitted on. Differences:"
+    },
+    {
+     "check": "E2",
+     "status": "NA",
+     "detail": "fray: no 'hparam_sanity' binding declared in .mlkit/repo.toml; the sweep runs on SageMaker AMT and the training plane has not been bootstrapped"
+    },
+    {
+     "check": "E3",
+     "status": "NA",
+     "detail": "fray: no 'efficiency' binding declared in .mlkit/repo.toml; utilisation is measured on a SageMaker job and the training plane has not been bootstrapped"
+    },
+    {
+     "check": "E4",
+     "status": "ESCALATED",
+     "detail": "E4 allocates credits and wires a Budgets alarm \u2014 a billing action reserved to the signatory"
+    },
+    {
+     "check": "E5",
+     "status": "ESCALATED",
+     "detail": "E5 states what each run will teach and what would change your mind; it is human-written by design"
+    }
+   ]
+  },
+  "identical": true
+ }
+}

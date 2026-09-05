@@ -51,7 +51,7 @@ that did not come out of a run of this CLI does not exist.
 | `mlkit notice` | regenerate `NOTICE.md` from the allowlist |
 | `mlkit allowlist verify` | allowlist structure and signature |
 | `mlkit identity` | which mlkit build this is; `--verify REPORT…` checks a report was written by it |
-| `mlkit check --phase PHASE --merged-with BASE-REF` | drive the phase on the **merge** of HEAD with BASE-REF, built as a synthetic commit in a temporary worktree; a conflict is refused (exit 2), never resolved; results stamped with both parents and never saved to the branch's store. Required for stacked PRs — `docs/MERGED_TREE_DRIVE.md` |
+| `mlkit check --phase PHASE --merged-with BASE-REF` | drive the phase on the **merge** of HEAD with BASE-REF, built as a synthetic commit in a temporary worktree; a conflict is refused (exit 2), never resolved; results stamped with both parents and never saved to the branch's store. The worktree holds **committed content only**, so a binding whose `[inputs]` this tree does not carry — or that declares none — renders **UNMEASURABLE**, never FAIL and never PASS. Required for stacked PRs — `docs/MERGED_TREE_DRIVE.md` |
 | `mlkit ancestry --base REF COMMIT…` | is each commit actually **in** REF (`git merge-base --is-ancestor`). "MERGED" is a status word; exit 1 if any is not contained, 2 if a ref did not resolve |
 
 ## Which mlkit measured this?
