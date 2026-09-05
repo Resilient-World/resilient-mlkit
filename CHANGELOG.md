@@ -66,6 +66,38 @@ and M-3 (and M-2 where it lands on the same line).
   check-not-dead pair that rebinds the runner clause and shows the status
   vanish).
 
+### M-3 — the merged-tree drive as a required control, and `mlkit ancestry`
+
+* **The defect, paid for three times this week (STATE.md 2026-09-04).**
+  torrent E-069: a D2 clause TRUE on its own branch, stale on the merged tree
+  (S-5 reached `main` via #178 and never reached `cec1c48`); chokepoint #122
+  moved the sha256 the S-5 register pinned, rc 0 → 1 only on the merge; and
+  three PRs reported MERGED while `main` was unchanged because their base was
+  a feature branch. Each was found by a person building the merged tree by
+  hand, or running `git merge-base --is-ancestor` by hand.
+* **`mlkit check --phase P --merged-with BASE-REF`** (`core/merged.py`):
+  builds the merge of HEAD with the base as a synthetic commit (`git
+  merge-tree --write-tree` + `git commit-tree`, both parents), drives the
+  phase in a temporary detached worktree, prints the table under a stamp
+  naming `head_sha`, `base_ref`, `base_sha`, `merge_tree`, `merge_commit`,
+  `identical_to_head`; `--json-out` writes it. **A conflict is refused (exit
+  2), never resolved.** Nothing is saved to the branch's `.mlkit/results/`;
+  no branch moves. The temporary worktree holds committed content only, so
+  binding-dependent checks render as on a clean clone.
+* **`mlkit ancestry --base REF COMMIT…`** (`--path DIR` or `--root/--repo`):
+  CONTAINED / NOT CONTAINED per commit with both SHAs; exit 1 if any is not
+  contained, 2 if a ref did not resolve (nothing asserted). The recipe, the
+  PR-body field and the PR-template lines: `docs/MERGED_TREE_DRIVE.md`.
+* **Verdict change on unchanged adopter code: none.** No check changes; two
+  CLI surfaces are added (minor). Controls in `tests/test_merged_tree_drive.py`:
+  T1 fires ONLY on the merge (D2 PASS on head, NA on base,
+  `PLACEBO_EXEMPTS_THE_CLAIM` on the merge — E-069's shape on mlkit's own
+  check); T2 a conflict exits 2 naming the path with nothing left behind; T3 a
+  contained base yields the head tree and identical statuses; T4/T5 the real
+  store is untouched and the synthetic commit's parents are exactly
+  `[head, base]`; A1–A3 ancestry both ways plus the unresolvable case.
+  Prereg: `reports/M3_MERGED_TREE_DRIVE_PREREGISTRATION.md`.
+
 ## v0.6.0 — 2026-09-01
 
 Not yet tagged. `v0.5.0` **is** tagged — annotated tag object `15a188b` on
