@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .result import InputUnavailable, PrematureInputRefusal
+
 #: The eight avoided-loss model repos, in the portfolio's canonical order.
 PORTFOLIO = (
     "choco",
@@ -128,6 +130,21 @@ class Repo:
         before = set(sys.modules)
         try:
             module = importlib.import_module(module_name)
+        except InputUnavailable as exc:
+            # Refused BY NAME, and not as a BindingError: a BindingError renders
+            # NA ("no binding declared"), and an InputUnavailable raised while
+            # the module is still being imported has not resolved anything --
+            # it has not read a pin, it has not reached a byte, it has only
+            # declined to be checked. The CredentialRequired discipline says
+            # raise only at the boundary; this is the same rule for bytes.
+            raise PrematureInputRefusal(
+                f"PREMATURE_INPUT_REFUSAL: {self.name}: '{module_name}' raised "
+                f"InputUnavailable while being IMPORTED for binding '{name}' "
+                f"({exc}). UNMEASURABLE is for a binding that resolved its "
+                "declaration and stopped at the byte it cannot read; a module "
+                "that refuses before it has resolved anything has dodged the "
+                "check, and that renders FAIL"
+            ) from exc
         except Exception as exc:
             raise BindingError(
                 f"{self.name}: importing '{module_name}' for binding '{name}' "

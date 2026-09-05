@@ -137,6 +137,17 @@ def _render(status: Status) -> str:
         return Measured.deferred("g", credential="CDSAPI_KEY", detail="request built").render()
     if status is Status.STALE:
         return Measured.stale("g", reason="measured at another sha").render()
+    if status is Status.UNMEASURABLE:
+        return Measured.unmeasurable(
+            "g", reason="staged panel absent", input="data/panel.parquet",
+            pin_expected="aa", pin_observed="",
+        ).render()
+    # Strict, not a fall-through. Until M-1 this line rendered ANY status it
+    # did not name as ESCALATED, so a seventh status arrived and the
+    # "six renderings are pairwise distinct" pin below stayed green over six
+    # distinct strings drawn from seven statuses -- dead coverage of exactly
+    # the shape that pin's docstring warns about.
+    assert status is Status.ESCALATED, f"_render does not know {status!r}"
     return Measured.escalated("g", reason="reserved to the signatory").render()
 
 
@@ -171,10 +182,24 @@ def test_mx5_escalated_does_not_render_like_na_or_fail() -> None:
     assert "signatory" in _render(Status.ESCALATED)
 
 
-def test_mx5_all_six_renderings_are_pairwise_distinct() -> None:
-    """FIRES: the states asserted above, plus every pair not named separately."""
+def test_mx5_all_seven_renderings_are_pairwise_distinct() -> None:
+    """FIRES: the states asserted above, plus every pair not named separately.
+
+    Counted against ``len(Status)`` rather than a literal, so a status added to
+    the enum and not to ``_render`` fails HERE (``_render`` now asserts on an
+    unknown status) instead of collapsing into a neighbour's rendering.
+    """
     rendered = [_render(s) for s in Status]
-    assert len(set(rendered)) == 6, f"two statuses render alike: {rendered}"
+    assert len(Status) == 7
+    assert len(set(rendered)) == len(Status), f"two statuses render alike: {rendered}"
+
+
+def test_mx5_unmeasurable_does_not_render_like_na_fail_or_pass() -> None:
+    """FIRES (M-1): armed-and-input-absent is its own thing in a column."""
+    rendered = _render(Status.UNMEASURABLE)
+    assert rendered not in {_render(Status.NA), _render(Status.FAIL), _render(Status.PASS)}
+    assert rendered.startswith("UNMEASURABLE")
+    assert "armed" in rendered
 
 
 def test_mx5_negative_control_only_pass_leads_with_pass() -> None:
@@ -214,6 +239,21 @@ _CASES = [
      lambda: core_result.CheckResult("g", "repo-gate", Status.STALE, "another sha")),
     ("ESCALATED", lambda: Measured.escalated("g", reason="signatory"),
      lambda: core_result.CheckResult.escalated("g", "repo-gate", "signatory")),
+    # M-1. Built through the export and through core.result from the SAME
+    # InputUnavailable operands, so the reason text and the evidence keys
+    # (input / pin_expected / pin_observed / unmeasurable) must agree exactly.
+    ("UNMEASURABLE",
+     lambda: Measured.unmeasurable(
+         "g", reason="staged panel absent", input="data/panel.parquet",
+         pin_expected="aa11", pin_observed="",
+     ),
+     lambda: core_result.CheckResult.unmeasurable(
+         "g", "repo-gate",
+         core_result.InputUnavailable(
+             "staged panel absent", input="data/panel.parquet",
+             pin_expected="aa11", pin_observed="",
+         ),
+     )),
 ]
 
 
@@ -271,23 +311,27 @@ def test_mx6_negative_control_the_battery_can_fail() -> None:
 def test_mx8_status_is_the_canonical_enum_itself() -> None:
     """SILENT: identity, not agreement. A copy that agrees today is still a copy."""
     assert Status is core_result.Status
-    assert len(Status) == 6
+    # Seven since M-1 (2026-09-04): UNMEASURABLE, appended, every earlier
+    # member in its earlier position. There is still no SKIP and no WARN.
+    assert len(Status) == 7
     assert [s.value for s in Status] == [
-        "PASS", "FAIL", "NA", "DEFERRED", "STALE", "ESCALATED",
+        "PASS", "FAIL", "NA", "DEFERRED", "STALE", "ESCALATED", "UNMEASURABLE",
     ]
+    assert not {"SKIP", "WARN"} & {s.value for s in Status}
 
 
-def test_mx8_the_three_state_copies_are_missing_three_of_them() -> None:
+def test_mx8_the_three_state_copies_are_missing_four_of_them() -> None:
     """FIRES: records what the copies cannot say, so the reason is checkable.
 
     blackout's ``EstimateResult``, triage's ``Measured`` and choco's
-    ``ValidationResult`` each carry PASS/FAIL/NA only. These three states have
+    ``ValidationResult`` each carry PASS/FAIL/NA only. These four states have
     no expression there, which is why converging on this module is a gain and
-    not a rename.
+    not a rename. (Three until M-1; the fourth is the one torrent's binding
+    had to spell as a FAIL whose reason begins "ENVIRONMENT REFUSAL".)
     """
     three_state = {"PASS", "FAIL", "NA"}
     missing = {s.value for s in Status} - three_state
-    assert missing == {"DEFERRED", "STALE", "ESCALATED"}
+    assert missing == {"DEFERRED", "STALE", "ESCALATED", "UNMEASURABLE"}
 
 
 # ------------------------------------------- the raise-instead-of-default family

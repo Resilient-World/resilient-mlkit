@@ -34,9 +34,9 @@ call sites, not pushed into it from outside.
 Every name those five modules define is exported here, so a repo can converge
 by changing an import rather than by rewriting its call sites.
 
-WHY SIX STATES AND NOT THREE
+WHY SEVEN STATES AND NOT THREE
 ----------------------------
-All three copies collapsed the portfolio's six statuses into three
+All three copies collapsed the portfolio's seven statuses (six until M-1) into three
 (PASS/FAIL/NA). ``core.result.Status``'s own docstring says what that costs,
 and it is worth repeating at the surface a repo will actually import:
 
@@ -153,6 +153,7 @@ from .core.result import (
     ALLOW_DIRTY_KEY,
     MAX_REASON,
     CheckResult,
+    InputUnavailable,
     CredentialRequired,
     FabricationError,
     Status,
@@ -194,8 +195,8 @@ MEASURED_STATUSES = frozenset({Status.PASS, Status.FAIL})
 #: carry no verdict, and they are redacted rather than refused.
 _REVALIDATED = frozenset({"name", "phase", "status", "reason", "metrics"})
 
-#: How each status renders as a leading token. Six distinct tokens, and the
-#: four non-verdict ones each say what kind of not-measured they are, so a
+#: How each status renders as a leading token. Seven distinct tokens, and the
+#: five non-verdict ones each say what kind of not-measured they are, so a
 #: reader scanning a column cannot mistake one for another or for a pass.
 _RENDER_TOKEN = {
     Status.PASS: "PASS",
@@ -204,6 +205,7 @@ _RENDER_TOKEN = {
     Status.DEFERRED: "DEFERRED (wired, awaiting a credential)",
     Status.STALE: "STALE (measured against another tree)",
     Status.ESCALATED: "ESCALATED (reserved to the signatory)",
+    Status.UNMEASURABLE: "UNMEASURABLE (armed; declared input absent on this machine)",
 }
 
 
@@ -240,7 +242,7 @@ class ValidationUnmeasured(Unmeasured):
 
 @dataclass
 class Measured:
-    """One repo-local gate outcome, over the portfolio's six statuses.
+    """One repo-local gate outcome, over the portfolio's seven statuses.
 
     Construct through the named constructors; they read as claims and they
     make the reason non-optional where it matters. Direct construction is
@@ -343,7 +345,7 @@ class Measured:
         return None
 
     def render(self) -> str:
-        """One line, with the status token first and six tokens that differ.
+        """One line, with the status token first and seven tokens that differ.
 
         The fleet's NA-distinctness rule in one method: an unmeasured gate must
         not render like a gate that cleared the bar, and must not render like
@@ -521,6 +523,38 @@ class Measured:
         """Reserved to the human signatory (CLAUDE.md rule 12)."""
         return cls.from_result(
             CheckResult.escalated(name, phase, reason, dict(metrics or {})),
+            gate_description=gate_description,
+            notes=notes,
+        )
+
+    @classmethod
+    def unmeasurable(
+        cls,
+        name: str,
+        *,
+        reason: str,
+        input: str = "",
+        pin_expected: str = "",
+        pin_observed: str = "",
+        metrics: dict[str, Any] | None = None,
+        gate_description: str = "",
+        notes: list[str] | None = None,
+        phase: str = REPO_GATE_PHASE,
+    ) -> Measured:
+        """Armed and resolved; the declared input is absent on this machine (M-1).
+
+        The same outcome ``cli._run_phase`` builds from an ``InputUnavailable``
+        raised by a binding, exposed here so a repo-local gate can say it
+        without inventing a fourth spelling of "not a finding".
+        """
+        return cls.from_result(
+            CheckResult.unmeasurable(
+                name, phase,
+                InputUnavailable(
+                    reason, input=input, pin_expected=pin_expected,
+                    pin_observed=pin_observed, evidence=dict(metrics or {}),
+                ),
+            ),
             gate_description=gate_description,
             notes=notes,
         )

@@ -15,7 +15,7 @@ import math
 
 from ..core import policy
 from ..core.repo import BindingError, Repo
-from ..core.result import CheckResult, CredentialRequired
+from ..core.result import CheckResult, CredentialRequired, InputUnavailable
 from . import RunContext, check
 
 PHASE = "triage"
@@ -30,7 +30,7 @@ def t1_batch_load(repo: Repo, ctx: RunContext) -> CheckResult:
 
     try:
         batch = fn()
-    except CredentialRequired:
+    except (CredentialRequired, InputUnavailable):
         raise
     except Exception as exc:  # noqa: BLE001 - the failure IS the finding
         return CheckResult.failed(
@@ -56,7 +56,7 @@ def t2_overfit_one_batch(repo: Repo, ctx: RunContext) -> CheckResult:
 
     try:
         losses = list(fn())
-    except CredentialRequired:
+    except (CredentialRequired, InputUnavailable):
         raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed(
@@ -121,7 +121,7 @@ def t3_weights_status(repo: Repo, ctx: RunContext) -> CheckResult:
 
     try:
         statuses = dict(fn())
-    except CredentialRequired:
+    except (CredentialRequired, InputUnavailable):
         raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed(
@@ -158,7 +158,7 @@ def t4_label_counts(repo: Repo, ctx: RunContext) -> CheckResult:
 
     try:
         counts = dict(fn())
-    except CredentialRequired:
+    except (CredentialRequired, InputUnavailable):
         raise
     except Exception as exc:  # noqa: BLE001
         return CheckResult.failed(

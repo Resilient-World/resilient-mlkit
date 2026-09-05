@@ -12,6 +12,60 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v0.7.0 — 2026-09-04
+
+Not yet tagged; neither is `v0.6.0` below. Tag cutting is the signatory's
+(E-M08); this heading exists because `tests/test_version_declaration.py`
+holds `__version__` to the newest heading, and a new status is a CLI-surface
+change, which this file's own scale calls **minor**. Plan v3 §7, items M-1
+and M-3 (and M-2 where it lands on the same line).
+
+### M-1 — `Status.UNMEASURABLE`: an armed check whose declared input this machine cannot supply
+
+* **The defect, measured three ways on 2026-09-04.** torrent `main` `d34649f`:
+  D2 renders FAIL with the reason "ENVIRONMENT REFUSAL, NOT A PLACEBO FINDING:
+  the staged Caravan subset could not be read" — the binding's docstring says
+  it chose FAIL because *"mlkit has no NA channel for a binding that raises"*.
+  chokepoint `main` `512ab25`: R2/R3/R5/R6 refuse on pin mismatch from any
+  clone without the pinned parquet. fray `main` `76f0dde`: E1 raises when the
+  NASS extract's bytes differ from the pin. Each is correct fail-closed
+  behaviour; each renders as an indictment or as an unarmed stop.
+* **What is new.** A seventh terminal status, reason-required (there is still
+  no SKIP and no WARN). `core.result.InputUnavailable(reason, input=,
+  pin_expected=, pin_observed=)` is the `CredentialRequired` discipline for
+  bytes: a binding raises it **only after** it has resolved its declaration
+  and reached the byte it cannot read. `cli._run_phase` renders it
+  `UNMEASURABLE` with `input` / `pin_expected` / `pin_observed` in evidence
+  and never attaches `halt`. Raised at import time it is
+  `PrematureInputRefusal` and renders **FAIL** naming
+  `PREMATURE_INPUT_REFUSAL` (`Repo.resolve`), because dodging a check is the
+  other face of the same trap. Every check that re-raised `CredentialRequired`
+  (17 sites) re-raises `InputUnavailable` the same way.
+* **What reads it.** `environment.from_results` treats an UNMEASURABLE row as
+  it treats a missing third-party module — the run is UNMEASURABLE, with both
+  digests in the bindings map — so `report.guarded_write` refuses to overwrite
+  a binding-dependent report from such a run (readiness.md today; an
+  adopter's hard_stops.md through the same writer). A missing module that
+  resolves inside the repo is still the repo's defect and still FAILs.
+  `portfolio.resolve` reads it as unmeasured (IN_PROGRESS; never READY, never
+  BLOCKED). `mlkit check` exits **3**, not 1. Glyph `U`.
+* **`core.arming.arm_state(declared, status)`** — the one definition of
+  `armed` / `halt_required` / `indicted` an adopter's hard-stops module
+  renders. torrent and chokepoint each typed `armed = status in {PASS, FAIL}`
+  and `halt_required = status == FAIL`; both lines read an UNMEASURABLE stop
+  as unarmed and non-halting. Exported at the top level with
+  `InputUnavailable`.
+* **Verdict change on unchanged adopter code: none from this build alone.**
+  No adopter binding raises `InputUnavailable` yet; every existing PASS/FAIL
+  row renders as before (suite 1195 → 1221, zero assertions removed; the nine
+  deleted test lines are the six-status pins, each replaced by a seven-status
+  pin, and one fall-through in a test helper that rendered any unknown status
+  as ESCALATED — made strict). Adoption rides on each repo's next repin PR.
+* Preregistration and controls: `reports/M1_UNMEASURABLE_PREREGISTRATION.md`,
+  `tests/test_unmeasurable_status.py` (C1–C9, both directions, plus a
+  check-not-dead pair that rebinds the runner clause and shows the status
+  vanish).
+
 ## v0.6.0 — 2026-09-01
 
 Not yet tagged. `v0.5.0` **is** tagged — annotated tag object `15a188b` on

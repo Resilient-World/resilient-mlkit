@@ -28,6 +28,8 @@ from .core.result import (
     ALLOW_DIRTY_KEY,
     CheckResult,
     CredentialRequired,
+    InputUnavailable,
+    PrematureInputRefusal,
     Status,
     UncommittedRead,
 )
@@ -96,6 +98,18 @@ def _run_phase(repo: Repo, phase: str, ctx: RunContext) -> list[CheckResult]:
             result = CheckResult.deferred(
                 spec.check_id, phase, exc.credential, exc.detail, exc.evidence
             )
+        except InputUnavailable as exc:
+            # The same discipline for bytes (M-1). A binding that resolved its
+            # declaration, read its pin and stopped at the byte this machine
+            # does not hold is ARMED and UNMEASURABLE here -- not FAIL (nothing
+            # is indicted) and not NA (the stop is not unarmed). torrent's D2
+            # rendered exactly this as "FAIL: ENVIRONMENT REFUSAL, NOT A
+            # PLACEBO FINDING" because there was no other word for it.
+            result = CheckResult.unmeasurable(spec.check_id, phase, exc)
+        except PrematureInputRefusal as exc:
+            # Raised at import time, before any declaration was resolved.
+            # Refused by name as a FAIL: the other direction of the same trap.
+            result = CheckResult.failed(spec.check_id, phase, str(exc))
         except UncommittedRead as exc:
             # The check measured something and then REFUSED to call it a pass,
             # because what it measured is not in git. That is the guard working,
@@ -281,7 +295,14 @@ def cmd_check(args: argparse.Namespace) -> int:
     # and CI should be able to tell them apart without reading the table.
     if agg.get(Status.FAIL.value):
         return 1
-    if agg.get(Status.NA.value) or agg.get(Status.STALE.value):
+    # UNMEASURABLE exits with NA and STALE: the phase is unmeasured here, and
+    # unmeasured is not green. It is kept out of the FAIL exit on purpose --
+    # CI gating on 1 would read an absent panel as a broken repo (M-1).
+    if (
+        agg.get(Status.NA.value)
+        or agg.get(Status.STALE.value)
+        or agg.get(Status.UNMEASURABLE.value)
+    ):
         return 3
     if agg.get(Status.DEFERRED.value) or agg.get(Status.ESCALATED.value):
         return 4
