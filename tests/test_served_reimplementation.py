@@ -676,13 +676,24 @@ def test_r12_is_registered_in_the_readiness_phase_and_before_r8():
 
 
 def test_r12_did_not_disturb_the_existing_readiness_order():
-    """Additive, asserted rather than promised."""
+    """Additive, asserted rather than promised.
+
+    R13 (M-2, 2026-09-04) joined the same way, directly after R12; with both
+    additive ids removed the original order stands, and with only R13 removed
+    R12's own placement (after R11, before R1) stands too.
+    """
     from resilient_mlkit.checks import PHASE_ORDER
 
-    without = [c for c in PHASE_ORDER["readiness"] if c != "R12"]
+    without = [c for c in PHASE_ORDER["readiness"] if c not in ("R12", "R13")]
     assert without == [
         "R9", "R10", "R11", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8",
     ]
+    without_r13 = [c for c in PHASE_ORDER["readiness"] if c != "R13"]
+    assert without_r13 == [
+        "R9", "R10", "R11", "R12", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8",
+    ]
+    order = PHASE_ORDER["readiness"]
+    assert order.index("R13") == order.index("R12") + 1
 
 
 # ---------------------------------------------------------------------------

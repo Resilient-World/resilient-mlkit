@@ -98,8 +98,12 @@ PHASES = ("triage", "selection", "readiness", "decision", "economics")
 PHASE_ORDER: dict[str, list[str]] = {
     "triage": ["T1", "T2", "T3", "T4", "T5"],
     "selection": ["S1", "S2", "S3", "S4", "S5"],
+    # R13 (M-2, 2026-09-04) sits with the other three walks that import
+    # nothing: it reads committed blobs and CLAUDE.md's own history, so it is
+    # as cheap as R10-R12 and measures correctly from any interpreter. Placed
+    # after R12 and before R1 for the cost reason only; no existing id moves.
     "readiness": [
-        "R9", "R10", "R11", "R12", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8",
+        "R9", "R10", "R11", "R12", "R13", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8",
     ],
     # D6 is appended, not inserted. Every existing decision id keeps its
     # position, so the only movement in the phase is one row at the end and a
@@ -246,4 +250,4 @@ def all_check_ids() -> list[str]:
 
 def load_all() -> None:
     """Import every check module so the registry is populated."""
-    from . import decision, economics, readiness, selection, triage  # noqa: F401
+    from . import decision, economics, parity, readiness, selection, triage  # noqa: F401

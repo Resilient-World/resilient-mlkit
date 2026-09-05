@@ -186,10 +186,11 @@ def test_header_names_as_many_checks_as_the_phase_runs(phase: str) -> None:
     assert named == declared, f"{header} names {sorted(named)}, phase runs {sorted(declared)}"
 
 
-def test_readiness_header_covers_r12() -> None:
-    """The specific regression: R12 joined the phase and the label did not."""
-    assert phase_header("readiness") == "R(9-12,1-8)"
-    assert len(PHASE_ORDER["readiness"]) == 12
+def test_readiness_header_covers_r12_and_r13() -> None:
+    """The specific regression: R12 joined the phase and the label did not.
+    R13 (M-2, 2026-09-04) joined after R12; the header is derived, so it moved."""
+    assert phase_header("readiness") == "R(9-13,1-8)"
+    assert len(PHASE_ORDER["readiness"]) == 13
 
 
 def test_header_preserves_run_order_not_sorted_order() -> None:

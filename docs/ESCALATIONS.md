@@ -3154,3 +3154,42 @@ This branch is `fix/m-d3-coverage-row-digest-tie` plus one commit. It touches
 other open mlkit PR modifies (#32, #37 and #38 all change `served.py`, at the
 import block, `__all__`, and from `seal` onward); `__all__` is deliberately NOT
 touched, so `_row_key_canonical` stays private and adds no conflict there.
+
+## E-M37 — resilient-mlkit is PUBLIC-SAFE by content; making it public is the signatory's S-10 decision (FINDING, no action taken here)
+
+**Recorded 2026-09-04 by the M-1/M-2/M-3 implementation, for plan v3 §6 S-10.**
+CI is red on all three model repos' mains because the workflow's token cannot
+clone this private repository; the merged fix consumes `MLKIT_READ_TOKEN`,
+which an agent may not mint (rules 12/13). The plan's recommendation is to make
+this repo public instead. This entry records what a content scan found so that
+decision rests on a measurement; **repo visibility was NOT changed and will not
+be changed by an agent.**
+
+Measured on the clone at `2befd4c` (branch `feat/v3-m2-r13-quoted-rule-parity`,
+which contains `main` `3bf16dd`), full history (249 commits, `.git` 2.8 MB):
+
+* **Tracked files: 184.** No file with a data or model-weight extension
+  (`parquet csv pt pth ckpt safetensors joblib pkl npy npz h5 nc zarr bin
+  onnx`): none. Largest tracked blob: `docs/ESCALATIONS.md` at 171,871 bytes;
+  every one of the five largest is a source or documentation file.
+* **Credential shapes** (`AKIA|ASIA` access keys, `ghp_` tokens, PEM private
+  keys, Slack `xox*`, `sk-` keys) in the tree at HEAD: **3 hits, all the same
+  deliberately fake fixture** `ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA` in
+  `tests/test_measurement_primitive.py:417-436`, which exists to prove
+  `core.result.redact` strips it. In the **full history** (`git log -p --all`):
+  the same 3 lines and nothing else. The redaction patterns themselves in
+  `core/result.py` are regexes, not values.
+* `spine/` carries the canonical docs and an EMPTY seed allowlist; no
+  adopter's signed allowlist, no licence text, no retrieved data.
+
+**What a public repo WOULD disclose, stated so the decision is informed:**
+`docs/ESCALATIONS.md`, `portfolio/*.md`, `reports/*.md|json` and this
+CHANGELOG name the eight adopter repositories, quote their check verdicts,
+figures and file paths (e.g. chokepoint's h=7 test skill, fray's crop-year
+intervals, torrent's ridge margin), and narrate their escalations. None of
+that is data, a model, or a secret; all of it is a description of private
+repositories' internals. That is a **disclosure** question, not a safety one,
+and it is the signatory's.
+
+**Recommendation (unchanged from plan v3 §6):** make it public, or mint the
+token. Either one turns CI green in three repos; neither is an agent's.

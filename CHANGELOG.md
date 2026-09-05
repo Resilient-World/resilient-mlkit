@@ -66,6 +66,95 @@ and M-3 (and M-2 where it lands on the same line).
   check-not-dead pair that rebinds the runner clause and shows the status
   vanish).
 
+### M-3 — the merged-tree drive as a required control, and `mlkit ancestry`
+
+* **The defect, paid for three times this week (STATE.md 2026-09-04).**
+  torrent E-069: a D2 clause TRUE on its own branch, stale on the merged tree
+  (S-5 reached `main` via #178 and never reached `cec1c48`); chokepoint #122
+  moved the sha256 the S-5 register pinned, rc 0 → 1 only on the merge; and
+  three PRs reported MERGED while `main` was unchanged because their base was
+  a feature branch. Each was found by a person building the merged tree by
+  hand, or running `git merge-base --is-ancestor` by hand.
+* **`mlkit check --phase P --merged-with BASE-REF`** (`core/merged.py`):
+  builds the merge of HEAD with the base as a synthetic commit (`git
+  merge-tree --write-tree` + `git commit-tree`, both parents), drives the
+  phase in a temporary detached worktree, prints the table under a stamp
+  naming `head_sha`, `base_ref`, `base_sha`, `merge_tree`, `merge_commit`,
+  `identical_to_head`; `--json-out` writes it. **A conflict is refused (exit
+  2), never resolved.** Nothing is saved to the branch's `.mlkit/results/`;
+  no branch moves. The temporary worktree holds committed content only, so
+  binding-dependent checks render as on a clean clone.
+* **`mlkit ancestry --base REF COMMIT…`** (`--path DIR` or `--root/--repo`):
+  CONTAINED / NOT CONTAINED per commit with both SHAs; exit 1 if any is not
+  contained, 2 if a ref did not resolve (nothing asserted). The recipe, the
+  PR-body field and the PR-template lines: `docs/MERGED_TREE_DRIVE.md`.
+* **Verdict change on unchanged adopter code: none.** No check changes; two
+  CLI surfaces are added (minor). Controls in `tests/test_merged_tree_drive.py`:
+  T1 fires ONLY on the merge (D2 PASS on head, NA on base,
+  `PLACEBO_EXEMPTS_THE_CLAIM` on the merge — E-069's shape on mlkit's own
+  check); T2 a conflict exits 2 naming the path with nothing left behind; T3 a
+  contained base yields the head tree and identical statuses; T4/T5 the real
+  store is untouched and the synthetic commit's parents are exactly
+  `[head, base]`; A1–A3 ancestry both ways plus the unresolvable case.
+  Prereg: `reports/M3_MERGED_TREE_DRIVE_PREREGISTRATION.md`.
+
+### M-2 — R13 `QUOTED_RULE_PARITY`: the stale-quotation scan as a fleet check (NEW CHECK; readiness 12 → 13)
+
+* **The defect (torrent E-069, 2026-09-04).** `src/torrent/mlops/hard_stops.py:48`
+  at `cec1c48` stored the D2 sentence; true on its branch, false at the merge
+  with S-5, "invisible to single-PR review by construction". Three repo copies
+  of `verify_one_sided_placebo_register.py --mode check` scan for one typed
+  phrase and exempt themselves by a typed path.
+* **What it reads, none of it typed.** Current clauses = `CLAUDE.md`'s
+  `## Hard stops` bullets at HEAD; superseded clauses = every prior bullet on
+  the tree's own `git log -- CLAUDE.md` ∪ the register's
+  `the_rule_it_replaces`, minus current; exemptions = the register's
+  `source_files_quoting_the_replaced_sentence` (`REGISTERED`, disclosed) and
+  `how_this_is_enforced.scanner` (`ENFORCEMENT`). Tokens are lowercase
+  alphanumeric runs and the clause digest is over tokens, so reflow and
+  re-quoting are silent (regenerate, never restamp).
+* **Discriminator, fixed by measurement before the code.** `STALE_QUOTATION`:
+  a 4-token window of a superseded clause absent from every current clause
+  (four is the register's own replaced phrase). `SECOND_COPY`: an 8-token
+  window of a current clause, excluding windows a superseded clause shares
+  (measured: torrent main's repaired module paraphrases the clause with a
+  5-token overlap; a paraphrase is not a copy). Verdict surface: committed
+  blobs under `[source] trees` + `mlkit_bindings.py`. `reports/` is disclosed
+  (`tied`/`untied`/`stale`), never failed.
+* **The drive of record** (`scripts/r13_fleet_drive.py` →
+  `reports/R13_FLEET_DRIVE.{json,md}`), on detached worktrees at the three
+  mains and on the historical merge built with M-3's machinery:
+  - torrent `d34649f`: **PASS**, 0 findings (the register's scanner exempt).
+  - torrent `cec1c48` alone: `SECOND_COPY` ×2, **no** `STALE_QUOTATION` — the
+    clause was current there.
+  - torrent `cec1c48 ⊕ 5052c71`: **`STALE_QUOTATION` at
+    `src/torrent/mlops/hard_stops.py:48`** — E-069 reproduced from git; the
+    `.gitignore` conflict on that pair was left UNRESOLVED (git's partial tree
+    driven; R13 never reads `.gitignore`).
+  - chokepoint `512ab25`: **FAIL, 1 finding** the prereg predicted at 0:
+    `scripts/run_foundation_full_val_ladder.py:227` keeps the superseded
+    prereg paragraph "verbatim as the historical record" in a docstring, and
+    it carries an 8-token run of the E1 clause. The two `hard_stops.py` sites
+    are `REGISTERED`.
+  - fray `76f0dde`: **FAIL, 2 findings** the prereg predicted at 1: the
+    predicted unlisted E1 copy at `scripts/measure_nass_condition_block.py:956`
+    (emitted into an artifact's `statement`), and a **stale D2 sentence the
+    S-5 scanner could not see**: `scripts/measure_avoided_loss_basis_risk.py:1278`
+    prints "D2 HARD STOP: the placebo estimate's confidence interval EXCLUDES
+    ZERO. The repo HALTS." — the pre-S-5 rule, capitalised past a
+    case-sensitive exact-string grep.
+  Both mispredictions are in the FIRING direction and both sites are the
+  defect class the check exists for; they are findings for the adopters, not
+  tuning targets. Neither adopter copy of the scanner is retired here (each
+  repo's own change, rule 7).
+* **Verdict change on unchanged adopter code: one new row per repo** (R13;
+  FAIL on fray and chokepoint main, PASS on torrent main). No existing row
+  moves; readiness denominator 12 → 13, gating checks 28 → 29, registry
+  33 → 34. Controls: `tests/test_quoted_rule_parity.py` (K3–K9 both ways,
+  including the reflow pair, the paraphrase falsifier, the register
+  check-not-dead pair, the disclosed-artifact surface, the working tree
+  ignored). Prereg: `reports/M2_QUOTED_RULE_PARITY_PREREGISTRATION.md`.
+
 ## v0.6.0 — 2026-09-01
 
 Not yet tagged. `v0.5.0` **is** tagged — annotated tag object `15a188b` on
