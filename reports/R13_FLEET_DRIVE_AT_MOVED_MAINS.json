@@ -1,26 +1,26 @@
 {
  "artifact_schema": "resilient-mlkit/r13-fleet-drive/1",
  "generated_by": "scripts/r13_fleet_drive.py",
- "generated_at_utc": "2026-09-04T18:38:10+00:00",
+ "generated_at_utc": "2026-09-05T13:27:36+00:00",
  "mlkit_version": "0.7.0",
  "mlkit_build": {
-  "stamp": "0.7.0+src.684676356d4b",
+  "stamp": "0.7.0+src.13cf968239eb",
   "version": "0.7.0",
-  "source_sha256": "684676356d4ba9f2fc50c71631e6e4463d2ba2df72935b11756d97c0d8b23cbf",
+  "source_sha256": "13cf968239eb32ba0dc3a45e6722627ab76bc68c10479ecad3f3ec9a6cb2dbd4",
   "files": 37,
   "root_kind": "checkout",
   "root_name": "resilient_mlkit",
   "vcs_commit": null,
   "vcs_url": null,
-  "vcs_reason": "installed from a local `file://` directory as an editable install, which records no vcs commit_id",
+  "vcs_reason": "2 installed resilient-mlkit distribution(s) were found and none of them describes the running tree `resilient_mlkit` (checkout); the metadata on this machine belongs to some other mlkit, so it is not reported as this one's",
   "unavailable": ""
  },
- "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v3-m1m3/src/resilient_mlkit/__init__.py",
+ "mlkit_imported_from": "`resilient_mlkit` (checkout)",
  "rows": [
   {
    "label": "fray@fray-main2",
    "repo": "fray",
-   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/fray-main2",
+   "tree_name": "fray-main2",
    "git_sha": "a17e1cfded8d306936e840348aba21ec4d6f14d1",
    "status": "FAIL",
    "reason": "2 quotation(s) of a hard-stop clause in committed source that the register does not list: scripts/measure_avoided_loss_basis_risk.py:1278 STALE_QUOTATION of the D2 clause (448dc718c32b) \u2014 \"confidence interval excludes zero\" (+1 more). A sentence about a rule, living in source and emitted into artifacts, goes stale the moment the rule moves (E-056, E-069). Read the document at run ti \u2026[truncated]",
@@ -124,7 +124,7 @@
   {
    "label": "chokepoint@cp-main2",
    "repo": "chokepoint",
-   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/cp-main2",
+   "tree_name": "cp-main2",
    "git_sha": "aa11801cc72fc5f47025e8bef3539984da03ddf4",
    "status": "FAIL",
    "reason": "1 quotation(s) of a hard-stop clause in committed source that the register does not list: scripts/run_foundation_full_val_ladder.py:227 SECOND_COPY of the E1 clause (HEAD) \u2014 \"flat between 10 and 25 of the data\". A sentence about a rule, living in source and emitted into artifacts, goes stale the moment the rule moves (E-056, E-069). Read the document at run time; do not store the sentence",
@@ -219,7 +219,7 @@
   {
    "label": "torrent@tor-main2",
    "repo": "torrent",
-   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/tor-main2",
+   "tree_name": "tor-main2",
    "git_sha": "29bc0892cccf76f6a3e04fe8bc881f70d83bc0d5",
    "status": "PASS",
    "reason": "",

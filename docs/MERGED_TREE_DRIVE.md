@@ -55,12 +55,71 @@ carries it.
 merged tree IS the branch tree, and the drive must equal a plain drive of HEAD
 (that is asserted in `tests/test_merged_tree_drive.py::test_t3_…`).
 
-Limits, said plainly: the temporary worktree holds **committed content only**.
-No gitignored staged panel travels with it, so a binding-dependent check renders
-what it renders on any clean clone — with M-1, `UNMEASURABLE` once the binding
-raises `InputUnavailable`. The AST-walking checks (R10/R11/R12) and the
-committed-declaration checks (D2's `[placebo]`, D3's `[coverage]`, E1's
-`[scaling]`) measure exactly as they do on the branch.
+## The worktree holds committed content only — and now says so (REPAIR, 2026-09-05)
+
+The temporary worktree is built from **tree objects**, so it holds **committed
+content only**: no gitignored staged panel travels with it. That limit was
+disclosed here and in `core/merged.py` and enforced nowhere, and the adjudicator
+measured the consequence. Driven against a real fray clone at `a18c447`, before
+this repair:
+
+```
+D2 PASS   estimate=-0.945, ci_low=-4.239, ci_high=+2.441      ← inputs never established
+D3 PASS   nominal=0.8, empirical=0.7944664031620553, n=253    ← inputs never established
+D6 FAIL   resampling_declaration raised TemporalSplitIdentityMismatch …
+E1 FAIL   scaling_probe raised TemporalSplitIdentityMismatch …
+```
+
+Two of those are an **environment failure rendered as a verdict**, in the shape
+each repo's own `hard_stops.py` reads as a fired stop — the exact conflation
+M-1's `UNMEASURABLE` exists to end, reappearing inside the tool meant to end it.
+It is the same class of defect fray #115 landed: an artifact recording that a
+promotion-gate re-run was NOT identical, when the re-run's inputs were absent
+and it had measured nothing.
+
+**What a repo declares.** An optional `[inputs]` table in `.mlkit/repo.toml`,
+keyed by BINDING NAME, listing the repo-relative paths that binding reads:
+
+```toml
+[inputs]
+placebo_test           = ["data/cache/nass_yields.json"]
+coverage               = ["data/cache/nass_yields.json"]
+resampling_declaration = ["data/cache/nass_yields.json"]
+scaling_probe          = ["data/cache/nass_yields.json"]
+metric_known_answer    = []   # reads nothing outside the committed tree
+```
+
+`[]` is a **positive declaration**, not an absence.
+
+**What the drive now does**, and only on `--merged-with`:
+
+| the binding | the row |
+|---|---|
+| declares inputs this tree carries | **driven**, renders whatever it renders |
+| declares `[]` | **driven** |
+| declares inputs this tree does NOT carry | **UNMEASURABLE**, naming the absent path |
+| declares nothing at all | **UNMEASURABLE**, naming the binding and this recipe |
+
+Never FAIL and never PASS. Exit stays `3` (unmeasured is not green, and is not
+the FAIL exit — CI gating on `1` must not read an absent panel as a broken
+repo), and no `halt` key is ever attached: nothing is indicted.
+
+**The last row is the fail-closed direction and it has a price, stated
+plainly.** The tree provably holds committed content only; whether a binding
+needs more than that is a fact only the repo knows; so with no declaration mlkit
+cannot *establish* that the input is present, and an unestablished input may be
+rendered as unmeasured but never as a verdict. The price is that a real
+merged-tree finding on an undeclared binding — E-069's own shape — renders
+UNMEASURABLE until the repo adds one line of TOML. That is driven, not asserted,
+in `tests/test_merged_tree_input_guard.py::test_b6_the_undeclared_refusal_masks_a_merge_defect_and_names_the_remedy`.
+
+A plain drive is untouched: the guard is armed only on the merged worktree.
+Measured on the same fray clone, pre- and post-repair plain drives of
+`selection`, `readiness`, `decision` and `economics` are row-for-row identical.
+
+The AST-walking checks (R10/R11/R12/R13) and the committed-declaration checks
+(D2's `[placebo]`, D3's `[coverage]`, E1's `[scaling]`) resolve no binding and
+measure exactly as they do on the branch.
 
 ## Recipe 2 — after any merge, verify containment per PR
 
@@ -108,4 +167,5 @@ on fray, and the same shape on chokepoint and torrent).
 | T2 | a conflict is refused, never resolved | exit 2, `.mlkit/repo.toml` named, one worktree left, no results dir |
 | T3 | silent when the merge is the branch | base ∈ ancestors(head) → merge tree == head tree, statuses equal, stamp says so |
 | T4/T5 | no side effect; stamp names both parents | real store untouched, HEAD unmoved, `git rev-list --parents` == `[head, base]`, results stamped with the synthetic commit |
+| B1–B7 | the input guard (`tests/test_merged_tree_input_guard.py`) | undeclared → UNMEASURABLE; declared-and-absent → UNMEASURABLE naming the path; declared-and-present and `[]` → the check RUNS (check-not-dead); a plain drive unchanged; a malformed declaration refuses rather than loosens; an import-time `InputUnavailable` is still `PREMATURE_INPUT_REFUSAL` FAIL |
 | A1–A3 | ancestry | a commit merged into a feature branch is NOT CONTAINED in main (exit 1) and CONTAINED in the feature branch (exit 0); an unresolvable ref exits 2 |

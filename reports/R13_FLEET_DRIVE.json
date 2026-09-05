@@ -1,25 +1,26 @@
 {
  "artifact_schema": "resilient-mlkit/r13-fleet-drive/1",
  "generated_by": "scripts/r13_fleet_drive.py",
- "generated_at_utc": "2026-09-04T18:22:58+00:00",
+ "generated_at_utc": "2026-09-05T13:26:29+00:00",
  "mlkit_version": "0.7.0",
  "mlkit_build": {
-  "stamp": "0.7.0+src.4e61de85a381",
+  "stamp": "0.7.0+src.13cf968239eb",
   "version": "0.7.0",
-  "source_sha256": "4e61de85a3811319e6ea5347e66516917c6418b0477748bd261f93fad4f7929c",
-  "files": 36,
-  "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v3-m1m3/src/resilient_mlkit",
+  "source_sha256": "13cf968239eb32ba0dc3a45e6722627ab76bc68c10479ecad3f3ec9a6cb2dbd4",
+  "files": 37,
+  "root_kind": "checkout",
+  "root_name": "resilient_mlkit",
   "vcs_commit": null,
   "vcs_url": null,
-  "vcs_reason": "installed from `file:///private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v3-m1m3` as an editable directory, which records no vcs commit_id",
+  "vcs_reason": "2 installed resilient-mlkit distribution(s) were found and none of them describes the running tree `resilient_mlkit` (checkout); the metadata on this machine belongs to some other mlkit, so it is not reported as this one's",
   "unavailable": ""
  },
- "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v3-m1m3/src/resilient_mlkit/__init__.py",
+ "mlkit_imported_from": "`resilient_mlkit` (checkout)",
  "rows": [
   {
    "label": "fray@fray-main",
    "repo": "fray",
-   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/fray-main",
+   "tree_name": "fray-main",
    "git_sha": "76f0ddebfd62931c8af37479e58b8957664c281e",
    "status": "FAIL",
    "reason": "2 quotation(s) of a hard-stop clause in committed source that the register does not list: scripts/measure_avoided_loss_basis_risk.py:1278 STALE_QUOTATION of the D2 clause (448dc718c32b) \u2014 \"confidence interval excludes zero\" (+1 more). A sentence about a rule, living in source and emitted into artifacts, goes stale the moment the rule moves (E-056, E-069). Read the document at run ti \u2026[truncated]",
@@ -123,7 +124,7 @@
   {
    "label": "chokepoint@cp-main",
    "repo": "chokepoint",
-   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/cp-main",
+   "tree_name": "cp-main",
    "git_sha": "512ab25449bf573edded4d4ab7993a0bd8ed2c26",
    "status": "FAIL",
    "reason": "1 quotation(s) of a hard-stop clause in committed source that the register does not list: scripts/run_foundation_full_val_ladder.py:227 SECOND_COPY of the E1 clause (HEAD) \u2014 \"flat between 10 and 25 of the data\". A sentence about a rule, living in source and emitted into artifacts, goes stale the moment the rule moves (E-056, E-069). Read the document at run time; do not store the sentence",
@@ -218,7 +219,7 @@
   {
    "label": "torrent@tor-main",
    "repo": "torrent",
-   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/tor-main",
+   "tree_name": "tor-main",
    "git_sha": "d34649f8e140637d8d8a7bc2d123f60b9e644ee2",
    "status": "PASS",
    "reason": "",
@@ -282,7 +283,7 @@
   {
    "label": "torrent@tor-cec1c48",
    "repo": "torrent",
-   "path": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/v3wt/tor-cec1c48",
+   "tree_name": "tor-cec1c48",
    "git_sha": "cec1c48004831747968e7250b8d8cf51eb9c0030",
    "status": "FAIL",
    "reason": "2 quotation(s) of a hard-stop clause in committed source that the register does not list: src/torrent/mlops/hard_stops.py:4 SECOND_COPY of the E1 clause (HEAD) \u2014 \"an e1 scaling curve that is flat between\" (+1 more). A sentence about a rule, living in source and emitted into artifacts, goes stale the moment the rule moves (E-056, E-069). Read the document at run time; do not store the sentence",
@@ -336,8 +337,8 @@
   {
    "label": "torrent@merge(cec1c48+5052c71)",
    "repo": "torrent",
-   "path": "/var/folders/bv/c64zv7nj0x32wbcswjvxwnzr0000gn/T/mlkit-merged-l3txp2aw/resilient-torrent",
-   "git_sha": "b188d353aea907c077128e5988b5e4abac760d19",
+   "tree_name": "resilient-torrent",
+   "git_sha": "48f0a1e96115fc310bc81cee67102dd3e17819a1",
    "status": "FAIL",
    "reason": "2 quotation(s) of a hard-stop clause in committed source that the register does not list: src/torrent/mlops/hard_stops.py:4 SECOND_COPY of the E1 clause (HEAD) \u2014 \"an e1 scaling curve that is flat between\" (+1 more). A sentence about a rule, living in source and emitted into artifacts, goes stale the moment the rule moves (E-056, E-069). Read the document at run time; do not store the sentence",
    "files_scanned": 611,
@@ -421,7 +422,7 @@
     "base_ref": "5052c71",
     "base_sha": "5052c71faf5fa0b0602eeb4b2b5325115735bd9d",
     "merge_tree": "03d23bb374a8fa586ac884687542aa6586ff3147",
-    "merge_commit": "b188d353aea907c077128e5988b5e4abac760d19",
+    "merge_commit": "48f0a1e96115fc310bc81cee67102dd3e17819a1",
     "identical_to_head": false,
     "conflicted_paths_left_unresolved": [
      ".gitignore"

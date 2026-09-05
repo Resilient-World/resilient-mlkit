@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from . import inputs
 from .result import InputUnavailable, PrematureInputRefusal
 
 #: The eight avoided-loss model repos, in the portfolio's canonical order.
@@ -48,6 +49,14 @@ class Repo:
 
     name: str
     path: Path
+    #: Set ONLY by ``mlkit check --merged-with`` on the temporary worktree it
+    #: drives. That worktree is built from tree objects, so it holds committed
+    #: content only and cannot carry a gitignored panel. With this set,
+    #: ``resolve`` refuses a binding whose declared inputs this tree does not
+    #: hold -- and a binding that declares none at all -- as
+    #: ``InputUnavailable``, which the runner renders UNMEASURABLE. See
+    #: ``core.inputs``. False everywhere else, so a plain drive is unchanged.
+    require_declared_inputs: bool = False
     #: Modules imported from inside this repo, accumulated across binding
     #: imports and binding calls, evicted together in release().
     _imported: set[str] = field(default_factory=set, repr=False, compare=False)
@@ -113,6 +122,13 @@ class Repo:
             raise BindingError(
                 f"{self.name}: no '{name}' binding declared in .mlkit/repo.toml"
             )
+        # BEFORE the import, and before any subject code runs: can this TREE
+        # supply what this binding reads? Only a merged-tree drive asks. The
+        # refusal is mlkit's own and is raised outside the import below, so it
+        # is never a PrematureInputRefusal -- that name is reserved for a
+        # SUBJECT module refusing during its own import.
+        if self.require_declared_inputs:
+            inputs.guard(self, name)
         if ":" not in spec:
             raise BindingError(
                 f"{self.name}: binding '{name}' must be 'module.path:callable', got {spec!r}"

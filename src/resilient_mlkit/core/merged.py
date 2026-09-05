@@ -115,6 +115,26 @@ class MergedTree:
         ]
 
 
+def commit_env() -> dict[str, str]:
+    """The environment every synthetic merge commit is made under.
+
+    Deterministic identity and dates so the same tree pair yields the same
+    commit id across drives and across machines; the TREE is the durable stamp
+    anyway, but a record that quotes a commit id should be able to quote the
+    same one twice. Exported rather than inlined because
+    ``scripts/r13_fleet_drive.py`` makes the PARTIAL merge commit for the
+    historical E-069 case itself, and made it without this -- so that one row
+    of an otherwise reproducible record carried a different id on every run.
+    """
+    return {
+        "GIT_AUTHOR_NAME": "mlkit", "GIT_AUTHOR_EMAIL": "mlkit@resilient.world",
+        "GIT_COMMITTER_NAME": "mlkit", "GIT_COMMITTER_EMAIL": "mlkit@resilient.world",
+        "GIT_AUTHOR_DATE": "2000-01-01T00:00:00Z", "GIT_COMMITTER_DATE": "2000-01-01T00:00:00Z",
+        "PATH": os.environ.get("PATH", ""),
+        "HOME": os.environ.get("HOME", ""),
+    }
+
+
 def _git(path: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", "-C", str(path), *args], capture_output=True, text=True, check=False
@@ -169,15 +189,7 @@ def build(repo_path: Path, base_ref: str, head_ref: str = "HEAD") -> MergedTree:
          "-m", f"mlkit --merged-with {base_ref}: synthetic merge of {head_sha[:12]} with "
                f"{base_sha[:12]}; not on any branch; discarded after the drive"],
         capture_output=True, text=True, check=False,
-        env={
-            # Deterministic identity so the same tree pair yields the same
-            # commit id across drives; the TREE is the durable stamp anyway.
-            "GIT_AUTHOR_NAME": "mlkit", "GIT_AUTHOR_EMAIL": "mlkit@resilient.world",
-            "GIT_COMMITTER_NAME": "mlkit", "GIT_COMMITTER_EMAIL": "mlkit@resilient.world",
-            "GIT_AUTHOR_DATE": "2000-01-01T00:00:00Z", "GIT_COMMITTER_DATE": "2000-01-01T00:00:00Z",
-            "PATH": os.environ.get("PATH", ""),
-            "HOME": os.environ.get("HOME", ""),
-        },
+        env=commit_env(),
     )
     if committed.returncode != 0:
         raise GitUnavailable(f"git commit-tree failed: {committed.stderr.strip()}")
