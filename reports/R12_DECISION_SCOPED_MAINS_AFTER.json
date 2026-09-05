@@ -87,16 +87,16 @@
   "files": 38,
   "root_kind": "checkout",
   "root_name": "resilient_mlkit",
-  "source_sha256": "4a17b84cb8533d3ff22013bf271eb05e298c338fc851b7df74da116d86c56b11",
-  "stamp": "0.7.0+src.4a17b84cb853",
+  "source_sha256": "2de05d676b69cff3af6074fa2c1dde77b43d12c11d5760c60ed7948de165fc16",
+  "stamp": "1.0.0+src.2de05d676b69",
   "unavailable": "",
   "vcs_commit": null,
   "vcs_reason": "the dist carries no direct_url.json (not a direct install)",
   "vcs_url": null,
-  "version": "0.7.0"
+  "version": "1.0.0"
  },
  "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/mlkit/src/resilient_mlkit/__init__.py",
- "mlkit_version": "0.7.0",
+ "mlkit_version": "1.0.0",
  "report_type": "r12_decision_scoped_exemption_drive",
  "scanner_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/mlkit/src/resilient_mlkit/core/served_reimplementation.py"
 }
