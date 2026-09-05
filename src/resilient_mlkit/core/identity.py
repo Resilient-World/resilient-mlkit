@@ -320,13 +320,13 @@ def digest_tree(root: Path) -> tuple[str | None, int, str]:
     an unknown subset is a number that looks like an identity and is not one.
     """
     if not root.is_dir():
-        return None, 0, f"package root {root} is not a directory"
+        return None, 0, f"package root {root_as_kind(root)} is not a directory"
     try:
         files = shipped_files(root)
     except OSError as exc:
-        return None, 0, f"could not walk {root}: {exc}"
+        return None, 0, f"could not walk {root_as_kind(root)}: {exc}"
     if not files:
-        return None, 0, f"no shipped files found under {root}"
+        return None, 0, f"no shipped files found under {root_as_kind(root)}"
 
     h = hashlib.sha256()
     for path in files:
@@ -414,6 +414,28 @@ def _dist_name(dist: object) -> str:
         return ""
 
 
+def root_as_kind(root: Path) -> str:
+    """``root`` named the way M-5 requires: a KIND and a basename, no directory.
+
+    ``BuildIdentity.root_kind`` / ``root_name`` already do this for the fields
+    and for ``context_line``. This is the same rule for the one place that had
+    been missed: ``vcs_reason``, which is a FIELD of ``to_dict()`` and so
+    travels inside ``mlkit_build`` into every artifact an adopter stamps. Two
+    of its branches interpolated the absolute package root, so an artifact
+    stamped from a checkout named that machine -- and
+    ``artifact.write_artifact`` refuses such an artifact, which is how this was
+    found: mlkit's own writer would not write mlkit's own identity.
+    """
+    parts = root.parts
+    if "site-packages" in parts or "dist-packages" in parts:
+        kind = "site-packages"
+    elif root.parent.name == "src" and (root.parent.parent / "pyproject.toml").is_file():
+        kind = "checkout"
+    else:
+        kind = "other"
+    return f"`{root.name}` ({kind})"
+
+
 def _vcs_of_installed_dist(root: Path) -> tuple[str | None, str | None, str]:
     """``(commit, url, reason)`` from the installed dist's ``direct_url.json``.
 
@@ -468,12 +490,13 @@ def _vcs_of_installed_dist(root: Path) -> tuple[str | None, str | None, str]:
     if seen:
         return None, None, (
             f"{seen} installed {DIST_NAME} distribution(s) were found and none "
-            f"of them describes {root}; the metadata on this machine belongs to "
-            "some other mlkit, so it is not reported as this one's"
+            f"of them describes the running tree {root_as_kind(root)}; the metadata "
+            "on this machine belongs to some other mlkit, so it is not reported "
+            "as this one's"
         )
     return None, None, (
-        f"no installed {DIST_NAME} distribution was found; {root} is on the "
-        "import path without being an installed dist"
+        f"no installed {DIST_NAME} distribution was found; the running tree "
+        f"{root_as_kind(root)} is on the import path without being an installed dist"
     )
 
 
@@ -505,9 +528,10 @@ def one_tree_or_reason(root: Path) -> str:
     if entries == [str(root)]:
         return ""
     return (
-        f"resilient_mlkit.__path__ is {entries!r}, not exactly [{str(root)!r}]; "
-        "the package is not one directory on this interpreter, so a digest of "
-        "one directory would describe only part of the instrument that ran"
+        f"resilient_mlkit.__path__ holds {len(entries)} entr(y/ies), not exactly "
+        f"the one running tree {root_as_kind(root)}; the package is not one "
+        "directory on this interpreter, so a digest of one directory would "
+        "describe only part of the instrument that ran"
     )
 
 

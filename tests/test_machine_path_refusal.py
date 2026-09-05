@@ -200,3 +200,146 @@ def test_record_refuses_a_module_without_a_file_and_a_repo_local_module_outside_
     assert entry["inside_repo"] is False and entry["repo_relative_path"] is None
     assert "why_no_repo_relative_path" in entry and len(entry["sha256"]) == 64
     assert module_bindings.problems(doc, root=root) == []
+
+
+# ---------------------------------------------------------------------------
+# P8 -- THE PRODUCING SCRIPT GOES THROUGH THE WRITER
+#
+# The adjudicator's finding, 2026-09-05: `reports/R13_FLEET_DRIVE_AT_MOVED_MAINS.json`
+# -- this stack's OWN drive of record for M-2, committed AFTER M-5 -- carried
+# four machine paths, because `scripts/r13_fleet_drive.py` wrote it with a bare
+# `Path.write_text`. A refusal the producing script walks around is theatre.
+# These hold the drive to its own writer.
+# ---------------------------------------------------------------------------
+
+DRIVE_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "r13_fleet_drive.py"
+
+
+def _load_drive():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("_r13_fleet_drive_under_test", DRIVE_SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def _tree(tmp_path: Path, name: str) -> Path:
+    """A minimal git worktree R13 can be driven over."""
+    import subprocess
+
+    root = tmp_path / name
+    (root / "src").mkdir(parents=True)
+    (root / "src" / "m.py").write_text("X = 1\n")
+    (root / "CLAUDE.md").write_text("# rules\n\nNothing quoted here.\n")
+    for args in (
+        ["init", "-q", "-b", "main"],
+        ["-c", "user.name=t", "-c", "user.email=t@t", "add", "-A"],
+        ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "seed"],
+    ):
+        subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+    return root
+
+
+def test_p8_the_drive_holds_no_bare_write_text_of_its_record():
+    """The defect, held down at the source: no `Path.write_text` of an output."""
+    body = DRIVE_SCRIPT.read_text()
+    assert "out.write_text(" not in body
+    assert "out_md.write_text(" not in body
+    assert "artifact.write_artifact(" in body
+    assert "artifact.write_text_artifact(" in body
+
+
+def test_p8_silent_arm_the_repaired_drive_writes_a_record_with_no_machine_path(tmp_path):
+    drive = _load_drive()
+    tree = _tree(tmp_path, "resilient-fray")
+    out = tmp_path / "out" / "record.json"
+    out_md = tmp_path / "out" / "record.md"
+    rc = drive.main(["--tree", f"fray={tree}", "--out", str(out), "--out-md", str(out_md)])
+    assert rc == 0
+    record = json.loads(out.read_text())
+    assert artifact.machine_paths(record) == []
+    assert artifact.machine_paths_in_text(out_md.read_text()) == []
+    # The row names the tree by a resolvable sha and a basename, never a path.
+    row = record["rows"][0]
+    assert "path" not in row
+    assert row["tree_name"] == "resilient-fray"
+    assert len(row["git_sha"]) == 40
+
+
+def test_p8_fires_arm_a_machine_path_in_the_record_is_refused_and_nothing_is_written(tmp_path):
+    drive = _load_drive()
+    tree = _tree(tmp_path, "resilient-fray")
+    out = tmp_path / "out" / "record.json"
+    out_md = tmp_path / "out" / "record.md"
+    rc = drive.main([
+        "--tree", f"fray={tree}",
+        "--out", str(out), "--out-md", str(out_md),
+        "--control-reintroduce-machine-path", str(tmp_path),
+    ])
+    assert rc == 2
+    assert not out.exists()
+    assert not out_md.exists()
+
+
+# ---------------------------------------------------------------------------
+# P9 -- the RENDERING is refused on the same terms as the record
+# ---------------------------------------------------------------------------
+
+
+def test_p9_a_directory_inside_a_markdown_table_cell_is_refused(tmp_path):
+    root = _repo(tmp_path)
+    text = "| tree | path |\n|---|---|\n| fray | `/private/tmp/claude-501/x/scratchpad/fray` |\n"
+    found = artifact.machine_paths_in_text(text)
+    assert [v for _, v in found] == ["/private/tmp/claude-501/x/scratchpad/fray"]
+    with pytest.raises(artifact.MachinePathRefused):
+        artifact.write_text_artifact(root, "reports/x.md", text)
+    assert not (root / "reports" / "x.md").exists()
+
+
+def test_p9_json_pointers_and_urls_in_prose_stay_silent(tmp_path):
+    root = _repo(tmp_path)
+    text = (
+        "- pointer `/hard_stops/e1/gain` is fine\n"
+        "- see https://example.com/a/b and `docs/allowlist.yaml`\n"
+    )
+    assert artifact.machine_paths_in_text(text) == []
+    assert artifact.write_text_artifact(root, "reports/ok.md", text).read_text() == text
+
+
+# ---------------------------------------------------------------------------
+# P10 -- mlkit's OWN identity carries no directory in any field
+#
+# `to_dict()` dropped `root` for M-5, but `vcs_reason` and `unavailable` are
+# also fields of it and two of their branches interpolated the absolute package
+# root. Both travel inside `mlkit_build` into every artifact an adopter stamps,
+# which is how mlkit's own writer came to refuse mlkit's own identity.
+# ---------------------------------------------------------------------------
+
+
+def test_p10_root_as_kind_names_a_kind_and_a_basename_never_a_directory(tmp_path):
+    src = tmp_path / "src" / "resilient_mlkit"
+    src.mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("[project]\n")
+    named = identity.root_as_kind(src)
+    assert named == "`resilient_mlkit` (checkout)"
+    assert str(tmp_path) not in named
+    assert artifact.machine_paths_in_text(named) == []
+
+
+def test_p10_no_identity_field_names_a_directory_on_any_branch(tmp_path):
+    """Every reason branch, forced, not merely the one this machine takes."""
+    absent = tmp_path / "no-such-tree" / "resilient_mlkit"
+    for reason in (
+        identity.digest_tree(absent)[2],
+        identity._vcs_of_installed_dist(absent)[2],
+        identity.one_tree_or_reason(absent),
+    ):
+        assert artifact.machine_paths_in_text(reason) == [], reason
+        assert str(tmp_path) not in reason
+
+    d = identity.build_identity().to_dict()
+    for key, value in d.items():
+        if isinstance(value, str):
+            assert artifact.machine_paths_in_text(value) == [], f"{key}: {value}"

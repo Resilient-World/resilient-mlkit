@@ -202,6 +202,50 @@ and M-3 (and M-2 where it lands on the same line).
   V3-11 is each repo's). Prereg:
   `reports/M5_MACHINE_PATH_REFUSAL_PREREGISTRATION.md`.
 
+### REPAIR (2026-09-05) — the fleet drive writes through the writer it ships
+
+* **The defect, found by the v3 adjudicator.** This stack's own drive of
+  record, `reports/R13_FLEET_DRIVE_AT_MOVED_MAINS.json` (committed *after*
+  M-5), carried **four** machine paths, and `reports/R13_FLEET_DRIVE.json`
+  carried **seven** — because `scripts/r13_fleet_drive.py` wrote both with a
+  bare `Path.write_text`. `write_artifact` refuses those payloads by name when
+  they are fed back to it. A refusal the producing script walks around is
+  theatre, and the adjudicator called it that.
+* **The root cause, fixed in the script.** Both outputs now go through
+  `core.artifact`: `write_artifact` for the record, and a new
+  `write_text_artifact` for the rendering, so the markdown is refused on the
+  same terms as the JSON (`machine_paths_in_text`, the same discriminator over
+  document tokens). The drive can now **refuse to record itself**, exits 2 when
+  it does, and writes nothing at all in that case.
+* **What replaced the paths.** A row names its tree by `git_sha` (resolvable
+  from the remote by any reader) and `tree_name` (a basename); `path` is gone.
+  `mlkit_file` becomes `mlkit_imported_from`, which carries the
+  kind-and-basename form. Both artifacts and both renderings were
+  **REGENERATED** by the repaired script on the trees they describe. **No R13
+  verdict moved**: fray FAIL 2, chokepoint FAIL 1, torrent PASS at the moved
+  mains; all five rows identical in the earlier record, including the E-069
+  merged row, whose merge tree is byte-identical (`03d23bb374a8`).
+* **`core.identity` no longer names a directory in any field.** `to_dict()`
+  dropped `root` for M-5, but two `vcs_reason` branches and three `unavailable`
+  branches interpolated the absolute package root — and both fields travel
+  inside `mlkit_build` into every artifact an adopter stamps. New
+  `identity.root_as_kind()` renders the running tree as `` `resilient_mlkit`
+  (checkout) ``. This is what made two of M-5's own tests fail on any machine
+  where the installed dist describes a different checkout; both pass now.
+* **`core.merged.commit_env()`** is exported so the drive's PARTIAL-merge
+  commit is made under the same deterministic identity `merged.build` uses.
+  The whole record is now reproducible except its timestamp; before, one row's
+  commit id moved on every run.
+* **Control pair, driven, committed** —
+  `reports/validation/R13_DRIVE_WRITER_CONTROL.json` via
+  `scripts/r13_drive_writer_control.py`. FIRES: with
+  `--control-reintroduce-machine-path` the drive exits 2 and neither output
+  exists. SILENT: the same drive over the same three trees writes a record with
+  zero machine paths in the JSON and zero in the markdown, fray FAIL 2 /
+  chokepoint FAIL 1 / torrent PASS. CHECK-NOT-DEAD: poisoning one row of that
+  same silent record makes the writer refuse it.
+
+
 ## v0.6.0 — 2026-09-01
 
 Not yet tagged. `v0.5.0` **is** tagged — annotated tag object `15a188b` on

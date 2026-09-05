@@ -1,0 +1,62 @@
+{
+ "artifact_schema": "resilient-mlkit/r13-drive-writer-control/1",
+ "generated_by": "scripts/r13_drive_writer_control.py",
+ "generated_at_utc": "2026-09-05T13:29:54+00:00",
+ "mlkit_version": "0.7.0",
+ "mlkit_build": {
+  "stamp": "0.7.0+src.13cf968239eb",
+  "version": "0.7.0",
+  "source_sha256": "13cf968239eb32ba0dc3a45e6722627ab76bc68c10479ecad3f3ec9a6cb2dbd4",
+  "files": 37,
+  "root_kind": "checkout",
+  "root_name": "resilient_mlkit",
+  "vcs_commit": null,
+  "vcs_url": null,
+  "vcs_reason": "2 installed resilient-mlkit distribution(s) were found and none of them describes the running tree `resilient_mlkit` (checkout); the metadata on this machine belongs to some other mlkit, so it is not reported as this one's",
+  "unavailable": ""
+ },
+ "arms": [
+  {
+   "arm": "FIRES",
+   "what_was_reintroduced": "a machine path in the record the drive writes",
+   "exit_code": 2,
+   "refused": true,
+   "json_written": false,
+   "md_written": false,
+   "stderr_tail": "REFUSED: REFUSED to write fires.json: 1 value(s) name a path on THIS machine, which no reader can resolve or check: /control_reintroduced = <the injected directory>. Record a repo module as repo-relative path + sha256 (resilient_mlkit.core.module_bindings.record) and mlkit by identity (resilient_mlkit.build_identity().to_dict(): stamp / source_sha256 / vcs_commit); record a data file by its repo-relative path and digest, or by its declared pin\n"
+  },
+  {
+   "arm": "SILENT",
+   "exit_code": 0,
+   "json_written": true,
+   "md_written": true,
+   "machine_paths_in_record": [],
+   "machine_paths_in_rendering": [],
+   "rows": [
+    {
+     "repo": "fray",
+     "git_sha": "a17e1cfded8d306936e840348aba21ec4d6f14d1",
+     "status": "FAIL",
+     "findings": 2
+    },
+    {
+     "repo": "chokepoint",
+     "git_sha": "aa11801cc72fc5f47025e8bef3539984da03ddf4",
+     "status": "FAIL",
+     "findings": 1
+    },
+    {
+     "repo": "torrent",
+     "git_sha": "29bc0892cccf76f6a3e04fe8bc881f70d83bc0d5",
+     "status": "PASS",
+     "findings": 0
+    }
+   ]
+  },
+  {
+   "arm": "CHECK_NOT_DEAD",
+   "question": "with the same SILENT record, does the discriminator still refuse a directory? Offer it one and see.",
+   "silent_record_refused_when_one_row_names_a_directory": true
+  }
+ ]
+}

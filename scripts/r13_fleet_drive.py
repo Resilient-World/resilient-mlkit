@@ -13,29 +13,60 @@ Usage::
 ``core.merged`` (the M-3 machinery: synthetic commit, temporary worktree,
 refused on conflict), drives R13 on it, and removes the worktree. The historical
 E-069 case is ``torrent=<clone>:cec1c48:5052c71``.
+
+THE RECORD GOES THROUGH mlkit's OWN WRITER
+------------------------------------------
+Until 2026-09-05 this script wrote its record with a bare ``Path.write_text``,
+and so wrote four machine paths into its own committed artifact -- the drive of
+record for M-2, sitting in the same stack as M-5, whose whole claim is that a
+writer refuses exactly that. The refusal was real and the drive walked around
+it. Both outputs now go through ``core.artifact``
+(:func:`~resilient_mlkit.core.artifact.write_artifact` for the JSON,
+:func:`~resilient_mlkit.core.artifact.write_text_artifact` for the rendering),
+which means this drive can REFUSE TO RECORD ITSELF, and does when it would name
+a directory on one machine. Nothing is written in that case: no partial file,
+no half-record under the name a reader trusts.
+
+What replaced the paths is the blessed shape M-5 offers: a tree is named by its
+``git_sha`` (resolvable by any reader) and its basename; mlkit is named by its
+build identity (``stamp`` / ``source_sha256`` / ``vcs_commit``), never by the
+directory it was imported from.
+
+``--control-reintroduce-machine-path VALUE`` is the FIRES arm of the control
+pair: it puts ``VALUE`` back into the record under ``control_reintroduced`` and
+offers the result to the writer. The writer refuses, this script exits 2, and
+the record is not written. It exists so the refusal is DRIVEN rather than
+asserted, and it can only ever cause a refusal.
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime as _dt
-import json
+import os
 import sys
 from pathlib import Path
 
 import resilient_mlkit
 from resilient_mlkit.checks import RunContext
 from resilient_mlkit.checks.parity import r13_quoted_rule_parity
-from resilient_mlkit.core import identity, merged
+from resilient_mlkit.core import artifact, identity, merged
 from resilient_mlkit.core.repo import Repo
 
 
 def _assert_this_checkout() -> str:
+    """Assert the running mlkit IS this checkout, and name it without a directory.
+
+    The assertion still compares absolute paths -- that is the only way to make
+    it -- but what it RETURNS, and therefore what lands in the record, is the
+    kind-and-basename form (``core.identity.root_as_kind``). The directory was
+    the record's first machine path.
+    """
     here = Path(__file__).resolve().parents[1] / "src"
     at = Path(resilient_mlkit.__file__).resolve()
     if not at.is_relative_to(here):
         raise SystemExit(f"resilient_mlkit imported from {at}, not from {here}; refusing to drive")
-    return str(at)
+    return identity.root_as_kind(at.parent)
 
 
 def _drive(name: str, path: Path, label: str) -> dict:
@@ -46,7 +77,10 @@ def _drive(name: str, path: Path, label: str) -> dict:
     return {
         "label": label,
         "repo": name,
-        "path": str(path),
+        # NOT the directory (M-5): a reader cannot resolve one clone's path and
+        # so cannot check anything by it. `git_sha` is what identifies the tree
+        # this row measured, and it is resolvable from the remote by anyone.
+        "tree_name": path.name,
         "git_sha": repo.git_sha,
         "status": result.status.value,
         "reason": result.reason,
@@ -66,7 +100,13 @@ def _partial_merge(clone: Path, base: str, head: str) -> merged.MergedTree:
     import subprocess
 
     def git(*a: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(["git", "-C", str(clone), *a], capture_output=True, text=True, check=False)
+        return subprocess.run(
+            ["git", "-C", str(clone), *a], capture_output=True, text=True, check=False,
+            # The same deterministic identity `core.merged.build` commits
+            # under, so this row's synthetic commit id is reproducible instead
+            # of moving on every drive.
+            env={**os.environ, **merged.commit_env()},
+        )
 
     head_sha = merged.resolve_ref(clone, head)
     base_sha = merged.resolve_ref(clone, base)
@@ -86,6 +126,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--merged", action="append", default=[], metavar="NAME=PATH:HEAD:BASE")
     ap.add_argument("--out", help="write the JSON record here")
     ap.add_argument("--out-md", help="render the record as markdown here (generated; never hand-edit)")
+    ap.add_argument(
+        "--control-reintroduce-machine-path", metavar="VALUE",
+        help="CONTROL (fires arm): put VALUE into the record and prove the writer "
+             "refuses it. Nothing is written and the drive exits 2.",
+    )
     args = ap.parse_args(argv)
 
     mlkit_at = _assert_this_checkout()
@@ -131,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         "generated_at_utc": _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
         "mlkit_version": resilient_mlkit.__version__,
         "mlkit_build": identity.build_identity().to_dict(),
-        "mlkit_file": mlkit_at,
+        "mlkit_imported_from": mlkit_at,
         "rows": rows,
     }
     for row in rows:
@@ -146,16 +191,28 @@ def main(argv: list[str] | None = None) -> int:
         for f in row["enforcement_sites"]:
             print(f"   enforcement {f['kind']} {f['path']}:{f['line']} [{f['clause']}]")
         print(f"   superseded: {[(c['marker'], c['source'][:12]) for c in row['superseded_clauses']]}")
-    if args.out:
-        out = Path(args.out)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(record, indent=1) + "\n")
-        print(f"wrote {out}", file=sys.stderr)
-    if args.out_md:
-        out_md = Path(args.out_md)
-        out_md.parent.mkdir(parents=True, exist_ok=True)
-        out_md.write_text(render_markdown(record))
-        print(f"wrote {out_md}", file=sys.stderr)
+    if args.control_reintroduce_machine_path:
+        # The FIRES arm. Deliberately after the drive and before every write,
+        # so the record offered to the writer is the real one plus the defect.
+        record["control_reintroduced"] = args.control_reintroduce_machine_path
+
+    try:
+        if args.out:
+            out = Path(args.out).resolve()
+            written = artifact.write_artifact(out.parent, out.name, record)
+            print(f"wrote {written.name}", file=sys.stderr)
+        if args.out_md:
+            out_md = Path(args.out_md).resolve()
+            written = artifact.write_text_artifact(
+                out_md.parent, out_md.name, render_markdown(record)
+            )
+            print(f"wrote {written.name}", file=sys.stderr)
+    except artifact.MachinePathRefused as exc:
+        # The drive refuses to record itself rather than writing a record no
+        # reader can check. Nothing was written -- write_artifact is atomic and
+        # refuses before it opens anything.
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        return 2
     return 0
 
 

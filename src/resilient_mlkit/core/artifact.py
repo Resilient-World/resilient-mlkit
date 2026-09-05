@@ -526,6 +526,7 @@ def unresolved(value: Any) -> bool:
 # (``module_bindings.problems``): a string that looks right is not a binding.
 
 import os as _os
+import re as _re
 import tempfile as _tempfile
 
 from . import module_bindings as _module_bindings
@@ -605,6 +606,73 @@ def machine_paths(
     return found
 
 
+#: How a rendered document is broken into candidate path tokens. Markdown puts
+#: paths inside backticks, tables put them between pipes, prose puts them
+#: before a comma or a full stop -- so the split is on everything that is not
+#: plausibly part of a path, and each token is then judged by exactly the
+#: discriminator :func:`machine_paths` uses for a JSON string.
+_TEXT_TOKENS = _re.compile(r"[^A-Za-z0-9_./:\\~+@%-]+")
+
+
+def machine_paths_in_text(
+    text: str,
+    *,
+    check_exists: bool = True,
+    roots: tuple[str, ...] = MACHINE_ROOTS,
+) -> list[tuple[str, str]]:
+    """Every ``(line:col, token)`` in ``text`` that names a machine path.
+
+    The markdown half of :func:`machine_paths`. A generated report is written
+    beside its JSON record and quoted far more often than the JSON is, so a
+    writer that refuses the record and not the rendering refuses nothing: the
+    directory reaches the reader either way. Same discriminator, same roots,
+    same existence test -- only the tokenizer differs.
+    """
+    found: list[tuple[str, str]] = []
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        for token in _TEXT_TOKENS.split(line):
+            token = token.rstrip(".,;:")
+            if not token:
+                continue
+            if _looks_like_machine_path(token, check_exists=check_exists, roots=roots):
+                found.append((f"{lineno}:{line.index(token) + 1}", token))
+    return found
+
+
+def write_text_artifact(
+    root: Path,
+    relpath: str,
+    text: str,
+    *,
+    check_exists: bool = True,
+    roots: tuple[str, ...] = MACHINE_ROOTS,
+) -> Path:
+    """Write ``text`` to ``root/relpath`` -- unless it names a machine.
+
+    The sibling of :func:`write_artifact` for a generated markdown rendering.
+    Refuses (nothing written) and writes atomically, on the same terms.
+    """
+    root = Path(root).resolve()
+    offenders = machine_paths_in_text(text, check_exists=check_exists, roots=roots)
+    if offenders:
+        raise MachinePathRefused(relpath, offenders)
+    return _atomic_write(root / relpath, text)
+
+
+def _atomic_write(target: Path, text: str) -> Path:
+    """Temp file + rename, so a refusal or a crash never leaves half a record."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = _tempfile.mkstemp(prefix=f".{target.name}.", dir=str(target.parent))
+    try:
+        with _os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        _os.replace(tmp, target)
+    finally:
+        if _os.path.exists(tmp):
+            _os.unlink(tmp)
+    return target
+
+
 def write_artifact(
     root: Path,
     relpath: str,
@@ -633,15 +701,4 @@ def write_artifact(
                 relpath, [(f"/{bindings_key}", "; ".join(bad)[:200])],
                 detail="the module bindings do not describe this tree:",
             )
-    target = root / relpath
-    target.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(payload, indent=1, sort_keys=False) + "\n"
-    fd, tmp = _tempfile.mkstemp(prefix=f".{target.name}.", dir=str(target.parent))
-    try:
-        with _os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        _os.replace(tmp, target)
-    finally:
-        if _os.path.exists(tmp):
-            _os.unlink(tmp)
-    return target
+    return _atomic_write(root / relpath, json.dumps(payload, indent=1, sort_keys=False) + "\n")
