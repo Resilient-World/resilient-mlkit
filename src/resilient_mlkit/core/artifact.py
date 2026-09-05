@@ -120,7 +120,7 @@ from typing import Any
 import yaml
 
 from .repo import Repo
-from .result import ALLOW_DIRTY_KEY, UncommittedRead
+from .result import ALLOW_DIRTY_KEY, FabricationError, UncommittedRead
 
 __all__ = [
     "ALLOW_DIRTY_KEY",
@@ -497,3 +497,151 @@ def resolve_pointer(document: Any, pointer: str) -> Any:
 
 def unresolved(value: Any) -> bool:
     return value is _UNRESOLVED
+
+
+# ---------------------------------------------------------------------------
+# M-5 — the writer refuses an artifact that names a machine path
+# ---------------------------------------------------------------------------
+#
+# THE DEFECT: 42 committed fray artifacts across 14 deleted scratch clones, and
+# the two chokepoint run-of-record artifacts of 2026-09-04
+# (``foundation_finetune.json``: 7 absolute-path strings;
+# ``foundation_cross_corridor_ladder.json``: 3), name
+# ``/private/tmp/claude-501/…`` -- a directory on one machine for one day. A
+# reader cannot resolve it, so cannot check it. This module was a READER only;
+# this is its writer, and the writer's one job beyond writing is to refuse.
+#
+# THE DISCRIMINATOR. A string is a MACHINE PATH when it is an absolute
+# filesystem path and either (a) it EXISTS on the machine doing the writing --
+# the strongest possible evidence that it names this machine -- or (b) it
+# begins with a machine root (``/private/tmp``, ``/Users``, ``/home``, …).
+# JSON pointers (``/hard_stops/x``), URLs and POSIX-looking labels that neither
+# exist nor start with a machine root are not paths and stay silent: a writer
+# that refused every leading slash would refuse the fleet's own pointer syntax.
+#
+# THE BLESSED SHAPE, offered in every refusal: repo-relative path + sha256 for
+# a repo module (``core.module_bindings.record``); ``stamp`` /
+# ``source_sha256`` / ``vcs_commit`` for mlkit (``core.identity.build_identity``).
+# A ``repo_relative_path`` that does not exist on the tree is refused too
+# (``module_bindings.problems``): a string that looks right is not a binding.
+
+import os as _os
+import tempfile as _tempfile
+
+from . import module_bindings as _module_bindings
+
+#: Directory prefixes that name a machine, not a tree.
+MACHINE_ROOTS: tuple[str, ...] = (
+    "/private/tmp", "/private/var", "/tmp", "/var/folders", "/var/tmp", "/Users",
+    "/home", "/root", "/opt", "/mnt", "/srv", "/Volumes", "/usr/local", "/workspace",
+)
+
+#: The key under which a payload carries ``module_bindings.record()`` output.
+MODULE_BINDINGS_KEY = "module_bindings"
+
+
+class MachinePathRefused(FabricationError):
+    """An artifact would have named a directory on this machine. Nothing written."""
+
+    def __init__(self, relpath: str, pointers: list[tuple[str, str]], detail: str = "") -> None:
+        self.relpath = relpath
+        self.pointers = list(pointers)
+        shown = "; ".join(f"{p} = {v[:80]}" for p, v in pointers[:8])
+        more = f" (+{len(pointers) - 8} more)" if len(pointers) > 8 else ""
+        super().__init__(
+            f"REFUSED to write {relpath}: {len(pointers)} value(s) name a path on THIS "
+            f"machine, which no reader can resolve or check: {shown}{more}. "
+            + (detail + " " if detail else "")
+            + "Record a repo module as repo-relative path + sha256 "
+            "(resilient_mlkit.core.module_bindings.record) and mlkit by identity "
+            "(resilient_mlkit.build_identity().to_dict(): stamp / source_sha256 / "
+            "vcs_commit); record a data file by its repo-relative path and digest, "
+            "or by its declared pin"
+        )
+
+
+def _looks_like_machine_path(value: str, *, check_exists: bool, roots: tuple[str, ...]) -> bool:
+    if len(value) < 2:
+        return False
+    is_abs = value.startswith("/") or (len(value) > 2 and value[1] == ":" and value[2] in "\\/")
+    if not is_abs:
+        return False
+    if "\n" in value or len(value) > 4096:
+        return False
+    if any(value == r or value.startswith(r + "/") for r in roots):
+        return True
+    if check_exists:
+        # A URL-ish or pointer-ish string never exists as a file; a real
+        # directory on this machine does. `os.path.exists` rather than
+        # Path.exists so an over-long or odd string cannot raise.
+        try:
+            return _os.path.exists(value)
+        except (OSError, ValueError):
+            return False
+    return False
+
+
+def machine_paths(
+    payload: Any,
+    *,
+    check_exists: bool = True,
+    roots: tuple[str, ...] = MACHINE_ROOTS,
+) -> list[tuple[str, str]]:
+    """Every ``(json_pointer, value)`` in ``payload`` that names a machine path."""
+    found: list[tuple[str, str]] = []
+
+    def walk(node: Any, pointer: str) -> None:
+        if isinstance(node, dict):
+            for k, v in node.items():
+                walk(v, f"{pointer}/{str(k).replace('~', '~0').replace('/', '~1')}")
+        elif isinstance(node, (list, tuple)):
+            for i, v in enumerate(node):
+                walk(v, f"{pointer}/{i}")
+        elif isinstance(node, str):
+            if _looks_like_machine_path(node, check_exists=check_exists, roots=roots):
+                found.append((pointer or "/", node))
+
+    walk(payload, "")
+    return found
+
+
+def write_artifact(
+    root: Path,
+    relpath: str,
+    payload: Any,
+    *,
+    bindings_key: str = MODULE_BINDINGS_KEY,
+    check_exists: bool = True,
+    roots: tuple[str, ...] = MACHINE_ROOTS,
+) -> Path:
+    """Write ``payload`` as JSON to ``root/relpath`` -- unless it names a machine.
+
+    Refuses (nothing written) when any string value is a machine path, or when
+    ``payload[bindings_key]`` carries a repo-relative binding that does not
+    describe the tree at ``root``. Writes atomically (temp file + rename) so a
+    refusal or a crash never leaves a half-written artifact under the name a
+    reader trusts.
+    """
+    root = Path(root).resolve()
+    offenders = machine_paths(payload, check_exists=check_exists, roots=roots)
+    if offenders:
+        raise MachinePathRefused(relpath, offenders)
+    if isinstance(payload, dict) and bindings_key in payload:
+        bad = _module_bindings.problems(payload[bindings_key], root=root)
+        if bad:
+            raise MachinePathRefused(
+                relpath, [(f"/{bindings_key}", "; ".join(bad)[:200])],
+                detail="the module bindings do not describe this tree:",
+            )
+    target = root / relpath
+    target.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(payload, indent=1, sort_keys=False) + "\n"
+    fd, tmp = _tempfile.mkstemp(prefix=f".{target.name}.", dir=str(target.parent))
+    try:
+        with _os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        _os.replace(tmp, target)
+    finally:
+        if _os.path.exists(tmp):
+            _os.unlink(tmp)
+    return target

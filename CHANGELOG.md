@@ -155,6 +155,53 @@ and M-3 (and M-2 where it lands on the same line).
   check-not-dead pair, the disclosed-artifact surface, the working tree
   ignored). Prereg: `reports/M2_QUOTED_RULE_PARITY_PREREGISTRATION.md`.
 
+### M-5 — the writer refuses an artifact that names a machine path; mlkit records itself by identity
+
+* **The defect, measured.** 42 committed fray artifacts across 14 deleted
+  scratch clones name `/private/tmp/claude-501/…` (fray E-069). The two
+  chokepoint run-of-record artifacts of 2026-09-04 carry **7** and **3**
+  absolute-path strings (`/hard_stops/modules_measured/resilient_mlkit`,
+  `/fits/…/checkpoint_dir`, `/hard_stops/pre_registration_statement/path`, …).
+  And **mlkit's own share:** `BuildIdentity.to_dict()` emitted `"root":
+  <absolute package directory>` and `context_line()` rendered it into the
+  header of every report mlkit writes; `vcs_reason` embedded the editable
+  install's `file:///…` URL.
+* **`core.artifact.write_artifact(root, relpath, payload)`** refuses, by name
+  and listing every JSON pointer, a payload carrying a **machine path** — an
+  absolute path that exists on the writing machine or begins with a machine
+  root (`/private/tmp`, `/Users`, `/home`, `/var/folders`, …). JSON pointers,
+  URLs and POSIX-looking labels stay silent. A `module_bindings` block whose
+  repo-relative path is not a file on the tree, or whose digest moved, is
+  refused too (a string that looks right is not a binding). Atomic write;
+  nothing written on refusal. **Stated boundary:** the discriminator sees
+  whole string values; a path embedded inside a sentence is not seen — the
+  drive script's own first record was refused for quoting one, correctly.
+* **`core.module_bindings`** — fray's `record()`/`problems()` lifted into the
+  instrument (schema `resilient-mlkit/module-bindings/1`): repo-relative path
+  + sha256 for a repo module; distribution / version / VCS commit / digest
+  and no path for an installed one; refusal at the yield site.
+* **`BuildIdentity`:** `to_dict()` replaces `root` with `root_kind`
+  (`site-packages` / `checkout` / `other`) and `root_name`; `context_line()`
+  and `vcs_reason` name kinds, never directories. `stamp` / `source_sha256` /
+  `vcs_commit` unchanged — the identity is the identity.
+* **Drive of record** (`scripts/m5_offenders_drive.py` →
+  `reports/M5_OFFENDERS_DRIVE.json`, written through the writer): both real
+  artifacts **refused** — `foundation_finetune.json` (sha `ff012e5d…`, 7
+  pointers), `foundation_cross_corridor_ladder.json` (sha `b7fd66ed…`, 3);
+  the record carries 0 machine-path fragments. Controls in
+  `tests/test_machine_path_refusal.py`: P1 offender shape refused listing all
+  four pointers; P2 blessed shape written, round-trips, `problems()` empty;
+  P3 a missing or moved repo-relative binding refused; P4 pointers/URLs/labels
+  written; P5 an existing path under no listed root refused (existence alone);
+  P6 identity carries no absolute path; P7 check-not-dead (roots emptied and
+  existence disabled → the offender is written). Suite 1244 → 1254.
+* **Verdict change on unchanged adopter code: none.** No check reads
+  `to_dict()["root"]`; an adopter that stamped it into an artifact gets
+  `root_kind`/`root_name` on regeneration. The 42 + 2 offending artifacts are
+  **not regenerated here** (their producers' inputs are not on this machine;
+  V3-11 is each repo's). Prereg:
+  `reports/M5_MACHINE_PATH_REFUSAL_PREREGISTRATION.md`.
+
 ## v0.6.0 — 2026-09-01
 
 Not yet tagged. `v0.5.0` **is** tagged — annotated tag object `15a188b` on
