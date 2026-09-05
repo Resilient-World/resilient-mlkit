@@ -3298,3 +3298,60 @@ file is worth a reader knowing about, and it is a question about the ROUTE
 exemption rather than about the serve arm, so it is named here and left alone.
 Closing it would mean asking whether a re-export route must itself be USED, which
 is a separate change with its own control pair and its own blast radius.
+
+---
+
+## E-M39 — torrent E-080's cross-repo invariant now RUNS, as a local command; making it a GATE is still the signatory's
+
+**Raised 2026-09-06 by `feat/e-080-register-check-fleet`. Status: OPEN on the one
+decision it cannot take.** The command is built, driven and documented; the
+obligation it carries is an obligation, not a gate, and the difference is stated
+rather than glossed.
+
+### What was closed
+
+torrent **E-080** (filed as E-079 in fray and chokepoint — one finding, two ids)
+recorded that `docs/one_sided_placebo_register.json` is one document kept in
+three repositories, that four live bodies existed at once on 2026-09-05, and that
+**every copy was internally consistent, so every repo's own scanner reported
+`0 problem(s)` and every repo's suite was green on the constant it had pinned.**
+The invariant lives between the repos and nothing ran it.
+
+`mlkit register --check-fleet --root <dir>` runs it, from checkouts already on
+the machine. It reads each copy from its own `HEAD`, recomputes
+`canonical_body_sha256` with **each repo's own committed function** cross-applied
+so the three implementations are checked against each other (rule 7 — mlkit
+defines no second digest), and fails on any digest or field divergence, naming
+the field by dotted path. `reports/S5_REGISTER_FLEET_CHECK_RESULTS.md` carries
+the drive: the three current mains PASS on the identical git blob
+`9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738`, and a copy that edits one field AND
+re-derives its own digest — internally consistent, green under its own repo's
+scanner, E-080's exact state — **still FAILS, naming the field.**
+
+### What is NOT closed, and why an agent may not close it
+
+**A command that someone must remember to run is weaker than a check that runs
+itself.** Making this automatic has exactly two shapes and both are reserved:
+
+1. **a credentialed fleet CI job or a required status on all three repos.** The
+   repos are private, so it needs a cross-repo credential. **Rule 13** forbids an
+   agent putting one anywhere near this, and standing CI configuration and any
+   cost-incurring resource are **rule 12**'s.
+2. **making the repositories readable to one another**, which is the S-10
+   disclosure question already open at **E-M37** and is the signatory's.
+
+Until one is taken, the invariant rests on the pre-landing obligation proposed in
+`docs/S5_REGISTER_FLEET_CHECK.md` §3 — that no change touching the register lands
+until this command has been run against the branch and the other two `main`s and
+exited 0, with its output in the pull request. **That text is PROPOSED here and
+pasted by nobody in this branch:** the plan reserves the sibling repos' edits to
+the agents who own them, and mlkit does not write into another repo's tree.
+
+### The narrower residual worth a reader's eye
+
+The obligation binds the person landing a register change. It does not bind the
+person who lands a change to one repo's `main` that makes a sibling's already
+merged copy stale — the second half of the same problem, and the reason
+`docs/S5_REGISTER_FLEET_CHECK.md` §3 also says **a register change lands in three
+repositories or in none**. That sentence is guidance; nothing enforces it, and
+nothing an agent may build enforces it either, for the reasons above.

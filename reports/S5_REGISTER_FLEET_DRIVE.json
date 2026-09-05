@@ -1,0 +1,402 @@
+{
+ "cases": {
+  "B1_unmutated": {
+   "artifact_schema": "resilient-mlkit/s5-register-fleet-check/1",
+   "copies": [
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "ddb87faf2b4f1d44f70350657e9b3e27d51d169e",
+     "repo": "resilient-chokepoint",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "5440702ca861a34b11db64e7571d1835f264c22e",
+     "repo": "resilient-fray",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "39977c66327716ad860177c6279780736171c5b1",
+     "repo": "resilient-torrent",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    }
+   ],
+   "exit_code": 0,
+   "identical_blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+   "ok": true,
+   "problems": [],
+   "refusal": null,
+   "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/work/s5/fleet"
+  },
+  "B1_unmutated_after_every_mutation": {
+   "artifact_schema": "resilient-mlkit/s5-register-fleet-check/1",
+   "copies": [
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "ddb87faf2b4f1d44f70350657e9b3e27d51d169e",
+     "repo": "resilient-chokepoint",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "5440702ca861a34b11db64e7571d1835f264c22e",
+     "repo": "resilient-fray",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "39977c66327716ad860177c6279780736171c5b1",
+     "repo": "resilient-torrent",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    }
+   ],
+   "exit_code": 0,
+   "identical_blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+   "ok": true,
+   "problems": [],
+   "refusal": null,
+   "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/work/s5/fleet"
+  },
+  "B2_field_changed_digest_stale": {
+   "artifact_schema": "resilient-mlkit/s5-register-fleet-check/1",
+   "copies": [
+    {
+     "agreed_digest": "4f2d16c237d3e4ce580270b1e715de52596a25beb783b8061965caa74b1c66da",
+     "blob": "3ac85484834c560353329c626a7eaca06275afff",
+     "computed_by": {
+      "resilient-chokepoint": "4f2d16c237d3e4ce580270b1e715de52596a25beb783b8061965caa74b1c66da",
+      "resilient-fray": "4f2d16c237d3e4ce580270b1e715de52596a25beb783b8061965caa74b1c66da",
+      "resilient-torrent": "4f2d16c237d3e4ce580270b1e715de52596a25beb783b8061965caa74b1c66da"
+     },
+     "head": "5a4bcec38fc152e8217b5e029dce9e0182649c06",
+     "repo": "resilient-chokepoint",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "5440702ca861a34b11db64e7571d1835f264c22e",
+     "repo": "resilient-fray",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "39977c66327716ad860177c6279780736171c5b1",
+     "repo": "resilient-torrent",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    }
+   ],
+   "exit_code": 1,
+   "identical_blob": null,
+   "ok": false,
+   "problems": [
+    {
+     "detail": "stored 'b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9', but this copy's body hashes to '4f2d16c237d3e4ce580270b1e715de52596a25beb783b8061965caa74b1c66da' under its own function. The register was edited without re-deriving its own digest",
+     "field": "canonical_body_sha256",
+     "kind": "SELF_INCONSISTENT",
+     "repo": "resilient-chokepoint"
+    },
+    {
+     "detail": "title holds 2 distinct values across the copies: resilient-chokepoint = \"The one-sided placebo register (MUTATED BY THE DRIVE)\"; resilient-fray, resilient-torrent = \"The one-sided placebo register\". These copies are ONE document; a field that differs means they are not, and no copy is the innocent party until a person says which one the document is",
+     "field": "title",
+     "kind": "DIVERGENT",
+     "repo": "resilient-chokepoint, resilient-fray, resilient-torrent"
+    }
+   ],
+   "refusal": null,
+   "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/work/s5/fleet"
+  },
+  "B3_digest_changed_only": {
+   "artifact_schema": "resilient-mlkit/s5-register-fleet-check/1",
+   "copies": [
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "a6d474679ce05bdee9d35274568f1300040aa0b3",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "c15050d41013cf9d5e397254370aee0dc8280a5e",
+     "repo": "resilient-chokepoint",
+     "stored_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "5440702ca861a34b11db64e7571d1835f264c22e",
+     "repo": "resilient-fray",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "39977c66327716ad860177c6279780736171c5b1",
+     "repo": "resilient-torrent",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    }
+   ],
+   "exit_code": 1,
+   "identical_blob": null,
+   "ok": false,
+   "problems": [
+    {
+     "detail": "stored '0000000000000000000000000000000000000000000000000000000000000000', but this copy's body hashes to 'b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9' under its own function. The register was edited without re-deriving its own digest",
+     "field": "canonical_body_sha256",
+     "kind": "SELF_INCONSISTENT",
+     "repo": "resilient-chokepoint"
+    }
+   ],
+   "refusal": null,
+   "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/work/s5/fleet"
+  },
+  "B4_field_changed_digest_rederived": {
+   "artifact_schema": "resilient-mlkit/s5-register-fleet-check/1",
+   "copies": [
+    {
+     "agreed_digest": "4f2d16c237d3e4ce580270b1e715de52596a25beb783b8061965caa74b1c66da",
+     "blob": "0ba218bafaddb850d640a4b15e0e313faf50f01b",
+     "computed_by": {
+      "resilient-chokepoint": "4f2d16c237d3e4ce580270b1e715de52596a25beb783b8061965caa74b1c66da",
+      "resilient-fray": "4f2d16c237d3e4ce580270b1e715de52596a25beb783b8061965caa74b1c66da",
+      "resilient-torrent": "4f2d16c237d3e4ce580270b1e715de52596a25beb783b8061965caa74b1c66da"
+     },
+     "head": "ab962366a9dcd0bbf44a258b4c4a4aeb8c757614",
+     "repo": "resilient-chokepoint",
+     "stored_digest": "4f2d16c237d3e4ce580270b1e715de52596a25beb783b8061965caa74b1c66da"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "5440702ca861a34b11db64e7571d1835f264c22e",
+     "repo": "resilient-fray",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "39977c66327716ad860177c6279780736171c5b1",
+     "repo": "resilient-torrent",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    }
+   ],
+   "exit_code": 1,
+   "identical_blob": null,
+   "ok": false,
+   "problems": [
+    {
+     "detail": "title holds 2 distinct values across the copies: resilient-chokepoint = \"The one-sided placebo register (MUTATED BY THE DRIVE)\"; resilient-fray, resilient-torrent = \"The one-sided placebo register\". These copies are ONE document; a field that differs means they are not, and no copy is the innocent party until a person says which one the document is",
+     "field": "title",
+     "kind": "DIVERGENT",
+     "repo": "resilient-chokepoint, resilient-fray, resilient-torrent"
+    }
+   ],
+   "refusal": null,
+   "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/work/s5/fleet"
+  },
+  "B4b_e080_field": {
+   "artifact_schema": "resilient-mlkit/s5-register-fleet-check/1",
+   "copies": [
+    {
+     "agreed_digest": "4c07ca0a8405333e3d7ab7e0bfd28b255a8cc35abcc645854db6d29d4c7f2cdb",
+     "blob": "cfb6285c9cdb165251ae0377c1d37184de591d4b",
+     "computed_by": {
+      "resilient-chokepoint": "4c07ca0a8405333e3d7ab7e0bfd28b255a8cc35abcc645854db6d29d4c7f2cdb",
+      "resilient-fray": "4c07ca0a8405333e3d7ab7e0bfd28b255a8cc35abcc645854db6d29d4c7f2cdb",
+      "resilient-torrent": "4c07ca0a8405333e3d7ab7e0bfd28b255a8cc35abcc645854db6d29d4c7f2cdb"
+     },
+     "head": "acae6aae5a5f7d1c5625aa4364f8d4673fd8ed8a",
+     "repo": "resilient-chokepoint",
+     "stored_digest": "4c07ca0a8405333e3d7ab7e0bfd28b255a8cc35abcc645854db6d29d4c7f2cdb"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "5440702ca861a34b11db64e7571d1835f264c22e",
+     "repo": "resilient-fray",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "39977c66327716ad860177c6279780736171c5b1",
+     "repo": "resilient-torrent",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    }
+   ],
+   "exit_code": 1,
+   "identical_blob": null,
+   "ok": false,
+   "problems": [
+    {
+     "detail": "source_files_quoting_the_replaced_sentence.resilient-chokepoint holds 2 distinct values across the copies: resilient-chokepoint = [\"src/some/file_that_quotes_the_replaced_clause.py\"]; resilient-fray, resilient-torrent = []. These copies are ONE document; a field that differs means they are not, and no copy is the innocent party until a person says which one the document is",
+     "field": "source_files_quoting_the_replaced_sentence.resilient-chokepoint",
+     "kind": "DIVERGENT",
+     "repo": "resilient-chokepoint, resilient-fray, resilient-torrent"
+    }
+   ],
+   "refusal": null,
+   "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/work/s5/fleet"
+  },
+  "B4c_declaration_removed": {
+   "artifact_schema": "resilient-mlkit/s5-register-fleet-check/1",
+   "copies": [
+    {
+     "agreed_digest": "8d60e512d79fc915eae1823e8fa738fde3c49c3a14a00bac20fe7c9c001ae397",
+     "blob": "d01e1dbe3f489c542f541e8a19d98b5399cf3088",
+     "computed_by": {
+      "resilient-chokepoint": "8d60e512d79fc915eae1823e8fa738fde3c49c3a14a00bac20fe7c9c001ae397",
+      "resilient-fray": "8d60e512d79fc915eae1823e8fa738fde3c49c3a14a00bac20fe7c9c001ae397",
+      "resilient-torrent": "8d60e512d79fc915eae1823e8fa738fde3c49c3a14a00bac20fe7c9c001ae397"
+     },
+     "head": "6c45d47c894881952b3611ec5b1caa9ec4ef24ac",
+     "repo": "resilient-chokepoint",
+     "stored_digest": "8d60e512d79fc915eae1823e8fa738fde3c49c3a14a00bac20fe7c9c001ae397"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "5440702ca861a34b11db64e7571d1835f264c22e",
+     "repo": "resilient-fray",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    },
+    {
+     "agreed_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+     "blob": "9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738",
+     "computed_by": {
+      "resilient-chokepoint": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-fray": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9",
+      "resilient-torrent": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+     },
+     "head": "39977c66327716ad860177c6279780736171c5b1",
+     "repo": "resilient-torrent",
+     "stored_digest": "b2dd5cc4895f61f9aab1412057d1f575cb6ee79e7026d8a497d4326fac3c9bd9"
+    }
+   ],
+   "exit_code": 1,
+   "identical_blob": null,
+   "ok": false,
+   "problems": [
+    {
+     "detail": "declarations[FR-D2-CONTROL-RESTATEMENT] holds 2 distinct values across the copies: resilient-chokepoint = \"<absent>\"; resilient-fray, resilient-torrent = {\"check\": \"D2 (a control driver's local restatement of the registered halt rule)\", \"commit_order\": \"preregistration -> declaration -> HEAD, verified by ancestry\u2026 (5349 chars). These copies are ONE document; a field that differs means they are not, and no copy is the innocent party until a person says which one the document is",
+     "field": "declarations[FR-D2-CONTROL-RESTATEMENT]",
+     "kind": "DIVERGENT",
+     "repo": "resilient-chokepoint, resilient-fray, resilient-torrent"
+    }
+   ],
+   "refusal": null,
+   "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/work/s5/fleet"
+  },
+  "B4c_dropped_declaration_id": "FR-D2-CONTROL-RESTATEMENT",
+  "B6_single_copy": {
+   "artifact_schema": "resilient-mlkit/s5-register-fleet-check/1",
+   "copies": [],
+   "exit_code": 2,
+   "identical_blob": null,
+   "ok": false,
+   "problems": [],
+   "refusal": "REFUSED: 1 copy/copies of docs/one_sided_placebo_register.json found under /private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/work/s5/lonely (resilient-chokepoint). The invariant this checks lives BETWEEN the repos, so a run over fewer than two copies measures nothing \u2014 and reporting it green would be the strongest possible version of the defect it exists to catch (E-080)",
+   "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/work/s5/lonely"
+  }
+ },
+ "generated_by": "scripts/s5_register_fleet_drive.py",
+ "mlkit_build": {
+  "files": 39,
+  "root_kind": "checkout",
+  "root_name": "resilient_mlkit",
+  "source_sha256": "175e1000c95066cf6a86884b5dcc0f8fbf3f0855e69b713e2ca9fe5fed231a1f",
+  "stamp": "1.1.0+src.175e1000c950",
+  "unavailable": "",
+  "vcs_commit": null,
+  "vcs_reason": "the dist carries no direct_url.json (not a direct install)",
+  "vcs_url": null,
+  "version": "1.1.0"
+ },
+ "mlkit_version": "1.1.0",
+ "mutated_clone": "resilient-chokepoint",
+ "report_type": "s5_register_fleet_check_drive",
+ "root": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/fleet"
+}
