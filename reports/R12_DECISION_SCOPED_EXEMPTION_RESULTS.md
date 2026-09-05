@@ -11,7 +11,14 @@ Builds, so no figure here is attributable to "some mlkit":
 | side | build stamp |
 |---|---|
 | before — `main` `1d9df13` | `0.7.0+src.8dd1b5f6046d` |
-| after — this branch | `0.7.0+src.4a17b84cb853` |
+| after — this branch, as landed | `1.0.0+src.2de05d676b69` |
+
+The first after-drive ran at `0.7.0+src.4a17b84cb853`, before the version bump
+this document's own measurement then justified. The artifacts were RE-DRIVEN on
+the final tree rather than restamped, and every row is byte-identical between
+the two; only the stamp moves. The `r12_served_contract` verdicts in A5 were
+taken at the earlier stamp and are unaffected — the rows they count are the same
+rows.
 
 Clones, all fresh from the remote on 2026-09-06:
 
