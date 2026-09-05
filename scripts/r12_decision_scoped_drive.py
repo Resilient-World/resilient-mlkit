@@ -51,6 +51,7 @@ import sys
 from pathlib import Path
 
 import resilient_mlkit
+from resilient_mlkit.core import identity as identity_mod
 from resilient_mlkit.core import served_reimplementation as sr
 
 TORRENT_REL = "mlkit_bindings.py"
@@ -235,8 +236,12 @@ def main(argv: list[str] | None = None) -> int:
     args.workdir.mkdir(parents=True, exist_ok=True)
     payload: dict[str, object] = {
         "report_type": "r12_decision_scoped_exemption_drive",
+        "generated_by": "scripts/r12_decision_scoped_drive.py",
         "mlkit_file": resilient_mlkit.__file__,
         "mlkit_version": resilient_mlkit.__version__,
+        # `mlkit_version` cannot identify a build (E-M24): two builds 40 commits
+        # apart answer it identically. The identity travels beside it.
+        "mlkit_build": identity_mod.build_identity().to_dict(),
         "scanner_file": sr.__file__,
     }
     if args.torrent:

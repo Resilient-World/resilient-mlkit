@@ -104,6 +104,49 @@ Both are held as FIRES/SILENT pairs in
 the FIRES halves. Neither closure moves a finding: both scanners walk all 14
 ``resilient-*`` checkouts, 3379 files, and produce identical rows file-for-file.
 
+THE SERVE ARM: THE EXEMPTION IS THE DECISION'S, NOT THE FILE'S (E-079)
+-----------------------------------------------------------------------
+Everything above scopes the exemption to the FILE, and resilient-torrent
+measured what that buys. Driven three ways on the real
+``resilient-torrent/mlkit_bindings.py`` (E-079, 2026-09-05, 588 files walked;
+reproduced here at 597 files on 2026-09-06):
+
+===========================================================  ========
+tree                                                          findings
+===========================================================  ========
+PR #190 as authored — a local ``D6_DECIDING_ARM = "val"``            1
+the repair — the arm obtained through ``ServeArms.require``          0
+the repair PLUS the constant restored AND USED, helper dead          0
+===========================================================  ========
+
+The third row is the defect. Once a file binds and uses ANY ``core.served``
+name, a serve-arm constant elsewhere in the same file went unreported — even
+when that constant was the value the file actually served on. So a silent R12
+did not establish that the arm flowed through the contract; one conforming
+helper anywhere in the file bought silence for every serve-arm decision in it.
+It is E-035's shape one layer out: there a dead IMPORT paid for a live local
+gate, here a live helper pays for a local arm.
+
+So for the ``SERVE_ARM`` clause the exemption is now a property of the VALUE:
+
+    a serve-arm site is exempt where the value it decides is DERIVED from a
+    bound ``core.served`` name — directly, through the one permitted level of
+    repo-local indirection, or through a module-level binding or helper in this
+    same file whose own value is so derived — and not where such a name merely
+    appears somewhere else in the file.
+
+:func:`_serve_arm_derivation` computes that derivation as a fixpoint over the
+module's top level, so ``ARMS = _arms()`` where ``_arms()`` returns the
+contract's ``ServeArms`` is exempt and ``ARMS = ("val", "train")`` in the same
+file is not. The fixpoint is what keeps adoption possible: a repo that puts the
+contract behind a helper, which is the shape torrent's repair actually has, must
+not be reported for having written two statements instead of one.
+
+**The other five clauses keep the file-scoped exemption unchanged.** E-079 is
+about the serve arm; re-scoping the promotion clause would be a second change
+wearing this one's clothes, and it is not made here. The change is therefore
+strictly stronger: it can only ADD findings, never remove one.
+
 WHAT A GREEN R12 DOES NOT CLAIM
 -------------------------------
 That the repo's serving path is correct. R12 is an ``ast`` walk: it can see
@@ -149,8 +192,10 @@ __all__ = [
     "CLAUSES",
     "CONTRACT_MODULE",
     "REIMPLEMENTED",
+    "SERVE_ARM_CLAUSE",
     "SERVING_ADJACENT",
     "Finding",
+    "ServeArmDerivation",
     "contract_importers",
     "iter_repo_python_files",
     "scan_repo",
@@ -179,11 +224,16 @@ REIMPLEMENTED = "CONTRACT_REIMPLEMENTED"
 #: contract behind it. The shape of a second definition, not yet a decision.
 SERVING_ADJACENT = "SERVING_ADJACENT"
 
+#: The one clause whose exemption is scoped to the DECISION rather than to the
+#: file (E-079). Named rather than spelled inline so the two places that ask
+#: about it cannot drift apart.
+SERVE_ARM_CLAUSE = "SERVE_ARM"
+
 CLAUSES = (
     "SELF_HASH",
     "PROVENANCE",
     "PROMOTION_VERDICT",
-    "SERVE_ARM",
+    SERVE_ARM_CLAUSE,
     "CHAMPION_RECORD",
     "SHADOW_ROUTER",
 )
@@ -547,10 +597,122 @@ def _uses(tree: ast.AST, is_source: Callable[[str], bool]) -> bool:
 def _uses_contract(tree: ast.AST) -> bool:
     """True when this file binds a contract name AND references it.
 
-    The exemption predicate. See the module docstring's E-035 note for why this
-    is not ``_imports_contract``.
+    The FILE-level exemption predicate, which after E-079 exempts the five
+    clauses that are shapes rather than serve-arm values. See the module
+    docstring's E-035 note for why this is not ``_imports_contract``, and its
+    E-079 note for why the serve arm no longer asks this question.
     """
     return _uses(tree, _is_contract_module)
+
+
+def _reads(node: ast.AST, names: Iterable[str], prefixes: Iterable[str]) -> bool:
+    """Does this subtree READ one of these bindings?
+
+    The same notion of "reads" :func:`_uses` applies, restricted to one subtree
+    instead of the whole module: a ``Load`` of a bare name, or a dotted chain
+    that reaches the whole prefix. ``Store`` is excluded for the same reason it
+    is there — a subtree that rebinds a name is not one that took a value from
+    it.
+    """
+    names = frozenset(names)
+    prefixes = frozenset(prefixes)
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Load):
+            if sub.id in names:
+                return True
+        elif isinstance(sub, ast.Attribute) and isinstance(sub.ctx, ast.Load):
+            chain = _dotted(sub)
+            if chain and any(
+                chain == prefix or chain.startswith(prefix + ".") for prefix in prefixes
+            ):
+                return True
+    return False
+
+
+@dataclass(frozen=True)
+class ServeArmDerivation:
+    """Which names in one file carry a value that came from the contract.
+
+    ``names`` and ``prefixes`` are the contract's own bindings, in the two
+    spellings :func:`_bindings_from` distinguishes. ``derived`` is the fixpoint
+    over the module's top level: every module-level function, class or binding
+    whose own body or value reads something already in the set. A serve-arm
+    site is exempt when it reads any of the three.
+    """
+
+    names: frozenset[str] = frozenset()
+    prefixes: frozenset[str] = frozenset()
+    derived: frozenset[str] = frozenset()
+
+    def covers(self, node: ast.AST | None) -> bool:
+        """Is this serve-arm value derived from a bound ``core.served`` name?"""
+        if node is None:
+            return False
+        return _reads(node, self.names | self.derived, self.prefixes)
+
+
+def _serve_arm_derivation(
+    tree: ast.AST, importers: set[str] | None = None
+) -> ServeArmDerivation:
+    """The E-079 predicate: what in this file carries the contract's value.
+
+    Both routes count — a direct ``core.served`` binding and one taken from a
+    repo-local module that imports the contract — because the file-level
+    exemption honours both and narrowing one without the other would fire on
+    the adoption path rather than on the evasion.
+
+    The fixpoint is small and deliberate. torrent's own repair is
+    ``d6_deciding_arm()`` returning ``_d6_serve_arms().require("val")``: two
+    statements, one contract. A rule that demanded the contract's name appear
+    IN the serve-arm expression itself would report that adoption, which is the
+    trade the module docstring forbids. What it will not do is treat a helper
+    the value never consults as evidence about the value — which is exactly the
+    row E-079 measured at 0.
+    """
+    names, prefixes = _bindings_from(tree, _is_contract_module)
+    if importers:
+        route_names, route_prefixes = _bindings_from(tree, lambda n: n in importers)
+        names |= route_names
+        prefixes |= route_prefixes
+    # A name this file also binds itself is a local definition wearing the
+    # contract's name; references to it resolve to the local thing. Same rule
+    # `_uses` applies, and for the same reason (shadow-and-call).
+    names -= _rebound_names(tree)
+
+    derived: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        pool = names | derived
+        for stmt in getattr(tree, "body", []):
+            if isinstance(
+                stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+            ):
+                if stmt.name in derived:
+                    continue
+                if _reads(stmt, pool, prefixes):
+                    derived.add(stmt.name)
+                    changed = True
+                continue
+            targets: list[ast.Name]
+            value: ast.expr | None
+            if isinstance(stmt, ast.Assign):
+                targets = [t for t in stmt.targets if isinstance(t, ast.Name)]
+                value = stmt.value
+            elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                targets = [stmt.target]
+                value = stmt.value
+            else:
+                continue
+            if value is None or not _reads(value, pool, prefixes):
+                continue
+            for target in targets:
+                if target.id not in derived:
+                    derived.add(target.id)
+                    changed = True
+    return ServeArmDerivation(
+        names=frozenset(names), prefixes=frozenset(prefixes), derived=frozenset(derived)
+    )
 
 
 def _uses_route(tree: ast.AST, importers: set[str]) -> bool:
@@ -605,9 +767,19 @@ def contract_importers(root: Path, paths: Iterable[Path] | None = None) -> set[s
 # The scanner
 # ---------------------------------------------------------------------------
 class _ModuleScanner:
-    def __init__(self, display: str, tree: ast.Module) -> None:
+    def __init__(
+        self,
+        display: str,
+        tree: ast.Module,
+        derivation: ServeArmDerivation | None = None,
+    ) -> None:
         self.display = display
         self.tree = tree
+        #: E-079. What in this file carries the contract's value, so a
+        #: serve-arm site can be exempted on its own derivation rather than on
+        #: the file's. ``None`` means "ask nothing", which is what a caller
+        #: that wants every shape reported passes.
+        self.derivation = derivation or ServeArmDerivation()
         self.findings: list[Finding] = []
         self.corroborating: list[str] = []
 
@@ -900,13 +1072,24 @@ class _ModuleScanner:
                 )
 
     def _scan_arm_policy(self) -> None:
-        """A local decision about which arm may be served."""
+        """A local decision about which arm may be served.
+
+        The exemption asked here is the DECISION's, not the file's (E-079). A
+        constant whose VALUE comes from the contract is the contract's policy
+        spelled in this file; a constant whose value is a bare tuple is this
+        file's policy, whatever else the file imports and uses.
+        """
         for node in self.tree.body:
             targets: list[ast.expr] = []
+            value: ast.expr | None = None
             if isinstance(node, ast.Assign):
                 targets = list(node.targets)
+                value = node.value
             elif isinstance(node, ast.AnnAssign):
                 targets = [node.target]
+                value = node.value
+            if self.derivation.covers(value):
+                continue
             for target in targets:
                 if isinstance(target, ast.Name) and _ARM_CONSTANT_RE.match(target.id):
                     self._record(
@@ -942,6 +1125,12 @@ class _ModuleScanner:
             )
             if not about_serving:
                 continue
+            # E-079 again, for the inline shape: a refusal expressed through
+            # the contract's arm data (`SERVE_ARMS.require(arm)`, or a test
+            # against a policy this file took from it) is the contract's guard
+            # written out; one against a local tuple is this file's.
+            if self.derivation.covers(if_node):
+                continue
             self._record(
                 if_node, "SERVE_ARM", "if <arm> ... raise",
                 "refuses an arm inline; core.served.ServeArms.require is the "
@@ -964,20 +1153,46 @@ def _parse(path: Path) -> ast.Module | None:
         return None
 
 
-def scan_source(source: str, display: str) -> list[Finding]:
-    """Findings for one module's source, ignoring the import exemption.
+def _findings_for(
+    display: str, tree: ast.Module, importers: set[str] | None = None
+) -> list[Finding]:
+    """One module's findings, with both exemptions applied.
 
-    The exemption is a repo-level fact (it needs the other files), so this
-    lower-level entry point reports the shapes it sees. :func:`scan_tree` and
-    :func:`scan_repo` apply the exemption.
+    Two exemptions, deliberately different in scope (E-079):
+
+    * the five clauses that are SHAPES — a self-hash, a provenance check, a
+      promotion verdict, a champion record, a router — are exempt when the FILE
+      binds and uses a ``core.served`` name, directly or through one repo-local
+      route. Unchanged.
+    * a ``SERVE_ARM`` site is exempt when the VALUE IT DECIDES is derived from
+      such a name. That is decided per site, inside the scanner, by
+      :class:`ServeArmDerivation`, so a file may be silent about its promotion
+      logic and named for its arm constant in the same pass.
+
+    The narrowing is one-directional: every finding the file-scoped rule
+    reported is still reported, and serve-arm sites that were silenced only by
+    something else in the file are now added.
+    """
+    derivation = _serve_arm_derivation(tree, importers)
+    findings = _ModuleScanner(display, tree, derivation).scan()
+    file_exempt = _uses_contract(tree) or _uses_route(tree, importers or set())
+    if file_exempt:
+        findings = [f for f in findings if f.clause == SERVE_ARM_CLAUSE]
+    return findings
+
+
+def scan_source(source: str, display: str) -> list[Finding]:
+    """Findings for one module's source, without the repo-local route.
+
+    The route exemption is a repo-level fact (it needs the other files), so
+    this lower-level entry point knows only about direct ``core.served``
+    bindings. :func:`scan_tree` and :func:`scan_repo` add the route.
     """
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return []
-    if _uses_contract(tree):
-        return []
-    return _ModuleScanner(display, tree).scan()
+    return _findings_for(display, tree)
 
 
 def iter_repo_python_files(root: Path) -> Iterator[Path]:
@@ -1004,6 +1219,9 @@ def scan_tree(
     and does not USE a name it took from the contract or from one of those
     modules. The difference between the two passes is the E-035 repair: a route
     is established by import, an exemption is earned by a reference.
+
+    Since E-079 the second pass no longer decides per FILE for every clause: a
+    serve-arm site is exempted on its own derivation. See :func:`_findings_for`.
     """
     root = Path(root)
     files = list(paths) if paths is not None else list(iter_repo_python_files(root))
@@ -1015,13 +1233,8 @@ def scan_tree(
         tree = _parse(path)
         if tree is None:
             continue
-        if _uses_contract(tree):
-            continue
-        if _uses_route(tree, importers):
-            # Uses a name taken from a repo-local module that imports the contract.
-            continue
         display = str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
-        findings.extend(_ModuleScanner(display, tree).scan())
+        findings.extend(_findings_for(display, tree, importers))
     findings.sort(key=lambda f: (f.severity != REIMPLEMENTED, f.path, f.line))
     return findings, len(files)
 
