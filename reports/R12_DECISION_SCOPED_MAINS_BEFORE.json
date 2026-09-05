@@ -1,0 +1,36 @@
+{
+ "fleet": {
+  "resilient-chokepoint": {
+   "files_walked": 330,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-fray": {
+   "files_walked": 283,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-torrent": {
+   "files_walked": 597,
+   "findings": 0,
+   "rows": []
+  }
+ },
+ "generated_by": "scripts/r12_decision_scoped_drive.py",
+ "mlkit_build": {
+  "files": 38,
+  "root_kind": "checkout",
+  "root_name": "resilient_mlkit",
+  "source_sha256": "8dd1b5f6046d723459ade8137fb499fdf9a5510f2e4cecf7d6a69321bc67d141",
+  "stamp": "0.7.0+src.8dd1b5f6046d",
+  "unavailable": "",
+  "vcs_commit": null,
+  "vcs_reason": "2 installed resilient-mlkit distribution(s) were found and none of them describes the running tree `resilient_mlkit` (checkout); the metadata on this machine belongs to some other mlkit, so it is not reported as this one's",
+  "vcs_url": null,
+  "version": "0.7.0"
+ },
+ "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/mlkit-main/src/resilient_mlkit/__init__.py",
+ "mlkit_version": "0.7.0",
+ "report_type": "r12_decision_scoped_exemption_drive",
+ "scanner_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/mlkit-main/src/resilient_mlkit/core/served_reimplementation.py"
+}

@@ -12,6 +12,70 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v1.0.0 — 2026-09-06
+
+Not yet tagged; neither is `v0.7.0` below. Tag cutting is the signatory's
+(E-M08). **The number is the scale applied to a measurement, not a claim about
+maturity:** this file's own rule says *major — an existing check changes verdict
+on unchanged code*, and R12 renders **FAIL on three repository `main`s that
+render PASS today**, with not one byte of their code changed
+(`reports/R12_DECISION_SCOPED_EXEMPTION_RESULTS.md`, A5). Every repo pins mlkit
+by ref, so nothing goes red until a repo moves its pin, which is exactly what
+tags are for. Plan v4 §1.9, first bullet; torrent **E-079**.
+
+### R12 — the served-contract exemption is scoped to the DECISION, not the file
+
+* **The defect, measured by the repo it was hiding from.** torrent drove its own
+  `mlkit_bindings.py` three ways (E-079): the #190 defect as authored (a local
+  `D6_DECIDING_ARM = "val"`) reported **1**; the repair, taking the arm through
+  `core.served.ServeArms.require`, reported **0**; and *the repair PLUS the
+  constant restored and USED, with the `ServeArms` helper left dead*, also
+  reported **0**. Once a file bound and used ANY `core.served` name, a serve-arm
+  constant elsewhere in it was silent — even when that constant was the value
+  actually served on. E-035's shape one layer out: there a dead IMPORT paid for
+  a live local gate, here a live helper pays for a local arm.
+* **What changed.** A `SERVE_ARM` site is now exempt only where **the value it
+  decides is derived from a bound `core.served` name** — directly, through the
+  one permitted repo-local route, or through a module-level binding or helper in
+  the same file whose own value is so derived. `ServeArmDerivation` computes that
+  as a fixpoint over the module's top level, so `ARMS = _arms()` where `_arms()`
+  returns the contract's `ServeArms` stays silent and `ARMS = ("val", "train")`
+  in the same file does not. torrent's real two-statement repair is silent, which
+  is the property that had to survive.
+* **The other five clauses keep the file-scoped exemption, unchanged.** E-079 is
+  about the serve arm. Re-scoping the promotion clause would be a second change
+  wearing this one's clothes and is not made here.
+* **Strictly stronger, measured rather than asserted.** Nine rows appear across
+  the three current `main`s and **not one row disappears anywhere**, on the fresh
+  mains or on all fourteen `resilient-*` checkouts (3,426 files).
+* **What it found, on the first drive.** `resilient-torrent`
+  `src/torrent/hydrology/candidate_promotion.py:124` writes `DECIDING_ARM = "val"`
+  eleven lines below a correct `SERVE_ARMS = ServeArms(...)` adoption — E-079's
+  own shape, in the wild, in the repo that raised it. `resilient-fray`
+  `mlkit_bindings.py:848` and `resilient-chokepoint` `mlkit_bindings.py:2112` are
+  the same shape. Four further `ARMS` rows are a different sense of the word and
+  are REPORTED, not adjudicated by mlkit: see **E-M38**.
+* Controls are FIRES/SILENT pairs on all three torrent shapes, on one level of
+  local indirection, on the repo-local route in both spellings, and at
+  `r12_served_contract` itself. Reverting `_findings_for` to the file-scoped rule
+  fails **exactly the ten FIRES halves and nothing else**.
+
+### Which checks can render FAIL on repo code that did not change
+
+The only thing a consumer upgrading reads is this entry, so the list is stated
+in full rather than by reference.
+
+* **R12** — new here, and measured, not supposed: `resilient-torrent`,
+  `resilient-fray` and `resilient-chokepoint` all render PASS at their current
+  `main`s under v0.7.0 and FAIL under this version, on nine `SERVE_ARM` rows.
+  The rows are enumerated in `reports/R12_DECISION_SCOPED_EXEMPTION_RESULTS.md`
+  and in **E-M38**; each is a real serve-arm decision taken locally, or a name
+  the owning repo should say is not one.
+* **D2, E1, T2, R2, D3, E3 and R4** — carried forward, not introduced here.
+  `docs/ESCALATIONS.md` E-M09 and E-M10 record the non-finite repairs that moved
+  these seven from PASS to FAIL on unchanged repo code; a consumer whose pin
+  predates that release inherits their move on this upgrade as well as R12's.
+
 ## v0.7.0 — 2026-09-04
 
 Not yet tagged; neither is `v0.6.0` below. Tag cutting is the signatory's

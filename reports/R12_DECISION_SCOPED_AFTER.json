@@ -1,0 +1,177 @@
+{
+ "fray": {
+  "adoption_commit": "fc4eaa426ca95e5677cc57972dcfd9f58604a5b6",
+  "fray_E035_dead_import": {
+   "files_walked": 283,
+   "findings": 5,
+   "rows": [
+    {
+     "clause": "SERVE_ARM",
+     "line": 848,
+     "path": "mlkit_bindings.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "D6_DECIDING_ARM"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 227,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "PromotionResult"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 252,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "_record"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 291,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "evaluate_promotion"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 503,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "run_promotion_gate"
+    }
+   ]
+  },
+  "fray_E035_pre_adoption": {
+   "files_walked": 283,
+   "findings": 6,
+   "rows": [
+    {
+     "clause": "SERVE_ARM",
+     "line": 848,
+     "path": "mlkit_bindings.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "D6_DECIDING_ARM"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 120,
+     "path": "scripts/verify_cqr_gate_wiring_controls.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "_promotion_gate"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 226,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "PromotionResult"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 251,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "_record"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 290,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "evaluate_promotion"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 502,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "run_promotion_gate"
+    }
+   ]
+  },
+  "pre_adoption_commit": "81f453f46a7c844e138370c1e41254a630f8af8d"
+ },
+ "fray_head": "5440702ca861a34b11db64e7571d1835f264c22e",
+ "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/mlkit/src/resilient_mlkit/__init__.py",
+ "mlkit_version": "0.7.0",
+ "report_type": "r12_decision_scoped_exemption_drive",
+ "scanner_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/mlkit/src/resilient_mlkit/core/served_reimplementation.py",
+ "torrent": {
+  "torrent_A_as_authored": {
+   "files_walked": 597,
+   "findings": 3,
+   "rows": [
+    {
+     "clause": "SERVE_ARM",
+     "line": 2854,
+     "path": "mlkit_bindings.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "D6_DECIDING_ARM"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 88,
+     "path": "scripts/hydrology/run_operational_information_set.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "ARMS"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 124,
+     "path": "src/torrent/hydrology/candidate_promotion.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "DECIDING_ARM"
+    }
+   ]
+  },
+  "torrent_B_repair": {
+   "files_walked": 597,
+   "findings": 2,
+   "rows": [
+    {
+     "clause": "SERVE_ARM",
+     "line": 88,
+     "path": "scripts/hydrology/run_operational_information_set.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "ARMS"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 124,
+     "path": "src/torrent/hydrology/candidate_promotion.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "DECIDING_ARM"
+    }
+   ]
+  },
+  "torrent_C_constant_used_helper_dead": {
+   "files_walked": 597,
+   "findings": 3,
+   "rows": [
+    {
+     "clause": "SERVE_ARM",
+     "line": 2854,
+     "path": "mlkit_bindings.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "D6_DECIDING_ARM"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 88,
+     "path": "scripts/hydrology/run_operational_information_set.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "ARMS"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 124,
+     "path": "src/torrent/hydrology/candidate_promotion.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "DECIDING_ARM"
+    }
+   ]
+  }
+ },
+ "torrent_head": "39977c66327716ad860177c6279780736171c5b1"
+}
