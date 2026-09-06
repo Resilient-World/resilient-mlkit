@@ -1350,3 +1350,174 @@ def test_e079_derivation_does_not_change_a_file_that_never_binds_the_contract():
         "SERVEABLE_ARMS",
         "if <arm> ... raise",
     }
+
+
+# ---------------------------------------------------------------------------
+# E-M38: a SERVE_ARM row names its own repair
+# ---------------------------------------------------------------------------
+# The nine rows E-M38 enumerates each told the owning repo WHY the site was a
+# finding and nothing about WHAT to write. A consumer fixing one had to read
+# this module to learn what "derived from a bound core.served name" means.
+# Every SERVE_ARM finding now carries `repair`, and the control that matters is
+# executable: the line the message names, written into the fixture, is the
+# line that clears the row.
+
+TORRENT_CANDIDATE_PROMOTION_SHAPE = '''
+    from resilient_mlkit.core.served import ServeArms
+
+    SERVE_ARMS = ServeArms(
+        open=frozenset({"val"}),
+        closed={"test": "the holdout ledger is held"},
+    )
+    DECIDING_ARM = "val"
+
+
+    def decide():
+        return DECIDING_ARM
+'''
+
+FRAY_BINDINGS_SHAPE = '''
+    from resilient_mlkit.core.served import row_set_digest
+
+    D6_DECIDING_ARM = "val"
+
+
+    def digest(rows):
+        return row_set_digest(rows)
+
+
+    def decide():
+        return D6_DECIDING_ARM
+'''
+
+INLINE_REFUSAL_SHAPE = '''
+    from resilient_mlkit.core.served import ServeArms
+
+
+    def serve(arm):
+        if arm == "test":
+            raise RuntimeError("closed")
+        return arm
+'''
+
+
+def _only_serve_arm(source, display="mlkit_bindings.py"):
+    findings = scan(source, display)
+    assert [f.clause for f in findings] == ["SERVE_ARM"], findings
+    return findings[0]
+
+
+def test_em38_the_repair_names_the_policy_the_file_already_takes_from_the_contract():
+    """torrent candidate_promotion.py:124, reduced: a live SERVE_ARMS eleven
+    lines above a bare literal. The repair names THAT binding, not a generic
+    ServeArms, and spells the arm the file actually serves."""
+    f = _only_serve_arm(TORRENT_CANDIDATE_PROMOTION_SHAPE)
+    assert f.symbol == "DECIDING_ARM"
+    assert f.repair.startswith("REPAIR: derive DECIDING_ARM from SERVE_ARMS")
+    assert 'DECIDING_ARM = SERVE_ARMS.require("val")' in f.repair
+    assert "E-079" in f.repair
+
+
+def test_em38_the_repair_the_message_names_is_the_repair_that_clears_the_row():
+    """The executable control. Take the message's own line, write it into the
+    fixture in place of the literal, rescan: silence. If the message ever
+    names a line the scanner would still report, this fails."""
+    f = _only_serve_arm(TORRENT_CANDIDATE_PROMOTION_SHAPE)
+    named = 'DECIDING_ARM = SERVE_ARMS.require("val")'
+    assert named in f.repair
+    repaired = TORRENT_CANDIDATE_PROMOTION_SHAPE.replace('DECIDING_ARM = "val"', named)
+    assert repaired != TORRENT_CANDIDATE_PROMOTION_SHAPE
+    assert scan(repaired, "mlkit_bindings.py") == []
+
+
+def test_em38_a_helper_returning_the_policy_is_named_as_a_call():
+    """E-079's third row: the policy lives behind a dead helper. The repair
+    names the helper, spelled as the call it is, and that line clears the row."""
+    f = _only_serve_arm(TORRENT_D6_CONSTANT_USED_HELPER_DEAD)
+    named = 'D6_DECIDING_ARM = _d6_serve_arms().require("val")'
+    assert named in f.repair, f.repair
+    repaired = TORRENT_D6_CONSTANT_USED_HELPER_DEAD.replace('D6_DECIDING_ARM = "val"', named)
+    assert scan(repaired, "mlkit_bindings.py") == []
+
+
+def test_em38_a_file_that_binds_the_contract_but_no_policy_is_told_to_declare_one():
+    """fray mlkit_bindings.py:848, reduced: row_set_digest is bound and used,
+    no ServeArms anywhere. The repair names what IS bound, the import that is
+    missing, the declaration, and the derivation -- in that order."""
+    f = _only_serve_arm(FRAY_BINDINGS_SHAPE)
+    r = f.repair
+    assert "this file binds row_set_digest from core.served" in r
+    assert "from resilient_mlkit.core.served import ServeArms" in r
+    assert 'SERVE_ARMS = ServeArms(open=frozenset({"val"})' in r
+    assert 'D6_DECIDING_ARM = SERVE_ARMS.require("val")' in r
+    assert r.index("import ServeArms") < r.index("SERVE_ARMS = ServeArms(") < r.index(
+        "D6_DECIDING_ARM = SERVE_ARMS.require"
+    )
+
+
+def test_em38_a_file_that_binds_nothing_is_told_the_import_first():
+    f = _only_serve_arm(TORRENT_D6_AS_AUTHORED)
+    assert "this file binds no core.served name" in f.repair
+    assert "from resilient_mlkit.core.served import ServeArms" in f.repair
+    assert 'D6_DECIDING_ARM = SERVE_ARMS.require("val")' in f.repair
+
+
+def test_em38_an_inline_refusal_is_told_to_use_the_contracts_guard():
+    f = _only_serve_arm(INLINE_REFUSAL_SHAPE, "src/serve/thing.py")
+    assert f.symbol == "if <arm> ... raise"
+    assert "SERVE_ARMS.require(<the arm being tested>)" in f.repair
+    assert "UNDECLARED" in f.repair
+    assert "declare the policy with the ServeArms this file already binds" in f.repair
+
+
+def test_em38_the_other_honest_exit_is_named_with_the_pattern_to_leave():
+    """E-M38 leaves two exits: adopt, or say the word is another sense. The
+    second is only usable if the message says which names the pattern owns."""
+    f = _only_serve_arm(TORRENT_D6_AS_AUTHORED)
+    assert "rename it out of R12's arm-constant pattern" in f.repair
+    assert "DECIDING" in f.repair and "SERVE_ARMS" in f.repair
+    assert "mlkit keeps no exemption list" in f.repair
+
+
+def test_em38_only_serve_arm_rows_carry_a_repair_and_to_dict_carries_it():
+    """The other five clauses are repaired by the file-level adoption the
+    module docstring describes; their rows say so by carrying no repair."""
+    hashing = scan(
+        textwrap.dedent(
+            '''
+            import hashlib, json
+
+            def artifact_hash(payload):
+                body = {k: v for k, v in payload.items() if k != "artifact_hash"}
+                return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+            '''
+        ),
+        "src/serve/thing.py",
+    )
+    assert hashing, "the control needs a non-SERVE_ARM finding to look at"
+    assert all(f.repair == "" for f in hashing)
+    assert all("repair" in f.to_dict() for f in hashing)
+    arm = _only_serve_arm(TORRENT_D6_AS_AUTHORED)
+    assert arm.to_dict()["repair"] == arm.repair != ""
+
+
+def test_em38_the_repair_survives_the_repo_scope_walk_and_reaches_the_report(tmp_path):
+    """scan() rebuilds every finding to attach corroboration; the first cut of
+    this field was dropped there and the nine real rows read `repair: ''`.
+    Held at repo scope AND in the R12 report the consumer actually reads."""
+    from resilient_mlkit.checks import RunContext
+    from resilient_mlkit.checks.readiness import R12_REPORT_RELPATH, r12_served_contract
+    from resilient_mlkit.core.repo import Repo
+
+    write_repo(tmp_path, {"mlkit_bindings.py": TORRENT_CANDIDATE_PROMOTION_SHAPE})
+    findings, _ = sr.scan_repo(tmp_path)
+    assert [f.symbol for f in findings] == ["DECIDING_ARM"]
+    assert 'DECIDING_ARM = SERVE_ARMS.require("val")' in findings[0].repair
+
+    result = r12_served_contract(
+        Repo(name="fixture", path=tmp_path), RunContext(nonce="test-nonce", root=tmp_path)
+    )
+    assert result.evidence["top"][0]["repair"] == findings[0].repair
+    report = (tmp_path / R12_REPORT_RELPATH).read_text(encoding="utf-8")
+    assert "| repair |" in report
+    assert 'DECIDING_ARM = SERVE_ARMS.require("val")' in report

@@ -3299,6 +3299,24 @@ exemption rather than about the serve arm, so it is named here and left alone.
 Closing it would mean asking whether a re-export route must itself be USED, which
 is a separate change with its own control pair and its own blast radius.
 
+### Amendment 2026-09-06 (repair campaign, mlkit lane): the row now names its repair; the nine sites are still the owners'
+
+The status above stands — none of the nine is mlkit's to edit — but the row a
+consumer meets the day its pin moves now says WHAT to write, not only why
+(v1.2.0, `Finding.repair`, `serve_arm_repair`). Driven on the three current
+`main`s (fray `ab0df86d`, torrent `39ddcd2b`, chokepoint `ceb40b4a`) the same
+nine rows appear, and each repair names the bound `core.served` name the value
+must derive from: torrent `candidate_promotion.py:124` is told
+`DECIDING_ARM = SERVE_ARMS.require("val")` by the name of the policy eleven lines
+above it; fray `mlkit_bindings.py:848` and chokepoint `mlkit_bindings.py:2112`
+are told which contract name they already bind, the import they lack, the
+`ServeArms` declaration and the derivation, with the arm spelled from the literal
+they serve (`"val"`, `"test"`); the four `ARMS` rows are told the same AND the
+other exit — the pattern a rename has to leave. Applied to throwaway copies of
+the three mains, the nine named repairs clear 9 of 9 rows and add 0 (the
+per-site list is with the repair campaign's records). The exemption list this
+entry refuses is still refused.
+
 ---
 
 ## E-M39 — torrent E-080's cross-repo invariant now RUNS, as a local command; making it a GATE is still the signatory's
