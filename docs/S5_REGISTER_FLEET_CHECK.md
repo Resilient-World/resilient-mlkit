@@ -1,7 +1,7 @@
 # S-5 — the register fleet check, and the pre-landing obligation it should carry
 
 **Status: the COMMAND is built and driven here (v1.1.0). The PIN that makes a
-repo refuse a register edit without a fresh run is built here too (v1.2.x,
+repo refuse a register edit without a fresh run is built here too (v1.3.0,
 E-M39 amendment): the run writes a sealed artifact, and a one-line test in
 each register-carrying repo asserts the artifact licenses the register at
 `HEAD`.** §3 carries the artifact contract and the exact test to paste into
@@ -182,7 +182,7 @@ fewer than two members.
 * `scripts/s5_register_fleet_drive.py` — the driver. It clones, mutates a clone,
   and throws it away; it never writes to the checkouts it was pointed at.
 * `tests/test_register_fleet.py` — the FIRES/SILENT pairs, on throwaway git
-  fixtures that need no sibling checkout present; from v1.2.x also the pin's
+  fixtures that need no sibling checkout present; from v1.3.0 also the pin's
   pairs (an edit committed without a fresh run FIRES in that repo and only that
   repo; a forged PASS fails on its seal; a REFUSED artifact verifies nothing and
   names no path; the loop closes on a fresh run).
