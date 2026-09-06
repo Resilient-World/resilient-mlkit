@@ -154,7 +154,7 @@ def test_p6_build_identity_carries_no_absolute_path_and_the_stamp_is_the_digest(
     assert d["root_name"] == "resilient_mlkit"
     assert artifact.machine_paths(d) == []
     assert not any(isinstance(v, str) and v.startswith("/") for v in d.values())
-    assert not any(tok.startswith("/") or tok.startswith("`/") for tok in ident.context_line().split())
+    assert not any(tok.startswith(("/", "`/")) for tok in ident.context_line().split())
     assert ident.stamp == f"{d['version']}+src.{(d['source_sha256'] or 'unknown')[:12]}"
 
 

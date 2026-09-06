@@ -42,7 +42,13 @@ from typing import Any
 
 from ..core import artifact, coverage_evidence, declaration
 from ..core.repo import BindingError, Repo
-from ..core.result import ALLOW_DIRTY_KEY, CheckResult, CredentialRequired, InputUnavailable, Status
+from ..core.result import (
+    ALLOW_DIRTY_KEY,
+    CheckResult,
+    CredentialRequired,
+    InputUnavailable,
+    Status,
+)
 from ..core.served import ResamplingDeclaration, RowUnit, ServedContractError
 from . import RunContext, check
 from .readiness import (

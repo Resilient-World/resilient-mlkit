@@ -159,7 +159,7 @@ def test_k9_a_stale_quotation_fires_and_names_the_commit_the_clause_came_from(tm
     assert r.status is Status.FAIL
     kinds = {(f["kind"], f["clause"]) for f in r.evidence["findings"]}
     assert (FINDING_STALE, "D2") in kinds
-    stale = [f for f in r.evidence["findings"] if f["kind"] == FINDING_STALE][0]
+    stale = next(f for f in r.evidence["findings"] if f["kind"] == FINDING_STALE)
     # line 2: textwrap.dedent keeps the fixture's leading newline.
     assert stale["path"] == "src/hard_stops.py" and stale["line"] == 2
     assert stale["window"] == "confidence interval excludes zero"

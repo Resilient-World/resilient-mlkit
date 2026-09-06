@@ -353,7 +353,7 @@ def test_c9_unmeasurable_requires_a_reason_and_is_never_a_pass():
 
 
 def test_c9_the_portfolio_reads_unmeasurable_as_in_progress_never_blocked_or_ready(tmp_path):
-    from resilient_mlkit.checks import PHASES, PHASE_ORDER, load_all
+    from resilient_mlkit.checks import PHASE_ORDER, PHASES, load_all
 
     load_all()
     (tmp_path / ".mlkit").mkdir()

@@ -12,6 +12,43 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v1.1.1 — 2026-09-06
+
+Not yet tagged. Tag cutting is the signatory's (E-M08). **A defect in the
+instrument's own CI, fixed with no verdict change** — this file's scale calls
+that *patch*. Repair campaign, mlkit lane, defect 1.
+
+### `ruff` and `mypy` are green again, at their causes
+
+* **The defect.** Both jobs were red on `main` before #51 and #52 landed
+  (run 33971175175 at `1d9df130`: `ruff failure`, `mypy failure`), and #51
+  added two ruff findings by name — `EXE001` and `F401` in
+  `scripts/r12_decision_scoped_drive.py`. Measured on `aa2524c5` with the CI
+  pins (ruff 0.16.5, mypy 2.3.1): **ruff 17 findings, mypy 3 errors.** A red
+  lint job that everyone has learned to read past is a job that catches
+  nothing, which is this package's own defect class pointed at its CI.
+* **What changed.** Every finding fixed where it arose: six import blocks
+  sorted, `__all__` isort-ordered, one dead `# noqa` for a rule the defaults do
+  not enable removed, the R12 driver made executable (it carries a shebang; every
+  other shebang'd driver in `scripts/` is 100755) and its unused `sys` import
+  dropped, and six one-line rewrites (`range(0, n)`, a nested `if`, an
+  unparenthesised implicit concatenation, a double `startswith`, three
+  `[...][0]` slices). The two mypy errors were real: `module_bindings.record()`
+  returns `{"schema": str, "bindings": {...}}` and its annotation claimed every
+  value was a mapping; `identity._pinned_commit` rebound `url` from `str` to
+  `Any | None` four lines after binding it. **No `# noqa` added, no rule
+  disabled, no config touched:** the CI jobs run at the same defaults with the
+  same pins, and now report **ruff 0, mypy 0**.
+* No check changes verdict, no report changes shape, no CLI surface moves.
+
+### Which checks can render FAIL on repo code that did not change
+
+None newly. Carried forward, not introduced here: **R12** (v1.0.0, nine
+`SERVE_ARM` rows on three `main`s, E-M38) and **D2, E1, T2, R2, D3, E3 and R4**
+(E-M09, E-M10). A consumer whose pin predates those releases inherits their
+moves on this upgrade.
+
+
 ## v1.1.0 — 2026-09-06
 
 Not yet tagged. Tag cutting is the signatory's (E-M08). **A new CLI surface and

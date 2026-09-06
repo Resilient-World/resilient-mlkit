@@ -250,4 +250,11 @@ def all_check_ids() -> list[str]:
 
 def load_all() -> None:
     """Import every check module so the registry is populated."""
-    from . import decision, economics, parity, readiness, selection, triage  # noqa: F401
+    from . import (  # noqa: F401
+        decision,
+        economics,
+        parity,
+        readiness,
+        selection,
+        triage,
+    )
