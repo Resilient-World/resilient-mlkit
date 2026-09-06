@@ -169,6 +169,46 @@ def write_repo(root, files):
 
 
 # ---------------------------------------------------------------------------
+# E-079: after the serve-arm exemption became the DECISION's, a fixture that
+# routes its PROMOTION logic through the contract and still declares its arms
+# as a bare tuple is no longer silent — it is the shape torrent measured. So
+# the SILENT halves below have to say where the ARM comes from as well, and
+# ``serving()`` is how they say it. Substituting one line keeps every other
+# shape in the fixture identical, which is the property that makes the pair a
+# pair.
+# ---------------------------------------------------------------------------
+SERVING_ARM_LINE = 'SERVEABLE_ARMS = ("val", "train")'
+
+#: The arm policy taken FROM the contract, in the three import spellings.
+ARMS_FROM_NAME = 'ServeArms(open={"val", "train"}, closed={"test": "held"})'
+ARMS_FROM_CHAIN = (
+    'resilient_mlkit.core.served.ServeArms(open={"val", "train"},'
+    ' closed={"test": "held"})'
+)
+ARMS_FROM_ALIAS = 'served.ServeArms(open={"val", "train"}, closed={"test": "held"})'
+
+
+def serving(arms=None):
+    """``SERVING`` with its serve-arm policy replaced by ``arms``.
+
+    ``None`` leaves the local tuple in place, which is the FIRES half.
+    """
+    source = textwrap.dedent(SERVING)
+    assert SERVING_ARM_LINE in source, "the fixture's arm line has moved"
+    if arms is None:
+        return source
+    return source.replace(SERVING_ARM_LINE, f"SERVEABLE_ARMS = {arms}")
+
+
+def serve_arm_rows(findings):
+    return [f for f in findings if f.clause == "SERVE_ARM"]
+
+
+def non_serve_arm_rows(findings):
+    return [f for f in findings if f.clause != "SERVE_ARM"]
+
+
+# ---------------------------------------------------------------------------
 # The pair the check exists for
 # ---------------------------------------------------------------------------
 def test_positive_control_a_repo_that_reimplements_is_named(tmp_path):
@@ -506,17 +546,48 @@ def test_a_champion_record_with_load_behaviour_is_a_finding():
 # The exemption, and its limits
 # ---------------------------------------------------------------------------
 def test_one_level_of_indirection_through_a_repo_adapter_is_exempt(tmp_path):
-    """A repo may put the contract behind one thin adapter of its own."""
+    """A repo may put the contract behind one thin adapter of its own.
+
+    SILENT for the promotion clause, and — since E-079 — silent for the arm
+    only when the ARM comes through the adapter too. Both halves are asserted
+    here rather than in two tests, because the variable between them is one
+    expression in one file and separating them would hide that.
+    """
+    adapter = """
+        from resilient_mlkit.core.served import (
+            ServeArms,
+            ServedModel,
+            challenger_decision,
+        )
+
+        __all__ = ["ServeArms", "ServedModel", "challenger_decision"]
+    """
     root = write_repo(
         tmp_path,
         {
-            "src/serve/contract.py": """
-                from resilient_mlkit.core.served import ServedModel, challenger_decision
-
-                __all__ = ["ServedModel", "challenger_decision"]
-            """,
+            "src/serve/contract.py": adapter,
             "src/serve/county_yield.py": """
-                from serve.contract import ServedModel, challenger_decision
+                from serve.contract import ServeArms, ServedModel, challenger_decision
+
+                SERVEABLE_ARMS = ServeArms(open={"val", "train"})
+
+                def challenger_gate(block):
+                    return challenger_decision(block, recorded_bar="p", metrics=("mae",))
+            """,
+        },
+    )
+    findings, _ = sr.scan_repo(root)
+    assert findings == []
+
+    # FIRES. The same adapter, the same use of it, and a LOCAL arm tuple: the
+    # promotion clause stays exempt and the arm is reported. This is E-079's
+    # third row, one level of indirection out.
+    root = write_repo(
+        tmp_path / "local_arm",
+        {
+            "src/serve/contract.py": adapter,
+            "src/serve/county_yield.py": """
+                from serve.contract import ServeArms, ServedModel, challenger_decision
 
                 SERVEABLE_ARMS = ("val", "train")
 
@@ -526,7 +597,9 @@ def test_one_level_of_indirection_through_a_repo_adapter_is_exempt(tmp_path):
         },
     )
     findings, _ = sr.scan_repo(root)
-    assert findings == []
+    assert [(f.path, f.clause, f.symbol) for f in findings] == [
+        ("src/serve/county_yield.py", "SERVE_ARM", "SERVEABLE_ARMS")
+    ]
 
 
 def test_two_levels_of_indirection_are_not_exempt(tmp_path):
@@ -763,21 +836,44 @@ def test_an_unused_import_does_not_exempt_through_the_check(tmp_path):
     assert result.evidence["contract_reimplemented"] > 0
 
 
+#: The contract import both halves below share, plus the call that uses it.
+CONTRACT_IMPORT = (
+    "from resilient_mlkit.core.served import ServeArms, challenger_decision\n"
+)
+DECIDE = (
+    "\n\ndef decide(comparisons):\n"
+    "    return challenger_decision(\n"
+    '        comparisons, recorded_bar=RECORDED_BAR, metrics=("mae",)\n'
+    "    )\n"
+)
+
+
 def test_a_used_import_still_exempts():
     """SILENT. Add the SAME import to the SAME fixture and then CALL it.
 
     The variable between this and the FIRES half is one call expression. If
     this went red the repair would have bought its firing by breaking adoption,
     which is the trade the module docstring says must not be made.
+
+    Since E-079 "the same fixture" has to include the ARM: a file whose
+    promotion logic is the contract's and whose arm policy is a local tuple is
+    exempt for the first and reported for the second, and the second half of
+    this test is that row.
     """
-    bare = textwrap.dedent(SERVING)
-    used = EVASION.replace("  # noqa: F401", "") + bare + (
-        "\n\ndef decide(comparisons):\n"
-        "    return challenger_decision(\n"
-        '        comparisons, recorded_bar=RECORDED_BAR, metrics=("mae",)\n'
-        "    )\n"
-    )
+    used = CONTRACT_IMPORT + serving(ARMS_FROM_NAME) + DECIDE
     assert sr.scan_source(used, "src/serve/thing.py") == []
+
+    # FIRES. The identical file with the arm policy left local.
+    local_arm = CONTRACT_IMPORT + serving() + DECIDE
+    findings = sr.scan_source(local_arm, "src/serve/thing.py")
+    assert non_serve_arm_rows(findings) == [], (
+        "the used import must still exempt the promotion and self-hash clauses; "
+        "E-079 scoped the SERVE_ARM clause and nothing else"
+    )
+    assert {f.symbol for f in serve_arm_rows(findings)} == {
+        "SERVEABLE_ARMS",
+        "if <arm> ... raise",
+    }
 
 
 def test_an_unused_repo_local_route_does_not_exempt_either(tmp_path):
@@ -871,7 +967,7 @@ def test_a_dotted_import_used_as_a_full_chain_still_exempts():
     """SILENT. The same import line; the variable is the chain that reads it."""
     used = (
         DOTTED_EVASION
-        + textwrap.dedent(SERVING)
+        + serving(ARMS_FROM_CHAIN)
         + "\n\ndef decide(comparisons):\n"
         "    return resilient_mlkit.core.served.challenger_decision(\n"
         '        comparisons, recorded_bar=RECORDED_BAR, metrics=("mae",)\n'
@@ -879,18 +975,44 @@ def test_a_dotted_import_used_as_a_full_chain_still_exempts():
     )
     assert sr.scan_source(used, "src/serve/thing.py") == []
 
+    # FIRES. The same dotted chain, the same use, a local arm tuple (E-079).
+    local_arm = (
+        DOTTED_EVASION
+        + serving()
+        + "\n\ndef decide(comparisons):\n"
+        "    return resilient_mlkit.core.served.challenger_decision(\n"
+        '        comparisons, recorded_bar=RECORDED_BAR, metrics=("mae",)\n'
+        "    )\n"
+    )
+    findings = sr.scan_source(local_arm, "src/serve/thing.py")
+    assert non_serve_arm_rows(findings) == []
+    assert serve_arm_rows(findings)
+
 
 def test_a_dotted_import_bound_with_as_still_exempts():
     """SILENT. ``import X.Y.Z as s`` binds a bare name, and ``s.f(...)`` uses it."""
     used = (
         "import resilient_mlkit.core.served as served\n"
-        + textwrap.dedent(SERVING)
+        + serving(ARMS_FROM_ALIAS)
         + "\n\ndef decide(comparisons):\n"
         "    return served.challenger_decision(\n"
         '        comparisons, recorded_bar=RECORDED_BAR, metrics=("mae",)\n'
         "    )\n"
     )
     assert sr.scan_source(used, "src/serve/thing.py") == []
+
+    # FIRES. The same alias, the same use, a local arm tuple (E-079).
+    local_arm = (
+        "import resilient_mlkit.core.served as served\n"
+        + serving()
+        + "\n\ndef decide(comparisons):\n"
+        "    return served.challenger_decision(\n"
+        '        comparisons, recorded_bar=RECORDED_BAR, metrics=("mae",)\n'
+        "    )\n"
+    )
+    findings = sr.scan_source(local_arm, "src/serve/thing.py")
+    assert non_serve_arm_rows(findings) == []
+    assert serve_arm_rows(findings)
 
 
 def test_shadowing_the_contract_name_and_then_calling_it_is_not_a_use():
@@ -959,7 +1081,7 @@ def test_a_repo_local_route_taken_by_the_dotted_spelling_still_exempts(tmp_path)
             """,
             "src/serve/county_yield.py": (
                 "import serve.contract\n"
-                + textwrap.dedent(SERVING)
+                + serving("serve.contract.ServeArms(open={\"val\"})")
                 + "\n\ndef decide(c):\n"
                 "    return serve.contract.challenger_decision(c)\n"
             ),
@@ -967,3 +1089,264 @@ def test_a_repo_local_route_taken_by_the_dotted_spelling_still_exempts(tmp_path)
     )
     findings, _ = sr.scan_repo(root)
     assert findings == []
+
+    # FIRES. The same dotted route, used, with the arm policy left local.
+    root = write_repo(
+        tmp_path / "local_arm",
+        {
+            "src/serve/contract.py": """
+                from resilient_mlkit.core.served import ServedModel, challenger_decision
+
+                __all__ = ["ServedModel", "challenger_decision"]
+            """,
+            "src/serve/county_yield.py": (
+                "import serve.contract\n"
+                + serving()
+                + "\n\ndef decide(c):\n"
+                "    return serve.contract.challenger_decision(c)\n"
+            ),
+        },
+    )
+    findings, _ = sr.scan_repo(root)
+    assert non_serve_arm_rows(findings) == []
+    assert {f.path for f in serve_arm_rows(findings)} == {"src/serve/county_yield.py"}
+
+
+# ---------------------------------------------------------------------------
+# E-079: the serve-arm exemption is the DECISION's, not the file's
+# ---------------------------------------------------------------------------
+# resilient-torrent drove its own `mlkit_bindings.py` three ways and the third
+# result is why these exist (E-079, 2026-09-05):
+#
+#     PR #190 as authored (local constant, no ServeArms)      1 finding
+#     the repair (arm obtained via ServeArms.require)         0
+#     the repair PLUS the constant restored and USED,
+#         with the helper left dead                           0   <-- the defect
+#
+# The fixtures below are that file reduced to its serve-arm decision. Every
+# pair holds ONE variable: where the value `d6_deciding_arm()` returns comes
+# from. Nothing else in the file moves between the halves.
+
+TORRENT_D6_HELPER = '''
+    from resilient_mlkit.core.served import ServeArms
+
+
+    def _d6_serve_arms():
+        return ServeArms(
+            open={"val"},
+            closed={"test": "a ledgered holdout", "train": "the fitted arm"},
+        )
+'''
+
+TORRENT_D6_REPAIR = TORRENT_D6_HELPER + '''
+
+    def d6_deciding_arm():
+        return _d6_serve_arms().require("val")
+'''
+
+TORRENT_D6_CONSTANT_USED_HELPER_DEAD = TORRENT_D6_HELPER + '''
+
+    D6_DECIDING_ARM = "val"
+
+
+    def d6_deciding_arm():
+        return D6_DECIDING_ARM
+'''
+
+TORRENT_D6_AS_AUTHORED = '''
+    D6_DECIDING_ARM = "val"
+
+
+    def d6_deciding_arm():
+        return D6_DECIDING_ARM
+'''
+
+
+def test_e079_a_conforming_helper_does_not_exempt_the_arm_the_file_actually_uses():
+    """FIRES. E-079's third row, which the file-scoped exemption read as clean.
+
+    `ServeArms` is imported and referenced, so the FILE routes through the
+    contract; the value served is a module-level constant that never consults
+    it. The exemption belongs to the decision, and this decision did not earn
+    it.
+    """
+    findings = scan(TORRENT_D6_CONSTANT_USED_HELPER_DEAD, "mlkit_bindings.py")
+    assert [(f.clause, f.symbol) for f in findings] == [
+        ("SERVE_ARM", "D6_DECIDING_ARM")
+    ]
+
+
+def test_e079_the_repair_that_takes_the_arm_from_the_contract_is_silent():
+    """SILENT. The same file; the variable is what `d6_deciding_arm` returns.
+
+    Two statements, not one: the value comes from a module-local helper whose
+    own value comes from the contract. A rule that demanded the contract's name
+    appear IN the returned expression would report torrent's real repair, which
+    is the trade the module docstring forbids.
+    """
+    assert scan(TORRENT_D6_REPAIR, "mlkit_bindings.py") == []
+
+
+def test_e079_the_defect_as_authored_is_still_reported():
+    """FIRES. E-079's first row, unmoved: no contract name in the file at all."""
+    findings = scan(TORRENT_D6_AS_AUTHORED, "mlkit_bindings.py")
+    assert [(f.clause, f.symbol) for f in findings] == [
+        ("SERVE_ARM", "D6_DECIDING_ARM")
+    ]
+
+
+def test_e079_the_three_shapes_are_the_control_pair_they_claim_to_be():
+    """A control on the controls: the three fixtures differ only where they say.
+
+    If the SILENT fixture had also dropped the constant's NAME, its silence
+    would be attributable to the missing shape rather than to the derivation,
+    and the pair would prove nothing. So the helper block is asserted
+    byte-identical across the two shapes that carry it.
+    """
+    assert TORRENT_D6_HELPER in TORRENT_D6_REPAIR
+    assert TORRENT_D6_HELPER in TORRENT_D6_CONSTANT_USED_HELPER_DEAD
+    assert "ServeArms" not in TORRENT_D6_AS_AUTHORED
+    assert 'D6_DECIDING_ARM = "val"' in TORRENT_D6_CONSTANT_USED_HELPER_DEAD
+    assert 'D6_DECIDING_ARM = "val"' in TORRENT_D6_AS_AUTHORED
+    assert 'D6_DECIDING_ARM = "val"' not in TORRENT_D6_REPAIR
+
+
+def test_e079_one_level_of_local_indirection_is_honoured_but_is_not_free():
+    """SILENT / FIRES on the same shape: `ARMS = _arms()`.
+
+    The fixpoint in `_serve_arm_derivation` is what makes the first half
+    silent. The second half is the same two statements with the helper
+    returning a tuple of its own, and it must fire — otherwise the fixpoint
+    would exempt any value reachable through any helper, which is the
+    file-scoped rule wearing a longer name.
+    """
+    silent = """
+        from resilient_mlkit.core.served import ServeArms
+
+        def _arms():
+            return ServeArms(open={"val"}, closed={"test": "held"})
+
+        SERVE_ARMS = _arms()
+    """
+    assert scan(silent) == []
+
+    fires = """
+        from resilient_mlkit.core.served import ServeArms
+
+        def _arms():
+            return ("val", "train")
+
+        def unrelated():
+            return ServeArms(open={"val"})
+
+        SERVE_ARMS = _arms()
+    """
+    findings = scan(fires)
+    assert [(f.clause, f.symbol) for f in findings] == [("SERVE_ARM", "SERVE_ARMS")]
+
+
+def test_e079_only_the_serve_arm_clause_is_decision_scoped():
+    """The five other clauses keep the FILE-scoped exemption, unchanged.
+
+    Stated as a test because "we changed one clause" is exactly the kind of
+    claim that goes stale. The fixture carries a promotion verdict AND a local
+    arm constant and uses the contract; only the arm is reported.
+    """
+    source = (
+        "from resilient_mlkit.core.served import challenger_decision\n"
+        + serving()
+        + DECIDE
+    )
+    findings = sr.scan_source(source, "src/serve/thing.py")
+    assert {f.clause for f in findings} == {"SERVE_ARM"}
+    bare = serving()
+    assert {f.clause for f in sr.scan_source(bare, "src/serve/thing.py")} > {
+        "SERVE_ARM"
+    }, "the fixture must carry other clauses or this control proves nothing"
+
+
+def test_e079_fires_at_repo_scope_and_through_the_check(tmp_path):
+    """FIRES at the check the portfolio actually runs, not only in the scanner."""
+    from resilient_mlkit.checks import RunContext
+    from resilient_mlkit.checks.readiness import r12_served_contract
+    from resilient_mlkit.core.repo import Repo
+    from resilient_mlkit.core.result import Status
+
+    write_repo(
+        tmp_path,
+        {"mlkit_bindings.py": TORRENT_D6_CONSTANT_USED_HELPER_DEAD},
+    )
+    result = r12_served_contract(
+        Repo(name="fixture", path=tmp_path),
+        RunContext(nonce="test-nonce", root=tmp_path),
+    )
+    assert result.status is Status.FAIL
+    assert result.evidence["contract_reimplemented"] == 1
+    findings, _ = sr.scan_repo(tmp_path)
+    assert [(f.path, f.clause, f.symbol) for f in findings] == [
+        ("mlkit_bindings.py", "SERVE_ARM", "D6_DECIDING_ARM")
+    ]
+
+
+def test_e079_is_silent_at_repo_scope_on_the_repair(tmp_path):
+    """SILENT at the same scope, through the same check."""
+    from resilient_mlkit.checks import RunContext
+    from resilient_mlkit.checks.readiness import r12_served_contract
+    from resilient_mlkit.core.repo import Repo
+    from resilient_mlkit.core.result import Status
+
+    write_repo(tmp_path, {"mlkit_bindings.py": TORRENT_D6_REPAIR})
+    result = r12_served_contract(
+        Repo(name="fixture", path=tmp_path),
+        RunContext(nonce="test-nonce", root=tmp_path),
+    )
+    assert result.status is Status.PASS
+    assert sr.scan_repo(tmp_path)[0] == []
+
+
+def test_e079_a_dead_route_does_not_derive_an_arm(tmp_path):
+    """FIRES. The E-035 evasion, aimed at the arm instead of at the gate.
+
+    A repo-local adapter that imports the contract makes the route real, and a
+    file that takes a name from that adapter and USES it is exempt for the five
+    shape clauses. It is not exempt for an arm the adapter never touched.
+    """
+    root = write_repo(
+        tmp_path,
+        {
+            "src/serve/contract.py": """
+                from resilient_mlkit.core.served import ServeArms, challenger_decision
+
+                __all__ = ["ServeArms", "challenger_decision"]
+            """,
+            "src/serve/arms.py": """
+                from serve.contract import ServeArms, challenger_decision
+
+                DECIDING_ARM = "val"
+
+                def gate(block):
+                    return challenger_decision(block, recorded_bar="p", metrics=("mae",))
+
+                def declared():
+                    return ServeArms(open={"val"})
+            """,
+        },
+    )
+    findings, _ = sr.scan_repo(root)
+    assert [(f.path, f.clause, f.symbol) for f in findings] == [
+        ("src/serve/arms.py", "SERVE_ARM", "DECIDING_ARM")
+    ]
+
+
+def test_e079_derivation_does_not_change_a_file_that_never_binds_the_contract():
+    """The narrowing is one-directional: it can only ADD findings.
+
+    Every fixture in this module that carries a serve-arm shape and no contract
+    binding must report exactly what it reported before, because there is
+    nothing for a derivation to exempt.
+    """
+    findings = scan(serving())
+    assert {f.symbol for f in serve_arm_rows(findings)} == {
+        "SERVEABLE_ARMS",
+        "if <arm> ... raise",
+    }

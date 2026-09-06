@@ -1,0 +1,102 @@
+{
+ "fleet": {
+  "resilient-chokepoint": {
+   "files_walked": 330,
+   "findings": 6,
+   "rows": [
+    {
+     "clause": "SERVE_ARM",
+     "line": 2112,
+     "path": "mlkit_bindings.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "DAILY_FLOW_DECIDING_ARM"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 2152,
+     "path": "mlkit_bindings.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "if <arm> ... raise"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 97,
+     "path": "scripts/run_foundation_corridor_allocation.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "ARMS"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 236,
+     "path": "scripts/run_foundation_corridor_allocation.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "if <arm> ... raise"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 97,
+     "path": "scripts/run_foundation_per_corridor_cqr.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "ARMS"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 203,
+     "path": "scripts/run_foundation_per_corridor_cqr.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "if <arm> ... raise"
+    }
+   ]
+  },
+  "resilient-fray": {
+   "files_walked": 283,
+   "findings": 1,
+   "rows": [
+    {
+     "clause": "SERVE_ARM",
+     "line": 848,
+     "path": "mlkit_bindings.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "D6_DECIDING_ARM"
+    }
+   ]
+  },
+  "resilient-torrent": {
+   "files_walked": 597,
+   "findings": 2,
+   "rows": [
+    {
+     "clause": "SERVE_ARM",
+     "line": 88,
+     "path": "scripts/hydrology/run_operational_information_set.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "ARMS"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 124,
+     "path": "src/torrent/hydrology/candidate_promotion.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "DECIDING_ARM"
+    }
+   ]
+  }
+ },
+ "generated_by": "scripts/r12_decision_scoped_drive.py",
+ "mlkit_build": {
+  "files": 38,
+  "root_kind": "checkout",
+  "root_name": "resilient_mlkit",
+  "source_sha256": "2de05d676b69cff3af6074fa2c1dde77b43d12c11d5760c60ed7948de165fc16",
+  "stamp": "1.0.0+src.2de05d676b69",
+  "unavailable": "",
+  "vcs_commit": null,
+  "vcs_reason": "the dist carries no direct_url.json (not a direct install)",
+  "vcs_url": null,
+  "version": "1.0.0"
+ },
+ "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/mlkit/src/resilient_mlkit/__init__.py",
+ "mlkit_version": "1.0.0",
+ "report_type": "r12_decision_scoped_exemption_drive",
+ "scanner_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/mlkit/src/resilient_mlkit/core/served_reimplementation.py"
+}

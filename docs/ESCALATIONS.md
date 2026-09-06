@@ -3193,3 +3193,108 @@ and it is the signatory's.
 
 **Recommendation (unchanged from plan v3 §6):** make it public, or mint the
 token. Either one turns CI green in three repos; neither is an agent's.
+
+---
+
+## E-M38 — R12's repaired serve-arm clause names nine sites on three current mains; three are real, four are a different sense of the word, and none of them is mlkit's to fix
+
+**Raised 2026-09-06 by the E-079 repair (`fix/e-079-served-exemption-scoped-to-the-decision`).
+Status: OPEN — enumerated here for the three owning repos. mlkit reports; it does
+not edit another repo's tree, which is rule 7 read in the direction that binds
+this repo.**
+
+### What the repair did, in one line
+
+`core.served_reimplementation` exempted every clause in a file once the FILE
+bound and used any `core.served` name. torrent measured what that bought
+(**E-079**) and asked for the exemption to be scoped to the DECISION. It now is,
+for the `SERVE_ARM` clause: a serve-arm site is exempt where the VALUE it decides
+is derived from a bound contract name. Full drive:
+`reports/R12_DECISION_SCOPED_EXEMPTION_RESULTS.md`.
+
+### What it found, first drive, on fresh clones of the three current mains
+
+Driven through `checks.readiness.r12_served_contract` — the check the portfolio
+runs — at `torrent 39977c6`, `fray 5440702`, `chokepoint ddb87fa`, with mlkit
+`0.7.0+src.8dd1b5f6046d` (before) and `0.7.0+src.4a17b84cb853` (after):
+
+| repo | before | after |
+|---|---|---|
+| `resilient-chokepoint` | PASS, 0 | **FAIL, 6** |
+| `resilient-fray` | PASS, 0 | **FAIL, 1** |
+| `resilient-torrent` | PASS, 0 | **FAIL, 2** |
+
+**Group 1 — three sites that are E-079's own shape, and are real.** A serve-arm
+value declared as a module-level constant, in a file that binds and uses the
+contract, so the file was silent and the value never touched it:
+
+* `resilient-torrent` `src/torrent/hydrology/candidate_promotion.py:124`
+  `DECIDING_ARM = "val"` — **eleven lines below a correct adoption**. The file
+  already declares `SERVE_ARMS = ServeArms(open=frozenset({"val"}), closed={"test": ...})`
+  with a real refusal reason attached, and then names the deciding arm in a
+  constant beside it. The obvious repair is torrent's own #190 repair applied one
+  file over: `SERVE_ARMS.require("val")`.
+* `resilient-fray` `mlkit_bindings.py:848` `D6_DECIDING_ARM = "val"`.
+* `resilient-chokepoint` `mlkit_bindings.py:2112` `DAILY_FLOW_DECIDING_ARM`, with
+  the paired inline refusal at `:2152`.
+
+**Group 2 — four rows on the word `ARMS`, which mlkit reports and does not
+adjudicate.**
+
+* `resilient-torrent` `scripts/hydrology/run_operational_information_set.py:88`
+  `ARMS` — a dict of EVALUATION arms (`S`, `O`, `P`, `S_d`, `P_d`, `F_d`, `F'_d`),
+  the E-070 information-set study, not a train/val/test serve arm.
+* `resilient-chokepoint` `scripts/run_foundation_corridor_allocation.py:97` and
+  `scripts/run_foundation_per_corridor_cqr.py:97`, with their inline refusals at
+  `:236` and `:203`.
+
+R12's arm-CONSTANT detector has always been NAME-based (`_ARM_CONSTANT_RE`
+matches a bare `ARMS`), and the file-scoped exemption was hiding these rather
+than deciding they were fine. **The E-079 repair did not touch that detector and
+must not:** tightening it would REMOVE findings, which is the opposite direction
+from the one this repair is allowed to move in and the direction CLAUDE.md rule 6
+forbids. Whether each of these is a serve-arm policy or a different sense of the
+word is the owning repo's call, made in the owning repo, with its own control.
+
+### What each owning repo has to decide, and what mlkit will not do for them
+
+For every row above, one of exactly two things is true, and only the repo can say
+which:
+
+1. it IS a serve-arm decision, and it should come through
+   `core.served.ServeArms.require` — the repair torrent already shipped once; or
+2. it is NOT a serve arm, and the repo says so where a reader can check it —
+   by renaming the constant out of the vocabulary, or by recording the reason in
+   its own escalation register with a control that would fire if it ever became
+   one.
+
+**mlkit will not add an exemption list, a per-repo allowlist, or a suppression
+comment for any of these.** A check with a list of files it agrees not to look at
+is the file-scoped exemption again, spelled longer.
+
+### Timing: nothing goes red until a pin moves
+
+Every repo pins mlkit by ref. This finding becomes a red check in a repo on the
+commit that moves its pin to `v1.0.0`, and not before — which is what the tags
+exist for (see this repo's `CHANGELOG.md` header). Landing this branch turns no
+sibling repo red on its own.
+
+### A residual, named and not repaired: a dead import still moves a finding IN ANOTHER FILE
+
+Found while driving E-035's control on the real fray file. At repo scope, the
+pre-adoption `src/registry/promotion_gate.py` reports 5 rows; the SAME blob plus
+E-035's one dead import line reports 4. The row that vanishes is in a different
+file — `scripts/verify_cqr_gate_wiring_controls.py:120 PROMOTION_VERDICT
+_promotion_gate` — because `contract_importers` is deliberately built on
+`_imports_contract`, so the dead import makes `registry.promotion_gate` a genuine
+re-export route and the control script that takes a name from it and uses it
+becomes exempt.
+
+The four rows E-035 is about, IN the gate itself, are unmoved (4 before, 4 after,
+on both sides of this branch), so **E-035 is not re-opened**. And the route is
+real at runtime: `from registry.promotion_gate import challenger_decision` does
+resolve to the contract. But a dead import that silences a finding in a third
+file is worth a reader knowing about, and it is a question about the ROUTE
+exemption rather than about the serve arm, so it is named here and left alone.
+Closing it would mean asking whether a re-export route must itself be USED, which
+is a separate change with its own control pair and its own blast radius.

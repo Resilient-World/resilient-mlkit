@@ -1,0 +1,292 @@
+{
+ "fleet": {
+  "resilient-arabica": {
+   "files_walked": 385,
+   "findings": 4,
+   "rows": [
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 94,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "_record"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 359,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "evaluate_all_gates"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 397,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "_status"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 774,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "main"
+    }
+   ]
+  },
+  "resilient-backend": {
+   "files_walked": 437,
+   "findings": 6,
+   "rows": [
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 62,
+     "path": "packages/resilient-validation/src/resilient_validation/evidence.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "is_promotable"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 109,
+     "path": "packages/resilient-validation/src/resilient_validation/evidence.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "assert_promotable"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 39,
+     "path": "src/resilient_backend/twin_kit/underwriting_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "{promote, ...}"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 135,
+     "path": "src/resilient_backend/twin_kit/underwriting_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "{promote, ...}"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 177,
+     "path": "src/resilient_backend/twin_kit/underwriting_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "{promote, ...}"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 220,
+     "path": "src/resilient_backend/twin_kit/underwriting_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "{promote, ...}"
+    }
+   ]
+  },
+  "resilient-blackout": {
+   "files_walked": 229,
+   "findings": 2,
+   "rows": [
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 34,
+     "path": "resilient_blackout/mlops/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "PromotionGate"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 686,
+     "path": "resilient_blackout/mlops/registry.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "PromotionGate"
+    }
+   ]
+  },
+  "resilient-choco": {
+   "files_walked": 399,
+   "findings": 2,
+   "rows": [
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 454,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "_record"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 493,
+     "path": "src/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "run_promotion_gate"
+    }
+   ]
+  },
+  "resilient-chokepoint": {
+   "files_walked": 285,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-fray": {
+   "files_walked": 235,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-frontend": {
+   "files_walked": 0,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-mentra": {
+   "files_walked": 49,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-mlkit": {
+   "files_walked": 30,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-provenance": {
+   "files_walked": 8,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-surge": {
+   "files_walked": 350,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-torrent": {
+   "files_walked": 551,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-transect": {
+   "files_walked": 50,
+   "findings": 0,
+   "rows": []
+  },
+  "resilient-triage": {
+   "files_walked": 418,
+   "findings": 14,
+   "rows": [
+    {
+     "clause": "SERVE_ARM",
+     "line": 286,
+     "path": "benchmarks/converge_dlnm_champion.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "if <arm> ... raise"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 54,
+     "path": "scripts/score_weekly_mortality_positive_metrics.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "ARM"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 132,
+     "path": "scripts/score_weekly_mortality_positive_metrics.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "if <arm> ... raise"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 127,
+     "path": "scripts/serialize_weekly_mortality_champion.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "if <arm> ... raise"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 55,
+     "path": "scripts/serve_weekly_mortality.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "SERVEABLE_ARMS"
+    },
+    {
+     "clause": "SERVE_ARM",
+     "line": 66,
+     "path": "scripts/serve_weekly_mortality.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "if <arm> ... raise"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 687,
+     "path": "src/resilient_triage/mlops/registry.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "PromotionGate"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 13,
+     "path": "src/resilient_triage/registry/promotion_gate.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "PromotionResult"
+    },
+    {
+     "clause": "SELF_HASH",
+     "line": 117,
+     "path": "src/resilient_triage/serve/weekly_mortality.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "sha256 over canonical JSON with the hash field excluded"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 444,
+     "path": "src/resilient_triage/serve/weekly_mortality.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "challenger_gate"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 466,
+     "path": "src/resilient_triage/serve/weekly_mortality.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "{promotable, ...}"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 480,
+     "path": "src/resilient_triage/serve/weekly_mortality.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "{promotable, ...}"
+    },
+    {
+     "clause": "PROMOTION_VERDICT",
+     "line": 494,
+     "path": "src/resilient_triage/serve/weekly_mortality.py",
+     "severity": "CONTRACT_REIMPLEMENTED",
+     "symbol": "{promotable, ...}"
+    },
+    {
+     "clause": "CHAMPION_RECORD",
+     "line": 121,
+     "path": "src/resilient_triage/serve/weekly_mortality.py",
+     "severity": "SERVING_ADJACENT",
+     "symbol": "WeeklyMortalityChampion"
+    }
+   ]
+  }
+ },
+ "generated_by": "scripts/r12_decision_scoped_drive.py",
+ "mlkit_build": {
+  "files": 38,
+  "root_kind": "checkout",
+  "root_name": "resilient_mlkit",
+  "source_sha256": "2de05d676b69cff3af6074fa2c1dde77b43d12c11d5760c60ed7948de165fc16",
+  "stamp": "1.0.0+src.2de05d676b69",
+  "unavailable": "",
+  "vcs_commit": null,
+  "vcs_reason": "the dist carries no direct_url.json (not a direct install)",
+  "vcs_url": null,
+  "version": "1.0.0"
+ },
+ "mlkit_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/mlkit/src/resilient_mlkit/__init__.py",
+ "mlkit_version": "1.0.0",
+ "report_type": "r12_decision_scoped_exemption_drive",
+ "scanner_file": "/private/tmp/claude-501/-Users-david-Downloads-Claude-Code-resilient-arabica/c0ab679d-4c0e-4b18-af54-98cbbc1a4764/scratchpad/mlkit-v4/mlkit/src/resilient_mlkit/core/served_reimplementation.py"
+}
