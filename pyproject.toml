@@ -74,3 +74,14 @@ timeout_method = "thread"
 [[tool.mypy.overrides]]
 module = ["numpy", "numpy.*"]
 ignore_missing_imports = true
+
+# `pytest_contention` is a pytest PLUGIN module: it is imported by pytest, never
+# by mlkit itself, and nothing in `resilient_mlkit/__init__.py` reaches it. So
+# pytest stays a TEST dependency and is absent from the environment CI's mypy
+# job builds (`pip install -e "."`, ci.yml:150). This is the same statement of
+# fact the numpy override above makes, about the same kind of dependency, and it
+# is not a silenced type error: every symbol this package DEFINES is still
+# checked.
+[[tool.mypy.overrides]]
+module = ["pytest", "pytest.*", "_pytest.*"]
+ignore_missing_imports = true
