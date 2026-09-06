@@ -484,8 +484,8 @@ def _vcs_of_installed_dist(root: Path) -> tuple[str | None, str | None, str]:
                 + (" as an editable install" if editable else " directly")
                 + ", which records no vcs commit_id"
             )
-        url = payload.get("url")
-        return commit, url if isinstance(url, str) else None, ""
+        pinned_url = payload.get("url")
+        return commit, pinned_url if isinstance(pinned_url, str) else None, ""
 
     if seen:
         return None, None, (

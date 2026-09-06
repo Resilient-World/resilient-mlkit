@@ -186,8 +186,8 @@ def build(repo_path: Path, base_ref: str, head_ref: str = "HEAD") -> MergedTree:
 
     committed = subprocess.run(
         ["git", "-C", str(path), "commit-tree", merge_tree, "-p", head_sha, "-p", base_sha,
-         "-m", f"mlkit --merged-with {base_ref}: synthetic merge of {head_sha[:12]} with "
-               f"{base_sha[:12]}; not on any branch; discarded after the drive"],
+         "-m", (f"mlkit --merged-with {base_ref}: synthetic merge of {head_sha[:12]} with "
+                f"{base_sha[:12]}; not on any branch; discarded after the drive")],
         capture_output=True, text=True, check=False,
         env=commit_env(),
     )

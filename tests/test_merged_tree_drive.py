@@ -165,7 +165,7 @@ def test_t1_the_defect_exists_only_in_the_combination(tmp_path, capsys):
     _git(repo, "checkout", "-q", "head")
     rc_merge = _check(root, "--merged-with", "base")
     captured = capsys.readouterr().out
-    d2 = [ln for ln in captured.splitlines() if ln.startswith("D2 ")][0]
+    d2 = next(ln for ln in captured.splitlines() if ln.startswith("D2 "))
     assert "FAIL" in d2 and "PLACEBO_EXEMPTS_THE_CLAIM" in d2, d2
     assert rc_merge == 1
     assert "MERGED-TREE DRIVE" in captured
@@ -245,7 +245,7 @@ def test_t4_t5_the_stamp_names_both_parents_and_the_real_store_is_untouched(tmp_
     assert parents == [shas["head"], shas["base"]]
     tree = _git(repo, "rev-parse", f"{row['merge_commit']}^{{tree}}")
     assert tree == row["merge_tree"]
-    d2 = [r for r in row["results"] if r["check_id"] == "D2"][0]
+    d2 = next(r for r in row["results"] if r["check_id"] == "D2")
     assert d2["status"] == "FAIL" and "PLACEBO_EXEMPTS_THE_CLAIM" in d2["reason"]
     assert d2["git_sha"] == row["merge_commit"], "results are stamped with the synthetic commit"
 

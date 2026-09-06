@@ -598,9 +598,10 @@ def machine_paths(
         elif isinstance(node, (list, tuple)):
             for i, v in enumerate(node):
                 walk(v, f"{pointer}/{i}")
-        elif isinstance(node, str):
-            if _looks_like_machine_path(node, check_exists=check_exists, roots=roots):
-                found.append((pointer or "/", node))
+        elif isinstance(node, str) and _looks_like_machine_path(
+            node, check_exists=check_exists, roots=roots
+        ):
+            found.append((pointer or "/", node))
 
     walk(payload, "")
     return found

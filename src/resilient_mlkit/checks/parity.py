@@ -355,7 +355,7 @@ def scan_text(relpath: str, text: str, vocab: Vocabulary) -> list[Finding]:
     for w, table, kind in ((W_STALE, vocab.stale, FINDING_STALE), (W_COPY, vocab.copy, FINDING_COPY)):
         if not table:
             continue
-        for i in range(0, max(0, len(toks) - w + 1)):
+        for i in range(max(0, len(toks) - w + 1)):
             win = tuple(toks[i:i + w])
             clause = table.get(win)
             if clause is None:

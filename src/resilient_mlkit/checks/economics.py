@@ -45,7 +45,12 @@ from itertools import pairwise
 
 from ..core import declaration
 from ..core.repo import BindingError, Repo
-from ..core.result import ALLOW_DIRTY_KEY, CheckResult, CredentialRequired, InputUnavailable
+from ..core.result import (
+    ALLOW_DIRTY_KEY,
+    CheckResult,
+    CredentialRequired,
+    InputUnavailable,
+)
 from . import RunContext, check
 
 PHASE = "economics"

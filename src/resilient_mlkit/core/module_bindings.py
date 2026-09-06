@@ -51,7 +51,7 @@ from types import ModuleType
 MODULE_BINDINGS_SCHEMA = "resilient-mlkit/module-bindings/1"
 
 
-class ModuleBindingRefusal(RuntimeError):  # noqa: N818 - refusal name, fleet shape
+class ModuleBindingRefusal(RuntimeError):  # refusal name, fleet shape: not an *Error
     """A binding could not be recorded or does not describe this tree."""
 
 
@@ -123,7 +123,7 @@ def record(
     root: Path,
     repo_local: Iterable[str] = (),
     subtree_of: dict[str, str] | None = None,
-) -> dict[str, dict[str, object]]:
+) -> dict[str, object]:
     """Bind every module to a file and describe it PORTABLY.
 
     ``root`` is the repository root. ``repo_local`` names the modules that MUST

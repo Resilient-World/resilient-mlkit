@@ -5,6 +5,7 @@ divergent copies of a gate is eight different definitions of "ready", which is
 the same as having none.
 """
 
+from .core.arming import ArmState, arm_state
 from .core.identity import (
     BuildIdentity,
     IdentityMatch,
@@ -12,7 +13,6 @@ from .core.identity import (
     verify_report,
     verify_report_text,
 )
-from .core.arming import ArmState, arm_state
 from .core.result import (
     CheckResult,
     CredentialRequired,
@@ -79,12 +79,6 @@ __all__ = [
     "BuildIdentity",
     "CheckResult",
     "CredentialRequired",
-    # M-1. The CredentialRequired discipline for bytes: raised by a binding
-    # that resolved its declaration and cannot read the input it is declared
-    # over; rendered UNMEASURABLE, never FAIL and never NA.
-    "InputUnavailable",
-    "PrematureInputRefusal",
-    "arm_state",
     # The gate verdict an adopter must NOT hand-roll. Exported at the top level
     # because the alternative -- a repo writing its own -- is the measured
     # defect it exists to retire (fray promotion_gate.py:401/:851).
@@ -95,10 +89,16 @@ __all__ = [
     # reason GateAggregate is -- the alternative is eight repos each deciding
     # for themselves what "the same instrument" means.
     "IdentityMatch",
+    # M-1. The CredentialRequired discipline for bytes: raised by a binding
+    # that resolved its declaration and cannot read the input it is declared
+    # over; rendered UNMEASURABLE, never FAIL and never NA.
+    "InputUnavailable",
+    "PrematureInputRefusal",
     "Status",
     "VerdictSealed",
     "__build__",
     "__version__",
+    "arm_state",
     "build_identity",
     "verify_report",
     "verify_report_text",
