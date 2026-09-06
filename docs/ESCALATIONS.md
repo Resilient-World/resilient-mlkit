@@ -3373,3 +3373,26 @@ merged copy stale — the second half of the same problem, and the reason
 `docs/S5_REGISTER_FLEET_CHECK.md` §3 also says **a register change lands in three
 repositories or in none**. That sentence is guidance; nothing enforces it, and
 nothing an agent may build enforces it either, for the reasons above.
+
+### Amendment 2026-09-06 (repair campaign, mlkit lane): the first half is now a check; the second half is still the signatory's
+
+**Closed (v1.3.0):** the half where a person forgets to run the command.
+`--check-fleet --out` writes a sealed, machine-path-free artifact
+(`proof_sha256` over mlkit's result — not a second digest of the register), and
+`verify_artifact` / `mlkit register --verify-artifact` returns every reason it
+does not license the register a repo carries at `HEAD`: broken seal, non-PASS
+verdict, fewer than two copies, or a `HEAD` blob the artifact never compared.
+The consumer's side is one test, given verbatim in
+`docs/S5_REGISTER_FLEET_CHECK.md` §3.2; with it a register edit is a red test in
+the repo that made the edit until a fresh run's artifact is committed. Driven on
+the three current `main`s (fray `ab0df86d`, torrent `39ddcd2b`, chokepoint
+`ceb40b4a`): PASS on blob `e340ec83…`, artifact written with zero machine paths,
+`--verify-artifact` exit 0 in all three checkouts. Pasting the test into the
+three repos is the owning agents' (rule 7 in the direction that binds mlkit);
+mlkit writes into no sibling tree.
+
+**Still open, still reserved:** the second half named above — a sibling whose
+merged copy goes stale when another repo's `main` moves has a green pin and no
+way to see that `main` without a credential (rule 13) or the S-10 disclosure
+decision (E-M37). No CI configuration and no credential was created here
+(rule 12).
