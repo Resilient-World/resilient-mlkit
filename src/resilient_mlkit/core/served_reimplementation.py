@@ -181,6 +181,7 @@ not parse, or one loaded at runtime from a string. Both are outside an AST.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import re
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
@@ -201,6 +202,7 @@ __all__ = [
     "scan_repo",
     "scan_source",
     "scan_tree",
+    "serve_arm_repair",
 ]
 
 #: The dotted module every adopter must route through.
@@ -401,6 +403,12 @@ class Finding:
     symbol: str
     detail: str
     corroborating: tuple[str, ...] = ()
+    #: The exact repair, naming the bound ``core.served`` name the value must
+    #: derive from (E-M38). Empty for clauses whose repair is the file-level
+    #: adoption the module docstring describes; filled for every ``SERVE_ARM``
+    #: row, because that clause is decided per site and the consumer fixing it
+    #: should not have to read this module to learn what "derived" means.
+    repair: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -411,6 +419,7 @@ class Finding:
             "symbol": self.symbol,
             "detail": self.detail,
             "corroborating": list(self.corroborating),
+            "repair": self.repair,
         }
 
 
@@ -643,12 +652,125 @@ class ServeArmDerivation:
     names: frozenset[str] = frozenset()
     prefixes: frozenset[str] = frozenset()
     derived: frozenset[str] = frozenset()
+    #: The subset of ``derived`` bound by ``def``/``class``, so a repair can
+    #: spell them as a call (``_d6_serve_arms().require(...)``) rather than as
+    #: a value.
+    callables: frozenset[str] = frozenset()
 
     def covers(self, node: ast.AST | None) -> bool:
         """Is this serve-arm value derived from a bound ``core.served`` name?"""
         if node is None:
             return False
         return _reads(node, self.names | self.derived, self.prefixes)
+
+    def policies(self) -> list[str]:
+        """Derived names that speak of arms, spelled as a reader would use them.
+
+        These are the values a ``SERVE_ARM`` repair can derive from: a
+        ``SERVE_ARMS = ServeArms(...)`` binding or a helper returning one. A
+        derived name that does not speak of arms (a coverage helper, a
+        polarity constant) is contract-derived but is not an arm policy, and
+        offering ``.require`` on it would be a wrong repair with a confident
+        voice.
+        """
+        arms = [
+            n for n in sorted(self.derived)
+            if _ARM_CONSTANT_RE.match(n) or _ARM_TOKEN_RE.search(n.lower())
+        ]
+        # A declared policy constant before a helper, so the example names
+        # the shape torrent's own adoption has.
+        arms.sort(key=lambda n: (n in self.callables, n))
+        return [f"{n}()" if n in self.callables else n for n in arms]
+
+
+#: The one import a serve-arm repair needs when the file binds no contract name.
+_SERVE_ARMS_IMPORT = "from resilient_mlkit.core.served import ServeArms"
+
+
+def serve_arm_repair(
+    derivation: ServeArmDerivation, symbol: str, *, arm: str | None, inline: bool
+) -> str:
+    """The exact repair for one ``SERVE_ARM`` finding (E-M38).
+
+    Names, in order of preference: the serve-arm policy this file already takes
+    from ``core.served`` (``SERVE_ARMS``, or a helper returning one); failing
+    that, the ``ServeArms`` the file binds and has not declared a policy with;
+    failing that, the import it lacks. Every branch ends in the same two
+    tokens — a ``ServeArms`` and its ``.require`` — because that is the only
+    shape the exemption is granted to. What no branch offers is a way to keep
+    the local value: a serve-arm value is the contract's, or it is this file's.
+
+    The closing sentence names the other honest exit E-M38 leaves open — that
+    the word is being used in a different sense — and says how a repo says so
+    where the check can see it (a rename out of the pattern), so the finding
+    cannot be read as demanding ``ServeArms`` for an evaluation-arm table.
+    """
+    arm_repr = f'"{arm}"' if arm else '"<arm>"'
+    policies = derivation.policies()
+    binds_serve_arms = "ServeArms" in derivation.names
+    declare = (
+        f"SERVE_ARMS = ServeArms(open=frozenset({{{arm_repr}}}), "
+        'closed={"<arm>": "<why it is closed>"})'
+    )
+    if policies:
+        best = policies[0]
+        because = (
+            f"{best} is the serve-arm policy this file already takes from "
+            "core.served"
+            + (f" (also: {', '.join(policies[1:])})" if len(policies) > 1 else "")
+        )
+        if inline:
+            head = (
+                f"replace the inline test with the contract's guard, "
+                f"`{best}.require(<the arm being tested>)`; {because}"
+            )
+        else:
+            head = (
+                f"derive {symbol} from {best}: `{symbol} = {best}.require({arm_repr})`; "
+                f"{because}, and a bare literal beside it is E-079's third row"
+            )
+    else:
+        # Bound names only -- not the derived helpers, which are this file's
+        # own, and not the route module's whole namespace. Capped: the point
+        # is "you already reach the contract", not an inventory.
+        bound = sorted(derivation.names)
+        shown = ", ".join(bound[:4]) + (f", +{len(bound) - 4} more" if len(bound) > 4 else "")
+        if binds_serve_arms:
+            have = "declare the policy with the ServeArms this file already binds"
+        elif bound:
+            have = (
+                f"this file binds {shown} from core.served (or from a module in "
+                f"this repo that imports it) but no serve-arm policy; add "
+                f"`{_SERVE_ARMS_IMPORT}` and declare one"
+            )
+        else:
+            have = (
+                f"this file binds no core.served name; add `{_SERVE_ARMS_IMPORT}` "
+                "and declare the policy"
+            )
+        if inline:
+            head = (
+                f"{have}, `{declare}`, then test the arm through the contract's "
+                "guard, `SERVE_ARMS.require(<the arm being tested>)`"
+            )
+        else:
+            head = (
+                f"{have}, `{declare}`, then derive "
+                f"`{symbol} = SERVE_ARMS.require({arm_repr})`"
+            )
+    guard = (
+        "ServeArms.require also refuses an UNDECLARED arm, which a test against "
+        "one name does not. "
+    ) if inline else ""
+    subject = "the constant this test reads" if inline else symbol
+    return (
+        f"REPAIR: {head}. {guard}"
+        f"If {subject} is not a serve arm at all (an evaluation-arm table, a "
+        "column-label assertion), rename it out of R12's arm-constant pattern -- "
+        "`<SERVEABLE|SERVED|OPEN|CLOSED|DECIDING|ALLOWED>_ARM(S)`/`_SPLIT(S)`, or a "
+        "bare `ARM`/`ARMS`/`SERVE_ARMS` -- and record why in the repo's own "
+        "escalation register; mlkit keeps no exemption list (E-M38)"
+    )
 
 
 def _serve_arm_derivation(
@@ -680,6 +802,7 @@ def _serve_arm_derivation(
     names -= _rebound_names(tree)
 
     derived: set[str] = set()
+    callables: set[str] = set()
     changed = True
     while changed:
         changed = False
@@ -692,6 +815,7 @@ def _serve_arm_derivation(
                     continue
                 if _reads(stmt, pool, prefixes):
                     derived.add(stmt.name)
+                    callables.add(stmt.name)
                     changed = True
                 continue
             targets: list[ast.Name]
@@ -711,7 +835,10 @@ def _serve_arm_derivation(
                     derived.add(target.id)
                     changed = True
     return ServeArmDerivation(
-        names=frozenset(names), prefixes=frozenset(prefixes), derived=frozenset(derived)
+        names=frozenset(names),
+        prefixes=frozenset(prefixes),
+        derived=frozenset(derived),
+        callables=frozenset(callables),
     )
 
 
@@ -817,7 +944,7 @@ class _ModuleScanner:
         }
 
     def _record(
-        self, node: ast.AST, clause: str, symbol: str, detail: str
+        self, node: ast.AST, clause: str, symbol: str, detail: str, repair: str = ""
     ) -> None:
         self.findings.append(
             Finding(
@@ -828,6 +955,7 @@ class _ModuleScanner:
                 symbol=symbol,
                 detail=detail,
                 corroborating=tuple(sorted(set(self.corroborating))),
+                repair=repair,
             )
         )
 
@@ -857,17 +985,11 @@ class _ModuleScanner:
             if key in seen:
                 continue
             seen.add(key)
-            findings.append(
-                Finding(
-                    path=f.path,
-                    line=f.line,
-                    clause=f.clause,
-                    severity=f.severity,
-                    symbol=f.symbol,
-                    detail=f.detail,
-                    corroborating=corroborating,
-                )
-            )
+            # `replace`, not a field-by-field copy: the copy this used to be
+            # silently dropped `repair` the day the field was added, and a
+            # rebuild that has to be told about every field is a rebuild that
+            # will forget the next one too.
+            findings.append(dataclasses.replace(f, corroborating=corroborating))
         findings.sort(key=lambda f: (f.line, f.clause, f.symbol))
         return findings
 
@@ -1090,6 +1212,13 @@ class _ModuleScanner:
                 value = node.value
             if self.derivation.covers(value):
                 continue
+            # The literal, when there is one, so the repair can spell the arm
+            # the file actually serves rather than a placeholder.
+            arm = (
+                value.value
+                if isinstance(value, ast.Constant) and isinstance(value.value, str)
+                else None
+            )
             for target in targets:
                 if isinstance(target, ast.Name) and _ARM_CONSTANT_RE.match(target.id):
                     self._record(
@@ -1098,6 +1227,9 @@ class _ModuleScanner:
                         "makes the policy data and the refusal mechanical, which is "
                         "what lets two repos disagree about which arm is closed "
                         "without disagreeing about the guard",
+                        repair=serve_arm_repair(
+                            self.derivation, target.id, arm=arm, inline=False
+                        ),
                     )
 
         for if_node in ast.walk(self.tree):
@@ -1136,6 +1268,9 @@ class _ModuleScanner:
                 "refuses an arm inline; core.served.ServeArms.require is the "
                 "contract's guard and refuses an UNDECLARED arm too, which an "
                 "inline test against one name does not",
+                repair=serve_arm_repair(
+                    self.derivation, "if <arm> ... raise", arm=None, inline=True
+                ),
             )
 
 

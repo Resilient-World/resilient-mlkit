@@ -12,6 +12,61 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v1.2.0 — 2026-09-06
+
+Not yet tagged. Tag cutting is the signatory's (E-M08). **A report surface
+changes; no verdict moves** — R12's rows are the same rows, each now carrying
+its repair — which this file's scale calls *minor*. Repair campaign, mlkit
+lane, defect 2; **E-M38**.
+
+### R12 — every `SERVE_ARM` row names the exact repair
+
+* **The defect.** E-M38 enumerated nine `SERVE_ARM` rows on three `main`s and
+  each told the owning repo WHY the site was a finding ("declares a serve-arm
+  policy locally; core.served.ServeArms makes the policy data …") and nothing
+  about WHAT to write. A consumer fixing one had to read
+  `core/served_reimplementation.py` to learn what "derived from a bound
+  `core.served` name" means — and the day each repo moves its pin, that row is
+  a red check with no instruction on it.
+* **What changed.** `Finding` carries `repair`; every `SERVE_ARM` row fills it
+  (`serve_arm_repair`). The sentence names, in order of preference, **the
+  serve-arm policy the file already takes from `core.served`** and the one line
+  that derives from it (`DECIDING_ARM = SERVE_ARMS.require("val")` — torrent
+  `candidate_promotion.py:124`, with the arm spelled from the literal the file
+  serves); failing that, the `ServeArms` the file binds and the declaration it
+  lacks; failing that, the import, the declaration and the derivation. An inline
+  refusal is told to test through `.require(...)`, which also refuses an
+  UNDECLARED arm. Every branch ends in the same two tokens, because that is the
+  only shape the exemption is granted to. The closing sentence names E-M38's
+  other honest exit — the word in a different sense — and the pattern a rename
+  has to leave, so an evaluation-arm table is not told to become a `ServeArms`.
+* **Where a consumer reads it.** `reports/served_contract.md` gains a `repair`
+  column; `evidence.top[*].repair` and `Finding.to_dict()["repair"]` carry it.
+  `ServeArmDerivation` learns which derived names are callables (`callables`)
+  and which speak of arms (`policies()`), so a helper is spelled as the call it
+  is.
+* **A defect found by the control, before it shipped.** `scan()` rebuilds every
+  finding to attach corroboration, field by field; the first cut of `repair`
+  was dropped there and the nine real rows read `repair: ""`. The rebuild is now
+  `dataclasses.replace`, so the next field cannot be forgotten the same way, and
+  a test holds the field at repo scope and in the written report.
+* **Controls.** The executable one: the line each message names, written into
+  the fixture in place of the literal, clears the row (`test_em38_the_repair_the_message_names_is_the_repair_that_clears_the_row`,
+  and the helper-as-call variant). Driven on the three current `main`s (fray
+  `ab0df86d`, torrent `39ddcd2b`, chokepoint `ceb40b4a`): the nine rows are the
+  same nine, each with its repair; and the nine repairs the messages name,
+  applied to throwaway copies, clear **9 of 9 rows and add 0**.
+* Nothing moves for the other five clauses; their rows carry an empty `repair`
+  and say so.
+
+### Which checks can render FAIL on repo code that did not change
+
+None newly. Carried forward, not introduced here: **R12** (v1.0.0, nine
+`SERVE_ARM` rows on three `main`s, E-M38) and **D2, E1, T2, R2, D3, E3 and R4**
+(E-M09, E-M10). A consumer whose pin predates those releases inherits their
+moves on this upgrade.
+
+
 ## v1.1.1 — 2026-09-06
 
 Not yet tagged. Tag cutting is the signatory's (E-M08). **A defect in the

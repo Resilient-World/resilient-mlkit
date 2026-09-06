@@ -1310,16 +1310,23 @@ def _write_r12_report(
         "Adoption is what clears this check; renaming is not, and neither is a",
         "dead import line.",
         "",
-        "| severity | clause | file | symbol | why it matters |",
-        "|---|---|---|---|---|",
+        "A `SERVE_ARM` row also carries its REPAIR: the bound `core.served` name",
+        "the value must derive from, or the import and declaration the file lacks",
+        "(E-M38). The repair is the row's, not the file's: two rows in one file can",
+        "name two different policies.",
+        "",
+        "| severity | clause | file | symbol | why it matters | repair |",
+        "|---|---|---|---|---|---|",
     ]
     for f in findings:
         detail = f.detail.replace("|", "\\|")
+        repair = f.repair.replace("|", "\\|") or "—"
         lines.append(
-            f"| {f.severity} | {f.clause} | `{f.path}:{f.line}` | `{f.symbol}` | {detail} |"
+            f"| {f.severity} | {f.clause} | `{f.path}:{f.line}` | `{f.symbol}` | {detail} "
+            f"| {repair} |"
         )
     if not findings:
-        lines.append("| — | — | — | — | (none) |")
+        lines.append("| — | — | — | — | (none) | — |")
     lines.append("")
     # Unguarded: static analysis, no repo imports. See core/report.py.
     report.guarded_write(
