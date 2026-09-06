@@ -12,6 +12,75 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v1.1.0 — 2026-09-06
+
+Not yet tagged. Tag cutting is the signatory's (E-M08). **A new CLI surface and
+no existing check's verdict moves in this release**, which this file's own scale
+calls *minor*. Plan v4 §1.9, second bullet; torrent **E-080** (filed as E-079 in
+fray and chokepoint — one finding, two ids).
+
+**Landing order.** This entry numbers itself 1.1.0 because it is meant to land
+after `fix/e-079-served-exemption-scoped-to-the-decision` (v1.0.0), with which it
+conflicts textually in this file and in `src/resilient_mlkit/__init__.py`. Both
+branches are cut from `1d9df13`; the second to land rebases and reconciles the
+heading. If this lands first it is renumbered, not merged as it stands.
+
+### `mlkit register --check-fleet` — the S-5 register's cross-repo invariant
+
+* **The defect (E-080).** `docs/one_sided_placebo_register.json` is ONE document
+  kept in three repositories, and `canonical_body_sha256` exists to make a drift
+  between the copies fail in whichever copy drifted. On 2026-09-05 there were
+  **four live bodies at once**, and every copy was internally consistent — so
+  every repo's own `--mode check` returned `0 problem(s)` and every repo's suite
+  was green on the constant it had pinned. Each repo had zeroed its own entry in
+  `source_files_quoting_the_replaced_sentence` and written, in prose, that the
+  other repo was still stale. Both statements were false and neither repo could
+  ever learn otherwise. **The invariant lives BETWEEN the repos and nothing ran
+  it.**
+* **Why a local command and not CI.** The repos are private, so a cross-repo CI
+  job needs a credential, and rule 13 forbids an agent putting one anywhere near
+  this; standing CI configuration is the signatory's under rule 12. So this runs
+  on a machine that already holds the checkouts. It fetches nothing,
+  authenticates to nothing, and writes nothing into any repo.
+* **What it does.** Reads every `resilient-*` copy under `--root` **from its own
+  `HEAD`**; recomputes the digest with **each repo's own committed**
+  `canonical_body_sha256`, cross-applied so the three implementations are checked
+  against each other too (rule 7 — mlkit defines no second digest); and fails on
+  any digest or field divergence, **naming the field** by dotted path.
+  `declarations` is compared by declaration id, so a narrowing live in one copy
+  and absent from another reports as `declarations[FR-D2-NASS-45ORIGIN-ABOVE]`
+  rather than as a positional index.
+* **Three exit codes, because three things are different.** `0` the copies are
+  one document; `1` they are not; `2` the run measured nothing — fewer than two
+  copies, or an unreadable copy. A fleet check over one copy reporting green
+  would be the strongest possible version of the defect it exists to catch, so it
+  refuses instead.
+* **The control that decides whether it was worth building:** a copy that edits
+  one field AND re-derives its own digest — internally consistent, green under
+  its own repo's scanner, which is E-080's state exactly — **still FAILS, naming
+  the field.** Driven on real clones: the three current mains PASS on the
+  identical git blob `9f6cb2b015f2ba9ca9e8c696b310d1bd9767e738`; six mutations
+  each fire; the unmutated fleet is re-driven after all of them and still passes.
+* The pre-landing obligation for the three adopting repos is **proposed** in
+  `docs/S5_REGISTER_FLEET_CHECK.md`. No sibling repo is edited by this release.
+
+### Which checks can render FAIL on repo code that did not change
+
+The only thing a consumer upgrading reads is this entry, so the list is stated in
+full rather than by reference.
+
+* **Nothing new in this release.** `register --check-fleet` is a command, not a
+  gating check: it is not in any phase, and no repo's readiness verdict moves
+  because of it.
+* **D2, E1, T2, R2, D3, E3 and R4** — carried forward. `docs/ESCALATIONS.md`
+  E-M09 and E-M10 record the non-finite repairs that moved these seven from PASS
+  to FAIL on unchanged repo code; a consumer whose pin predates that release
+  inherits their move on this upgrade.
+* **R12**, if this is reached by upgrading across **v1.0.0**: that release scoped
+  R12's serve-arm exemption to the decision and moves three repository `main`s
+  from PASS to FAIL. See its entry.
+
+
 ## v1.0.0 — 2026-09-06
 
 Not yet tagged; neither is `v0.7.0` below. Tag cutting is the signatory's
@@ -75,6 +144,7 @@ in full rather than by reference.
   `docs/ESCALATIONS.md` E-M09 and E-M10 record the non-finite repairs that moved
   these seven from PASS to FAIL on unchanged repo code; a consumer whose pin
   predates that release inherits their move on this upgrade as well as R12's.
+
 
 ## v0.7.0 — 2026-09-04
 

@@ -24,6 +24,7 @@ from .core import identity as identity_mod
 from .core import merged as merged_mod
 from .core import nonce as nonce_mod
 from .core import policy, store
+from .core import register as register_mod
 from .core.repo import PORTFOLIO, Repo, discover, find_root
 from .core.result import (
     ALLOW_DIRTY_KEY,
@@ -1093,6 +1094,71 @@ def cmd_identity(args: argparse.Namespace) -> int:
     return 0 if all(r.ok for r in results) else 1
 
 
+#: Exit code for `mlkit register --check-fleet` when the run measured nothing
+#: rather than measuring agreement. Distinct from 1 so a caller can tell "the
+#: copies disagree" from "there were not enough copies to ask", which are
+#: different problems with different fixes.
+REGISTER_REFUSED_EXIT = 2
+
+
+def cmd_register(args: argparse.Namespace) -> int:
+    """S-5's cross-repo invariant, run locally (E-080).
+
+    `docs/one_sided_placebo_register.json` is one document kept in three
+    repositories, and on 2026-09-05 there were four live bodies at once. Every
+    copy was internally consistent, so every repo's own scanner reported
+    `0 problem(s)` and every repo's suite was green on the constant it had
+    pinned. The invariant lives BETWEEN the repos and nothing ran it.
+
+    This runs it, from checkouts already on disk. It fetches nothing and
+    authenticates to nothing: the repos are private, and rule 13 forbids an
+    agent putting a credential near a cross-repo job. A standing CI equivalent
+    is the signatory's under rule 12 and is not built here.
+    """
+    root = Path(args.root).resolve() if args.root else find_root()
+    try:
+        report = register_mod.check_fleet(root)
+    except register_mod.RegisterUnreadable as exc:
+        if args.json:
+            print(json.dumps({"refusal": str(exc)}, indent=1))
+        else:
+            print(f"REFUSED: {exc}")
+        return REGISTER_REFUSED_EXIT
+
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=1))
+    else:
+        if report.refusal:
+            print(report.refusal)
+        else:
+            print(f"root: {report.root}")
+            for copy in report.copies:
+                print(
+                    f"  {copy.repo:24s} HEAD {copy.head[:12]}  blob {copy.blob[:12]}  "
+                    f"body {(copy.agreed_digest or 'DISAGREEING')[:16]}"
+                )
+            blob = report.one_blob
+            print(
+                f"  {len(report.copies)} copies, "
+                + (
+                    f"IDENTICAL git blob {blob}"
+                    if blob
+                    else "the copies are DIFFERENT git objects"
+                )
+            )
+            for problem in report.problems:
+                where = f" {problem.field_path}" if problem.field_path else ""
+                print(f"  {problem.kind}{where} [{problem.repo}]")
+                print(f"      {problem.detail}")
+            print(
+                "  0 problem(s)" if not report.problems
+                else f"  {len(report.problems)} problem(s)"
+            )
+    if report.refusal:
+        return REGISTER_REFUSED_EXIT
+    return 1 if report.problems else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mlkit",
@@ -1220,6 +1286,32 @@ def build_parser() -> argparse.ArgumentParser:
     p_ident.add_argument("--json", action="store_true", help="machine-readable output")
     p_ident.set_defaults(func=cmd_identity)
 
+    p_register = sub.add_parser(
+        "register",
+        help="S-5: compare the one-sided placebo register across the checkouts on this machine",
+        description=(
+            "The register is ONE document kept in three repositories, and its "
+            "canonical_body_sha256 exists to make a drift between the copies "
+            "fail in whichever copy drifted. It cannot: every copy can be "
+            "internally consistent while the four of them disagree, which is "
+            "what happened on 2026-09-05 (torrent E-080). This reads every "
+            "copy under --root from its own HEAD, recomputes the digest with "
+            "EACH REPO'S OWN committed canonical_body_sha256, and fails on any "
+            "digest or field divergence, naming the field. It is local by "
+            "design: the repos are private and rule 13 forbids an agent putting "
+            "a cross-repo credential in CI."
+        ),
+    )
+    p_register.add_argument(
+        "--root", help="directory containing the resilient-* checkouts"
+    )
+    p_register.add_argument(
+        "--check-fleet", action="store_true", dest="check_fleet",
+        help="compare every copy found under --root (the only mode today)",
+    )
+    p_register.add_argument("--json", action="store_true", help="machine-readable output")
+    p_register.set_defaults(func=cmd_register)
+
     p_allow = sub.add_parser("allowlist", help="verify allowlist structure and signature")
     common(p_allow)
     p_allow.add_argument("action", choices=["verify"], nargs="?", default="verify")
@@ -1233,6 +1325,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "check" and not args.portfolio and not args.phase:
         parser.error("check requires --phase PHASE or --portfolio")
+    if args.command == "register" and not args.check_fleet:
+        # There is one mode, and it is named on the command line rather than
+        # defaulted, so a future second mode cannot silently inherit callers
+        # written for this one.
+        parser.error("register requires --check-fleet")
     return int(args.func(args) or 0)
 
 
