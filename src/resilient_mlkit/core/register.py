@@ -66,6 +66,7 @@ scope.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -77,17 +78,26 @@ from pathlib import Path
 from typing import Any
 
 __all__ = [
+    "ARTIFACT_RELPATH",
+    "ARTIFACT_SCHEMA",
     "DIVERGENT",
+    "PROOF_FIELD",
     "REGISTER_RELPATH",
     "SELF_INCONSISTENT",
     "VERIFIER_RELPATH",
+    "ArtifactRefused",
     "Copy",
     "FleetReport",
     "Problem",
     "RegisterUnreadable",
+    "artifact_document",
     "check_fleet",
     "field_divergences",
+    "load_artifact",
     "load_copy",
+    "proof_sha256",
+    "verify_artifact",
+    "write_artifact",
 ]
 
 #: The document, in every repo that carries it.
@@ -99,6 +109,22 @@ VERIFIER_RELPATH = "scripts/verify_one_sided_placebo_register.py"
 
 #: The field the digest covers everything except.
 DIGEST_FIELD = "canonical_body_sha256"
+
+#: The committable result of one ``--check-fleet`` run (E-M39). A consumer
+#: commits it beside the register it describes and pins it with
+#: :func:`verify_artifact`, so a register edit with no fresh fleet check is a
+#: red test in that repo rather than a paragraph somebody was meant to read.
+ARTIFACT_SCHEMA = "resilient-mlkit/s5-register-fleet-check/1"
+
+#: Where a consumer is asked to keep it. A suggestion the verifier does not
+#: depend on: :func:`verify_artifact` takes the path it is given.
+ARTIFACT_RELPATH = "reports/s5_register_fleet_check.json"
+
+#: The artifact's own seal: sha256 over its canonical body with this field
+#: removed. It is NOT a second digest of the register (rule 7) -- the register's
+#: digest stays the repos' own ``canonical_body_sha256``. It seals mlkit's
+#: RESULT, so an artifact edited by hand to read PASS no longer verifies.
+PROOF_FIELD = "proof_sha256"
 
 #: Lists whose elements are matched by a stable key rather than by position,
 #: so that an element present in one copy and absent from another is reported
@@ -467,9 +493,12 @@ def check_fleet(root: Path) -> FleetReport:
             root=str(root),
             copies=(),
             problems=(),
+            # No path in the sentence: this refusal is carried verbatim into the
+            # committable artifact, and a machine path there is M-5's defect.
+            # The CLI prints --root on its own line beside it.
             refusal=(
                 f"REFUSED: {len(roots)} copy/copies of {REGISTER_RELPATH} found under "
-                f"{root} ({found}). The invariant this checks lives BETWEEN the repos, "
+                f"--root ({found}). The invariant this checks lives BETWEEN the repos, "
                 "so a run over fewer than two copies measures nothing — and reporting "
                 "it green would be the strongest possible version of the defect it "
                 "exists to catch (E-080)"
@@ -567,3 +596,152 @@ def check_fleet(root: Path) -> FleetReport:
     return FleetReport(
         root=str(root), copies=tuple(copies), problems=tuple(problems), refusal=None
     )
+
+
+# ---------------------------------------------------------------------------
+# the committable artifact, and the consumer-side pin (E-M39)
+# ---------------------------------------------------------------------------
+class ArtifactRefused(RuntimeError):
+    """The artifact would carry something a committed file may not (a machine path)."""
+
+
+def proof_sha256(doc: Mapping[str, Any]) -> str:
+    """The seal over an artifact body: sha256 of its canonical JSON, seal excluded."""
+    body = {k: v for k, v in doc.items() if k != PROOF_FIELD}
+    blob = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def artifact_document(
+    report: FleetReport, *, mlkit_version: str, mlkit_build: str
+) -> dict[str, Any]:
+    """The committable form of one fleet-check run.
+
+    Differs from :meth:`FleetReport.to_dict` in exactly the ways a committed
+    file needs: no ``root`` and no ``path`` (machine paths), a one-word
+    ``verdict`` beside the boolean, the mlkit that measured it, and the seal.
+    Everything a reader needs to re-derive the verdict is inside it: each
+    copy's HEAD, its register blob, what every repo's function computed over
+    its body, and every problem by field.
+    """
+    verdict = "REFUSED" if report.refusal else ("FAIL" if report.problems else "PASS")
+    doc: dict[str, Any] = {
+        "artifact_schema": ARTIFACT_SCHEMA,
+        "verdict": verdict,
+        "ok": report.ok,
+        "mlkit": {"version": mlkit_version, "build": mlkit_build},
+        "copies": [
+            {
+                "repo": c.repo,
+                "head": c.head,
+                "blob": c.blob,
+                "stored_digest": c.stored_digest,
+                "computed_by": dict(sorted(c.computed.items())),
+                "agreed_digest": c.agreed_digest,
+            }
+            for c in report.copies
+        ],
+        "identical_blob": report.one_blob,
+        "problems": [p.to_dict() for p in report.problems],
+        "refusal": report.refusal,
+    }
+    doc[PROOF_FIELD] = proof_sha256(doc)
+    return doc
+
+
+def write_artifact(
+    report: FleetReport, path: Path, *, mlkit_version: str, mlkit_build: str
+) -> dict[str, Any]:
+    """Write :func:`artifact_document` to ``path``; refuse a machine path in it."""
+    from . import artifact as artifact_mod
+
+    doc = artifact_document(report, mlkit_version=mlkit_version, mlkit_build=mlkit_build)
+    offending = artifact_mod.machine_paths(doc)
+    if offending:
+        raise ArtifactRefused(
+            "the fleet-check artifact would carry a machine path and is not written: "
+            + "; ".join(f"{pointer} = {value!r}" for pointer, value in offending)
+        )
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    return doc
+
+
+def load_artifact(path: Path) -> dict[str, Any]:
+    try:
+        doc = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RegisterUnreadable(f"fleet-check artifact {Path(path).name}: {exc}") from exc
+    if not isinstance(doc, dict):
+        raise RegisterUnreadable(
+            f"fleet-check artifact {Path(path).name} is a {type(doc).__name__}, not an object"
+        )
+    return doc
+
+
+def verify_artifact(doc_or_path: Mapping[str, Any] | Path | str, repo_root: Path) -> list[str]:
+    """Every reason a committed fleet-check artifact does not license the
+    register this repository carries at ``HEAD``. Empty is the pin holding.
+
+    This is the consumer-side half of E-M39: a test in each register-carrying
+    repo asserts this returns ``[]``. Then a register edit with no fresh
+    ``--check-fleet`` run is a red test in that repo -- the blob at ``HEAD``
+    is not among the blobs the artifact compared -- and so is an artifact from
+    a FAIL or REFUSED run, or one edited by hand to say PASS.
+
+    It reads ``HEAD``, like the check it pins: an uncommitted register edit
+    does not move this, and the same edit committed does.
+    """
+    problems: list[str] = []
+    if isinstance(doc_or_path, (str, Path)):
+        try:
+            doc: Mapping[str, Any] = load_artifact(Path(doc_or_path))
+        except RegisterUnreadable as exc:
+            return [str(exc)]
+    else:
+        doc = doc_or_path
+
+    if doc.get("artifact_schema") != ARTIFACT_SCHEMA:
+        problems.append(
+            f"artifact_schema is {doc.get('artifact_schema')!r}, not {ARTIFACT_SCHEMA!r}: "
+            "this is not a fleet-check artifact mlkit wrote"
+        )
+        return problems
+    stored = doc.get(PROOF_FIELD)
+    computed = proof_sha256(doc)
+    if stored != computed:
+        problems.append(
+            f"{PROOF_FIELD} is {str(stored)[:16]!r} but the body seals to {computed[:16]!r}: "
+            "the artifact was edited after it was written, or was not written by "
+            "`mlkit register --check-fleet --out`"
+        )
+    verdict = doc.get("verdict")
+    if verdict != "PASS" or doc.get("ok") is not True:
+        problems.append(
+            f"verdict is {verdict!r}: a register change lands on a PASS, never on a "
+            "FAIL or on a run that measured nothing"
+            + (f" ({doc['refusal']})" if doc.get("refusal") else "")
+        )
+    copies = doc.get("copies") or []
+    if len(copies) < 2:
+        problems.append(
+            f"{len(copies)} copy/copies compared: the invariant lives BETWEEN the repos "
+            "and fewer than two is not a fleet check"
+        )
+    try:
+        head_blob = _blob_id(Path(repo_root), REGISTER_RELPATH)
+    except RegisterUnreadable as exc:
+        problems.append(f"this repository's register at HEAD could not be read: {exc}")
+        return problems
+    compared = {c.get("blob") for c in copies if isinstance(c, Mapping)}
+    if head_blob not in compared:
+        shown = ", ".join(sorted(str(b)[:12] for b in compared)) or "none"
+        problems.append(
+            f"this repository's {REGISTER_RELPATH} at HEAD is blob {head_blob[:12]}, which "
+            f"the artifact never compared (it compared: {shown}). The fleet check ran "
+            "before this edit, or on another tree. Re-run `mlkit register --check-fleet "
+            f"--root <checkouts> --out {ARTIFACT_RELPATH}` on this tree beside the "
+            "other repositories and commit its output"
+        )
+    return problems

@@ -1115,6 +1115,9 @@ def cmd_register(args: argparse.Namespace) -> int:
     agent putting a credential near a cross-repo job. A standing CI equivalent
     is the signatory's under rule 12 and is not built here.
     """
+    if args.verify_artifact:
+        return _cmd_register_verify(args)
+
     root = Path(args.root).resolve() if args.root else find_root()
     try:
         report = register_mod.check_fleet(root)
@@ -1125,13 +1128,29 @@ def cmd_register(args: argparse.Namespace) -> int:
             print(f"REFUSED: {exc}")
         return REGISTER_REFUSED_EXIT
 
+    if args.out:
+        # The committable form (E-M39): sealed, machine-path-free, and written
+        # for EVERY verdict -- a FAIL or REFUSED artifact is an honest record
+        # that verify_artifact will refuse, not a file withheld so the tree
+        # keeps its last green one.
+        try:
+            register_mod.write_artifact(
+                report,
+                Path(args.out),
+                mlkit_version=__version__,
+                mlkit_build=identity_mod.build_identity().stamp,
+            )
+        except register_mod.ArtifactRefused as exc:
+            print(f"REFUSED: {exc}")
+            return REGISTER_REFUSED_EXIT
+
     if args.json:
         print(json.dumps(report.to_dict(), indent=1))
     else:
+        print(f"root: {report.root}")
         if report.refusal:
             print(report.refusal)
         else:
-            print(f"root: {report.root}")
             for copy in report.copies:
                 print(
                     f"  {copy.repo:24s} HEAD {copy.head[:12]}  blob {copy.blob[:12]}  "
@@ -1154,9 +1173,37 @@ def cmd_register(args: argparse.Namespace) -> int:
                 "  0 problem(s)" if not report.problems
                 else f"  {len(report.problems)} problem(s)"
             )
+        if args.out:
+            print(f"  artifact written: {args.out}")
     if report.refusal:
         return REGISTER_REFUSED_EXIT
     return 1 if report.problems else 0
+
+
+def _cmd_register_verify(args: argparse.Namespace) -> int:
+    """`mlkit register --verify-artifact FILE [--repo DIR]` -- the consumer's pin.
+
+    Exit 0 when the artifact licenses the register this repository carries at
+    HEAD; 1 when it does not (the reasons are printed, one per line); 2 when
+    the artifact could not be read at all.
+    """
+    repo_root = Path(args.repo).resolve() if args.repo else Path.cwd()
+    try:
+        doc = register_mod.load_artifact(Path(args.verify_artifact))
+    except register_mod.RegisterUnreadable as exc:
+        print(f"REFUSED: {exc}")
+        return REGISTER_REFUSED_EXIT
+    problems = register_mod.verify_artifact(doc, repo_root)
+    if args.json:
+        print(json.dumps({"artifact": args.verify_artifact, "problems": problems}, indent=1))
+    else:
+        for p in problems:
+            print(f"  {p}")
+        print(
+            f"  {len(problems)} problem(s)"
+            + ("" if problems else f": the artifact licenses {register_mod.REGISTER_RELPATH} at HEAD")
+        )
+    return 1 if problems else 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1307,7 +1354,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_register.add_argument(
         "--check-fleet", action="store_true", dest="check_fleet",
-        help="compare every copy found under --root (the only mode today)",
+        help="compare every copy found under --root",
+    )
+    p_register.add_argument(
+        "--out", metavar="FILE",
+        help=(
+            "with --check-fleet: also write the sealed, committable artifact "
+            f"(E-M39); a consumer keeps it at {register_mod.ARTIFACT_RELPATH} and pins "
+            "it with --verify-artifact"
+        ),
+    )
+    p_register.add_argument(
+        "--verify-artifact", metavar="FILE", dest="verify_artifact",
+        help=(
+            "the consumer's pin: does FILE license the register this repository "
+            "carries at HEAD? Exit 0 yes, 1 no (reasons printed), 2 unreadable"
+        ),
+    )
+    p_register.add_argument(
+        "--repo", metavar="DIR",
+        help="with --verify-artifact: the repository to check (default: the current directory)",
     )
     p_register.add_argument("--json", action="store_true", help="machine-readable output")
     p_register.set_defaults(func=cmd_register)
@@ -1325,11 +1391,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "check" and not args.portfolio and not args.phase:
         parser.error("check requires --phase PHASE or --portfolio")
-    if args.command == "register" and not args.check_fleet:
-        # There is one mode, and it is named on the command line rather than
-        # defaulted, so a future second mode cannot silently inherit callers
-        # written for this one.
-        parser.error("register requires --check-fleet")
+    if args.command == "register" and not (args.check_fleet or args.verify_artifact):
+        # Two modes, each named on the command line rather than defaulted, so
+        # neither can silently inherit callers written for the other.
+        parser.error("register requires --check-fleet or --verify-artifact FILE")
+    if args.command == "register" and args.check_fleet and args.verify_artifact:
+        parser.error("register: --check-fleet and --verify-artifact are separate runs")
     return int(args.func(args) or 0)
 
 

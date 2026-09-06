@@ -12,6 +12,68 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v1.3.0 — 2026-09-06
+
+Not yet tagged. Tag cutting is the signatory's (E-M08). **A CLI surface grows
+and a new committable artifact exists; no verdict moves** — this file's scale
+calls that *minor*. Repair campaign, mlkit lane, defect 3; **E-M39**.
+
+### S-5 — the fleet check writes a sealed artifact, and a consumer test PINS it
+
+* **The defect (E-M39).** v1.1.0 built `mlkit register --check-fleet`, and named
+  its own residual: a command somebody must remember to run is weaker than a
+  check. The two ways to make it automatic — a credentialed fleet CI job, or
+  making the repos readable to one another — are the signatory's (rules 12,
+  13). So the obligation was a paragraph proposed for three repos to paste, and
+  a paragraph is not a check.
+* **What changed.** The half that is an agent's to close is a PIN, not CI.
+  `--check-fleet --out FILE` writes `artifact_document(...)`: the verdict, the
+  mlkit that measured it, each copy's `HEAD`, register **blob**, stored digest
+  and what every repo's own `canonical_body_sha256` computed over it, every
+  problem by field, and **`proof_sha256`** — sha256 over the artifact's own
+  canonical body. That seal is NOT a second digest of the register (rule 7);
+  it seals mlkit's *result*, so a FAIL artifact retyped as PASS no longer
+  verifies. `verify_artifact(path, repo_root)` returns every reason the
+  artifact does not license the register the repo carries at `HEAD` — a broken
+  seal, a non-PASS verdict, fewer than two copies, and **a `HEAD` blob the
+  artifact never compared, which is a register edit with no fresh run**.
+  `mlkit register --verify-artifact FILE --repo DIR` is the same verdict from a
+  shell (exit 0 / 1 / 2).
+* **The consumer's side is one test**, given verbatim in
+  `docs/S5_REGISTER_FLEET_CHECK.md` §3.2:
+  `assert register.verify_artifact(ROOT / register.ARTIFACT_RELPATH, ROOT) == []`.
+  With it, a register edit is a red test in the repo that made the edit until
+  `--check-fleet --out` has been re-run on that tree beside the other two
+  repositories and its output committed. It reads `HEAD` like the check it pins.
+* **No machine path in a committed file.** The artifact carries no `--root` and
+  no checkout path; `write_artifact` refuses one that would
+  (`core.artifact.machine_paths`). The one-copy refusal sentence used to embed
+  `--root`'s path and now says `--root`; the CLI prints the path on its own line.
+  The artifact is written for every verdict — a FAIL or REFUSED record is honest
+  and the pin refuses it; withholding it would be the defect this catches.
+* **Driven on the three current `main`s** (fray `ab0df86d`, torrent `39ddcd2b`,
+  chokepoint `ceb40b4a`): PASS on blob `e340ec83…`, artifact written with zero
+  machine paths, `--verify-artifact` exit 0 in all three checkouts.
+* **Controls** (`tests/test_register_fleet.py`, nine added): an edit committed
+  in one repo without a fresh run FIRES in that repo and only that repo; the
+  same edit uncommitted does not move the pin and committed does; a forged PASS
+  fails on its seal while the honest FAIL fails on its verdict with the seal
+  intact; a REFUSED run writes an artifact that verifies nothing and names no
+  path; the loop closes on a fresh run after the edit lands in all three.
+* **What this does not close, still the signatory's:** the sibling whose
+  already-merged copy goes stale when another repo's `main` moves. Its pin is
+  green — its `HEAD` blob is the one its artifact compared — and nothing an
+  agent may build lets it see the other repo's `main` without a credential or
+  a disclosure decision (E-M37). "Three repositories or none" carries that half.
+
+### Which checks can render FAIL on repo code that did not change
+
+None newly. Carried forward, not introduced here: **R12** (v1.0.0, nine
+`SERVE_ARM` rows on three `main`s, E-M38) and **D2, E1, T2, R2, D3, E3 and R4**
+(E-M09, E-M10). A consumer whose pin predates those releases inherits their
+moves on this upgrade.
+
+
 ## v1.2.0 — 2026-09-06
 
 Not yet tagged. Tag cutting is the signatory's (E-M08). **A report surface

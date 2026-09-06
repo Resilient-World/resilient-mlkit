@@ -412,3 +412,178 @@ def test_the_cli_json_payload_names_the_field_and_who_holds_what(tmp_path, capsy
         "each copy must record what EVERY repo's function computed over it; that "
         "cross-application is what makes 'one answer' a measurement"
     )
+
+
+# ---------------------------------------------------------------------------
+# E-M39: the committable artifact, and the consumer-side pin
+# ---------------------------------------------------------------------------
+# `--check-fleet` answered E-080 with a command somebody must remember to run.
+# E-M39 named that as the residual: an obligation is weaker than a check. The
+# closure that is an agent's to build is not CI (rule 12/13) but a PIN: the run
+# writes a sealed artifact, the consumer commits it beside the register, and a
+# test in the consumer asserts `verify_artifact(...) == []`. Then a register
+# edit with no fresh run is a red test in the repo that made the edit -- the
+# blob at HEAD is not among the blobs the artifact compared.
+#
+# Every pair below holds one variable: the register at HEAD, the artifact's
+# body, or the run's verdict.
+
+from resilient_mlkit.core import artifact as artifact_mod
+
+
+def _write(root: Path, out: Path) -> tuple[int, dict]:
+    """``(exit code, the artifact as written)``. The document is returned as
+    the file holds it -- a helper that tucked the exit code INTO the dict broke
+    the seal it was about to test, which is the seal working."""
+    rc = cli.main(["register", "--check-fleet", "--root", str(root), "--out", str(out)])
+    return rc, json.loads(out.read_text(encoding="utf-8"))
+
+
+def test_the_artifact_is_sealed_carries_no_machine_path_and_verifies_in_every_repo(tmp_path):
+    """SILENT: three copies of one document, the artifact written by the run."""
+    root = make_fleet(tmp_path)
+    out = tmp_path / "artifact.json"
+    rc, doc = _write(root, out)
+    assert rc == 0
+    assert doc["artifact_schema"] == reg.ARTIFACT_SCHEMA
+    assert doc["verdict"] == "PASS" and doc["ok"] is True
+    assert doc[reg.PROOF_FIELD] == reg.proof_sha256(doc)
+    assert len(doc["copies"]) == 3 and doc["identical_blob"]
+    assert "root" not in doc and all("path" not in c for c in doc["copies"])
+    assert artifact_mod.machine_paths(doc) == [], "a committed file may carry no machine path"
+    assert doc["mlkit"]["version"] == cli.__version__
+    for name in REPOS:
+        assert reg.verify_artifact(doc, root / name) == []
+        assert reg.verify_artifact(out, root / name) == []
+
+
+def test_a_register_edit_committed_without_a_fresh_run_fails_the_pin_in_that_repo(tmp_path):
+    """FIRES. The hook E-M39 asked for, on the shape that matters: an edit that
+    is internally consistent (digest re-derived), so the repo's own scanner is
+    green -- and the pin is red, because HEAD's blob was never compared."""
+    root = make_fleet(tmp_path)
+    out = tmp_path / "artifact.json"
+    _, doc = _write(root, out)
+    body = dict(BODY)
+    body["title"] = "edited after the fleet check"
+    recommit(root / "resilient-fray", sealed(body))
+
+    problems = reg.verify_artifact(doc, root / "resilient-fray")
+    assert len(problems) == 1, problems
+    assert "at HEAD is blob" in problems[0] and "never compared" in problems[0]
+    assert reg.ARTIFACT_RELPATH in problems[0], "the message says how to close the loop"
+    # The two repos that did not move still verify: the pin names the mover.
+    assert reg.verify_artifact(doc, root / "resilient-chokepoint") == []
+    assert reg.verify_artifact(doc, root / "resilient-torrent") == []
+
+
+def test_the_loop_closes_a_fresh_run_after_the_edit_verifies_again(tmp_path):
+    """SILENT again, and the register is now edited in all three (one document)."""
+    root = make_fleet(tmp_path)
+    out = tmp_path / "artifact.json"
+    body = dict(BODY)
+    body["title"] = "the edit, landed in three repositories"
+    for name in REPOS:
+        recommit(root / name, sealed(body))
+    rc, doc = _write(root, out)
+    assert rc == 0
+    for name in REPOS:
+        assert reg.verify_artifact(doc, root / name) == []
+
+
+def test_an_uncommitted_register_edit_does_not_move_the_pin_the_same_edit_committed_does(tmp_path):
+    """The pin reads HEAD like the check it pins. A pair, not an assertion."""
+    root = make_fleet(tmp_path)
+    _, doc = _write(root, tmp_path / "artifact.json")
+    body = dict(BODY)
+    body["title"] = "working-tree only"
+    repo = root / "resilient-torrent"
+    (repo / reg.REGISTER_RELPATH).write_text(json.dumps(sealed(body), indent=1) + "\n")
+    assert reg.verify_artifact(doc, repo) == []
+    recommit(repo, sealed(body))
+    assert reg.verify_artifact(doc, repo) != []
+
+
+def test_an_artifact_edited_by_hand_to_read_pass_fails_on_its_seal(tmp_path):
+    """FIRES. The seal is what stops a FAIL artifact being retyped as a PASS."""
+    root = make_fleet(tmp_path)
+    body = dict(BODY)
+    body["title"] = "drifted"
+    recommit(root / "resilient-chokepoint", sealed(body))
+    out = tmp_path / "artifact.json"
+    rc, doc = _write(root, out)
+    assert rc == 1 and doc["verdict"] == "FAIL"
+
+    forged = dict(doc)
+    forged["verdict"], forged["ok"], forged["problems"] = "PASS", True, []
+    problems = reg.verify_artifact(forged, root / "resilient-fray")
+    assert any(reg.PROOF_FIELD in p and "edited" in p for p in problems), problems
+    # And the honest FAIL artifact is refused on its verdict, seal intact.
+    honest = reg.verify_artifact(doc, root / "resilient-fray")
+    assert any("verdict is 'FAIL'" in p for p in honest), honest
+    assert not any(reg.PROOF_FIELD in p for p in honest)
+
+
+def test_a_refused_run_writes_an_artifact_that_verifies_nothing_and_names_no_path(tmp_path):
+    """A run over one copy is written down as REFUSED -- and carries no --root path,
+    because the refusal sentence lands in a committed file."""
+    lonely = tmp_path / "lonely"
+    lonely.mkdir()
+    make_repo(lonely / "resilient-fray", sealed(BODY))
+    out = tmp_path / "artifact.json"
+    rc, doc = _write(lonely, out)
+    assert rc == cli.REGISTER_REFUSED_EXIT
+    assert doc["verdict"] == "REFUSED" and doc["copies"] == []
+    assert str(lonely) not in json.dumps(doc)
+    assert artifact_mod.machine_paths(doc) == []
+    problems = reg.verify_artifact(doc, lonely / "resilient-fray")
+    assert any("REFUSED" in p for p in problems)
+    assert any("fewer than two" in p for p in problems)
+
+
+def test_a_document_that_is_not_a_fleet_check_artifact_is_named_as_such(tmp_path):
+    root = make_fleet(tmp_path)
+    problems = reg.verify_artifact({"artifact_schema": "something/else"}, root / "resilient-fray")
+    assert problems and "not a fleet-check artifact" in problems[0]
+    missing = reg.verify_artifact(tmp_path / "absent.json", root / "resilient-fray")
+    assert problems and len(missing) == 1
+
+
+def test_the_verify_cli_exit_codes_and_the_repo_flag(tmp_path, capsys):
+    root = make_fleet(tmp_path)
+    out = tmp_path / "artifact.json"
+    _write(root, out)
+    capsys.readouterr()
+    assert cli.main([
+        "register", "--verify-artifact", str(out), "--repo", str(root / "resilient-fray"),
+    ]) == 0
+    assert "licenses" in capsys.readouterr().out
+
+    body = dict(BODY)
+    body["title"] = "edited"
+    recommit(root / "resilient-fray", sealed(body))
+    assert cli.main([
+        "register", "--verify-artifact", str(out), "--repo", str(root / "resilient-fray"), "--json",
+    ]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert len(payload["problems"]) == 1 and "never compared" in payload["problems"][0]
+
+    assert cli.main([
+        "register", "--verify-artifact", str(tmp_path / "absent.json"), "--repo", str(root),
+    ]) == cli.REGISTER_REFUSED_EXIT
+    with pytest.raises(SystemExit):
+        cli.main(["register", "--check-fleet", "--root", str(root), "--verify-artifact", str(out)])
+
+
+def test_the_written_artifact_agrees_with_the_json_report_on_every_shared_field(tmp_path, capsys):
+    """The artifact is the report in committable clothes, not a second opinion."""
+    root = make_fleet(tmp_path)
+    out = tmp_path / "artifact.json"
+    _, doc = _write(root, out)
+    capsys.readouterr()
+    cli.main(["register", "--check-fleet", "--root", str(root), "--json"])
+    report = json.loads(capsys.readouterr().out)
+    assert doc["identical_blob"] == report["identical_blob"]
+    assert doc["ok"] == report["ok"]
+    assert [c["blob"] for c in doc["copies"]] == [c["blob"] for c in report["copies"]]
+    assert [c["agreed_digest"] for c in doc["copies"]] == [c["agreed_digest"] for c in report["copies"]]

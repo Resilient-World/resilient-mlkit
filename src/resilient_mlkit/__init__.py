@@ -46,7 +46,7 @@ from .core.result import (
 #: BUMPED 0.6.0 -> 0.7.0 on 2026-09-04 (plan v3 M-1): a seventh terminal
 #: status is a CLI-surface change, which CHANGELOG.md's own scale calls minor.
 #: Neither v0.6.0 nor v0.7.0 is tagged; the tag stays the signatory's.
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 #: The version is NOT the identity, and E-M24 is the measurement that says so:
 #: fray runs mlkit ``c65b2e7`` and mlkit main is ``6921e9a`` -- 40 commits, 9
