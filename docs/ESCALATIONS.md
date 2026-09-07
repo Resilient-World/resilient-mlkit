@@ -3718,3 +3718,99 @@ universe today.
 **No consumer repository was edited and nothing was pushed to one.** The eight
 fleet copies were throwaway shallow clones, read for measurement and left
 unpushed. **#45 untouched.**
+
+---
+
+## E-M43 — `mlkit allowlist verify` could not fail on two of the four things it printed
+
+**Repo:** `Resilient-World/resilient-mlkit` (public). **Opened** 2026-09-07 on
+`main` `912853df` (v2.1.0). **Preregistration:**
+`reports/E_M43_M44_GATE_DEFECT_PREREGISTRATION.md`, this branch's first commit.
+**Readings:** `reports/E_M43_M44_GATE_DEFECT_RESULTS.md`. **Driven arms:**
+`reports/E_M43_ALLOWLIST_EXIT_ARMS.json`.
+
+### The finding, and the clause of it that was withdrawn before any edit
+
+The finding arrived as four clauses. Measured on `main` first, because a
+control arm driven against a defect that is not there passes against nothing:
+
+* **UNSIGNED exited 0 — TRUE, and this was not in the evidence handed over.**
+  `cmd_allowlist` printed `<repo>: N entries, UNSIGNED` and left `rc` at 0.
+  CLAUDE.md rule 14 makes the signature the determination: an agent proposes an
+  addition here and never edits the allowlist, and every check built on it
+  reports ESCALATED rather than PASS so that an unratified licence position
+  routes to AWAITING-SIGNOFF instead of to a run. The one command whose whole
+  job is to say whether those determinations hold returned success on their
+  absence, so any CI step gating on `$?` treated an unsigned allowlist as a
+  signed one.
+* **Matching NO repository exited 0, silently — TRUE.** `--root` at a directory
+  holding no `resilient-*` checkout printed nothing at all. Silence and success
+  were the same answer. Five sibling commands already refused this with exit 2;
+  `allowlist` had no guard.
+* **`entries_sha256` flipped by one character exits 0 — NOT REPRODUCED, and
+  withdrawn.** Against the process it exits **1**, and did before this branch:
+  `_verify_signature` writes the digest mismatch into `parse_error` and
+  `cmd_allowlist` sets `rc = 1` there. Driven in arm **C2**. The 0 reproduces
+  in a **pipeline** — `mlkit allowlist verify | head` reports the last stage's
+  status — driven in arm **C2P**. That is the same family as the two
+  silent-failure traps the 2026-09-07 verification pass caught in its own
+  tooling (BSD `sed` with no `\?` in a BRE; zsh not word-splitting an unquoted
+  parameter). The branch that was already right is now pinned by a test so it
+  cannot become the defect it was reported as.
+* **The bare, `--root`-less form is not universally silent** — it walks upward
+  looking for two `resilient-*` siblings, so from inside a checkout it finds
+  the fleet. Recorded, not changed.
+
+### The repair
+
+Exit 0 read-and-fine, 1 read-and-bad, `NOTHING_MATCHED_EXIT` (2) nothing-read.
+One definition of the empty-selection refusal (`_refuse_empty_selection`),
+replacing six separate copies-or-absences of it, used by `check`, `portfolio`,
+`spine`, `notice`, `env`, `keys` and `allowlist`, and asserted for all seven by
+one parametrised test. The refusal says what was NOT done — *"Nothing was read,
+so nothing was verified: this is REFUSED, not a pass"* — because *"no portfolio
+repos found"* reads like an observation about a directory.
+
+Two more of the same shape, found by reading every subcommand:
+
+* **`mlkit notice` printed `REFUSED — NOTICE.md exists … and was not generated
+  by mlkit` and returned 0.** R9's remedy text drives an agent into this
+  command, so its exit status is a gate whether or not anyone declared it one.
+  Now 1 when any repo's NOTICE.md was not written; still 0 for a repo with no
+  allowlist, which has no obligation to render.
+* **`mlkit keys` described a portfolio it had not read.** Now refused.
+
+### What was NOT changed, with the reason
+
+`ancestry`, `identity --verify`, `register`, `check --portfolio`, `spine` and
+`env` were each read for the same two shapes and each already distinguishes
+"measured and bad" from "could not measure" in its exit code. Named here so the
+judgement is visible rather than the omission.
+
+### The fleet, before and after
+
+Eight adopter clones at their remote mains, five phases each, one interpreter
+with `PYTHONPATH` switched between `origin/main`'s package tree and the
+branch's, `resilient_mlkit.__file__` asserted inside the named tree before any
+row, arms SEQUENTIAL, every clone reset and cleaned before every phase.
+
+```
+rows BEFORE 272   rows AFTER 272
+added 0   removed 0   STATUS moved 0   reason moved 0
+```
+
+Zero movement was **preregistered**, not observed and then explained: an exit
+code is not a verdict, and any row that moved would have refuted the change.
+The instrument's own determinism was measured the same way — two independent
+drives of `origin/main` agree on all 272 rows.
+
+### RESERVED, and left for the signatory or for each repo
+
+1. **The v2.2.0 tag is not cut.** E-M08: cutting a tag is the signatory's.
+2. **No allowlist was added to, edited or signed** — rule 14, and the UNSIGNED
+   exit code exists precisely so that state routes to the signatory.
+3. **Nothing was pushed to a consumer repo.** All eight rev-pin mlkit, so no
+   consumer's CI sees this exit code until someone moves a pin.
+
+**No gate file, threshold, range or holdout was edited. No credential was read,
+printed, logged or written. `#45` untouched.**

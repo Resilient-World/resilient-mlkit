@@ -12,6 +12,105 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v2.2.0 — 2026-09-07
+
+Not yet tagged. Tag cutting is the signatory's (E-M08). **Minor**, and decided
+by the drive: a CLI SURFACE changes and no check is touched. **Nothing in this
+release moves a check's verdict, or a check's reason, on unchanged repo code** —
+measured over all eight adopter remote mains, five phases each, before and
+after: **272 adjudicated rows, 0 added, 0 removed, 0 status moved, 0 reasons
+moved.** Zero movement was preregistered in
+`reports/E_M43_M44_GATE_DEFECT_PREREGISTRATION.md` §3 before the drive, on the
+ground that an exit code is not a verdict; any movement would have refuted the
+change rather than been explained after it. **E-M43.**
+
+### `mlkit allowlist verify` could not fail on two of the four things it printed
+
+* **An UNSIGNED allowlist printed and exited 0.** CLAUDE.md rule 14 makes the
+  signature the determination — the agent proposes in `docs/ESCALATIONS.md`,
+  the human signs — and every check built on the allowlist reports ESCALATED
+  rather than PASS so that an unratified licence position cannot be mistaken
+  for a ratified one. The one command whose whole job is to say whether those
+  determinations hold returned success on their absence. It now exits **1**.
+* **Matching NO repository printed NOTHING and exited 0.** `--root` at a
+  directory with no `resilient-*` checkout, or `--repo` naming a repo that is
+  not cloned there: silence and success were indistinguishable from a pass. It
+  now exits **2** — a different code from 1, because "an allowlist was read and
+  it is bad" and "nothing was read" are different problems with different
+  fixes — and prints a refusal that says what was *not* done, not only what was
+  not found.
+* **MISSING, INVALID and a defective entry already exited 1** and still do.
+  Each is now pinned by a control arm so it cannot drift into the same shape.
+* **The clause this lane was handed that is NOT a defect, recorded rather than
+  quietly dropped.** "Flip one character of `entries_sha256`: the command
+  prints INVALID and returns 0." Against the process it returns **1**, and did
+  before this release. The 0 comes from a PIPELINE — `mlkit allowlist verify |
+  head` reports the last stage's status — which is the same family as the two
+  silent-failure traps the 2026-09-07 verification pass caught in its own
+  tooling. Arm **C2P** drives it so the distinction is a measurement.
+
+### The same shape, hunted across every other subcommand
+
+* **`mlkit notice` printed `REFUSED — NOTICE.md exists … and was not generated
+  by mlkit` and returned 0.** R9's own remedy text (``run `mlkit notice` ``)
+  sends an agent into this command, which makes its exit status a gate whether
+  or not anyone declared it one: `mlkit notice && git commit -am "regenerate"`
+  committed nothing and reported success. It now returns **1** when any repo's
+  NOTICE.md was not written. A repo with no allowlist is still 0 — there is no
+  obligation to render, and R9 escalates that state rather than failing it.
+* **`mlkit keys` said "Nothing in the portfolio is waiting on a key" from a
+  root under which it had read nothing.** Now refused with exit 2.
+* **`check`, `portfolio`, `spine`, `notice` and `env` carried five separate
+  copies of the empty-selection guard**, and `allowlist` carried none — which
+  is how the seventh command comes to be missing the thing the other six have.
+  One definition now (`_refuse_empty_selection`, `NOTHING_MATCHED_EXIT`), used
+  by all seven and asserted for all seven by one parametrised test.
+* Read and judged **not** defects, so the judgement is visible rather than the
+  omission: `ancestry` (0/1/2, with 2 reserved for "the question could not be
+  asked"), `identity --verify` (0/1/3), `register` (0/1/2, and its
+  `REGISTER_REFUSED_EXIT` is already the "measured nothing" code),
+  `check --portfolio` (`portfolio.exit_code`), `spine` (0/1/3), `env`
+  (1 if any repo is UNMEASURABLE).
+
+### Controls
+
+`reports/E_M43_ALLOWLIST_EXIT_ARMS.json`, driven by
+`scripts/e_m43_allowlist_exit_drive.py` and read back by
+`tests/test_e_m43_allowlist_exit.py` so the record cannot drift from the code.
+Ten arms, each in a subprocess that first asserts `resilient_mlkit.__file__`
+resolves inside the package tree the arm names and exits 9 otherwise. Every
+fixture mutation is applied in Python and REFUSES a no-op — BSD `sed` has no
+`\?` in a BRE, and this fleet has already spent one "corrupted digest" control
+that corrupted nothing. **C8a and C8b are the NOT-DEAD arms**: `cli.py`
+reverted to `origin/main`, the UNSIGNED and no-repo-matched conditions
+re-driven, both returning **0**.
+
+The artifact names no directory: the refusal quotes the root it searched, and
+the record keeps a boolean and the token's LENGTH instead.
+`machine_paths_in_text` runs over the finished artifact and the write is
+refused if it finds one.
+
+### Which checks can render FAIL on repo code that did not change
+
+**None in this release, newly or otherwise.** No check is touched: the change
+is entirely in `cli.py`, and 272 rows over eight mains and five phases read
+identically before and after — zero added, zero removed, zero status moved,
+zero reasons moved.
+
+Carried forward, not introduced here: **R10** (v2.0.0, NA → PASS on
+chokepoint), **R12** (v1.0.0, nine `SERVE_ARM` rows on three `main`s, E-M38)
+and **D2, E1, T2, R2, D3, E3 and R4** (E-M09, E-M10). A consumer whose pin
+predates those releases inherits their moves on this upgrade, and v2.1.0's
+report-write refusal — one repo, one report, `resilient-fray`'s
+`readiness.md` — with them.
+
+What an upgrading CI job CAN newly find is a red step where it had a green one,
+and in every case because the step was already failing and could not say so: a
+job running `mlkit allowlist verify` against an unsigned allowlist, or against
+a root where the checkouts are not where it thinks they are, and a job running
+`mlkit notice` that has been refusing to overwrite a hand-written NOTICE.md.
+Those are not new failures. They are the same failures, now visible to `$?`.
+
 ## v2.1.0 — 2026-09-07
 
 Not yet tagged. Tag cutting is the signatory's (E-M08). **Minor**, and decided
