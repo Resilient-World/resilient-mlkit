@@ -3396,3 +3396,133 @@ merged copy goes stale when another repo's `main` moves has a green pin and no
 way to see that `main` without a credential (rule 13) or the S-10 disclosure
 decision (E-M37). No CI configuration and no credential was created here
 (rule 12).
+
+---
+
+## E-M40 — four measurements were lost on one day to verdicts that depended on machine load; the record and the narrow status exist now, and one case still cannot be told apart
+
+**Raised** 2026-09-06. **Status: FIXED HERE for the distinguishable cases;
+one residual DECLARED and not fixable by this instrument.**
+
+### The defect
+
+A test or a gate whose verdict depends on how busy the machine was. Four
+instances, all on 2026-09-06, all on one 10-CPU host, each recorded in the lane
+record it was measured in.
+
+1. **mlkit, this repo.** `tests/test_pytest_timeout_active.py::
+   test_positive_control_a_sleeping_test_fails_on_timeout` gives a child pytest
+   **10 s of wall time**. Run against three concurrent suites, the arm took
+   **1196.12 s** against a normal **635.75 s** and that test read **rc 1** — a
+   result that would have blocked landing PR #54. The same tree, the same
+   runner, on the quiet machine: **1307 passed, rc 0, 101.02 s**. The tell that
+   dated the cause to contention: the concurrent arm ALSO failed the same
+   file's **negative** control (`a fast test passes under the same limit`), and
+   a fast test cannot be made slow by a source change. `git diff --name-only
+   origin/main 1a0fb080` touched no file matching `timeout`.
+2. **resilient-choco.** The **same tree run twice** — `a2e85c2`, whose tree
+   `1246ece5` is byte-identical to #184's head tree, verified as one git object
+   — produced failure sets **five names apart**, every one a `pytest-timeout` at
+   the 120/180 s boundary. The `main`-vs-#184 difference the landing decision
+   rested on was **three** names: smaller than the churn of one tree against
+   itself. Separately, a test file's own `@pytest.mark.timeout(120)` **beats**
+   `--timeout` on the command line, so a runner-level accommodation silently
+   does not reach the test that most needs it.
+3. **resilient-torrent.** `timeout_method = "thread"` cannot bound a hang that
+   holds the interpreter lock: a 180 s per-test timeout did not fire on a torch
+   section that held the GIL for **79 minutes**, and what did fire was
+   `faulthandler_timeout`, which dumps and does not kill. That stall and a
+   "hung" readiness regeneration both vanished at low load; the suite runs in
+   13.6 minutes quiet.
+4. **resilient-arabica.** A three-stream parallel plan produced a phantom
+   failure — a test that shells out with a 120 s budget and takes 36 s alone. It
+   was discarded and re-run uncontended.
+
+The fact the instrument was missing: **a wall-clock budget missed on a busy
+machine is not a fact about the tree.** It is not a PASS and it is not a FAIL,
+and rendering it as either loses a real measurement — in mlkit's case, nearly a
+correct landing.
+
+### What shipped (v1.4.0)
+
+* **`core.contention.ContentionRecord`** — 1/5/15-minute load average at both
+  ends of the span, CPU count, this process's CPU **and its reaped children's**
+  (the incident is a test that shells out; `time.process_time()` cannot see the
+  child), wall time, and the elapsed-vs-budget ratio. Standard library only, no
+  dependency, no network, nothing written.
+* **`core.contention.classify`** returning `PASS` / `FAIL` / **`UNMEASURABLE`**
+  — the status this portfolio already has for "armed, declaration resolved, the
+  environment cannot supply the input" (M-1). The predicate is four conditions
+  and **all four are required**: the assertion IS a wall-clock budget
+  (structural — `UNMEASURABLE` is unreachable except through
+  `WallClockBudget`); the budget was missed; `cpu_ratio ≤ 0.5` (waiting, not
+  working); `load1 ≥ 1.0 × cpu_count`. Both constants were fixed in
+  `reports/CONTENTION_PREREGISTRATION.md` **before the module existed**.
+* **`WallClockBudget` refuses to move either threshold in the permissive
+  direction**, by name, citing rule 6 — and every record carries the thresholds
+  it was judged against, so a fork that forced them by editing the module is
+  legible in the artifact.
+* **`resilient_mlkit.pytest_contention`** — a `wall_clock_budget` marker and
+  fixture, and a session hook printing the run's contention line at the top and
+  bottom of the log, so any arm's log can be dated afterwards. It **never
+  changes pytest's verdict**: no pass, no skip, no xfail, proved by running the
+  same file with and without the plugin under identical configuration and
+  requiring identical exit codes. Registration is opt-in; there is deliberately
+  no `pytest11` entry point, because one would arrive in eight repos as ambient
+  drift.
+* **`docs/CONTENDED_MEASUREMENT.md`** — the protocol: arms run SEQUENTIALLY; each
+  records its contention record; a by-name comparison between arms at materially
+  different load is **VOID** and is re-measured, not explained. choco's
+  same-tree-twice case is the worked example, with the rule that a by-name
+  difference smaller than the measured flake floor is not evidence.
+
+### Driven both ways, and the artifact is committed
+
+`reports/CONTENTION_CONTROL_ARMS.json`, budget derived from the measured quiet
+baseline (`0.5783 s` = 1.5 × `0.3855 s`), all on this 10-CPU host:
+
+```
+NEGATIVE  unchanged child, quiet (load 6.11)   0.40s  cpu 0.38s ratio 0.95  PASS
+FIRES     REGRESSED O(n^2), quiet (load 6.11)  6.46s  cpu 6.39s ratio 0.99  FAIL
+SILENT    unchanged child, LOADED (load 13.23) 1.94s  cpu 0.54s ratio 0.28  UNMEASURABLE
+NOT-DEAD  N1 facility removed                                               FAIL
+          N2 C4 destroyed (load_per_cpu 0.0)                                FAIL
+          N3 C3 destroyed (max_cpu_ratio 1.0)                               FAIL
+          N4 BOTH destroyed                                                 UNMEASURABLE
+```
+
+The same unchanged code reads PASS quiet and UNMEASURABLE loaded; the regressed
+code reads FAIL on the *quiet* machine. **N2 is the load-bearing control**:
+destroying the whole load condition does not save a CPU-burning regression,
+because the CPU condition decides it alone.
+
+### THE RESIDUAL, declared before measuring and unchanged by it
+
+**A sleeping regression on a loaded machine cannot be told from contention by
+this record.** A newly introduced `time.sleep(30)` and a 30 s wait for a busy
+CPU produce the same evidence: no CPU burned, high load. Such an arm reads
+UNMEASURABLE. That is **not a pass** — it satisfies no gate, carries no `halt`
+key, and the protocol obliges a re-measurement on a quiet machine, where the
+load condition fails and the same code reads FAIL. The classifier was designed
+so that its uncertain answer is an OBLIGATION rather than a verdict, precisely
+because this case exists; had the residual been the other way round — a status
+that could absorb a FAIL without obliging anything — the preregistration's
+withdrawal rule would have applied and only the record-and-report half would
+have shipped.
+
+Four further residuals are declared in `core/contention.py`'s module docstring
+and in the preregistration §6: no model of how much slowdown a given load
+explains (inventing one would be a fabricated range, rule 2); `getloadavg`
+decays over the preceding minute; `os.times()` counts only reaped children; two
+instants, not a time series.
+
+### What is NOT done here, and whose it is
+
+**No consumer repository was touched.** All eight rev-pin mlkit, so no consumer
+verdict moves on this release; adopting the plugin is each repo's own one-line
+PR, and the per-repo instructions naming the file and the smallest change are
+written out separately rather than applied. No test threshold, no
+`@pytest.mark.timeout` value and no ini setting in any repo was edited by this
+lane — changing a timeout METHOD is a reporting-mechanism change and is allowed
+identically on every arm; changing a committed 120/180 s THRESHOLD is a rule-6
+edit and was not made.

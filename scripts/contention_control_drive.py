@@ -43,6 +43,7 @@ import argparse
 import dataclasses
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -96,17 +97,42 @@ BUSY = (
 )
 
 
-def run_child(n: int, budget_s: float, what: str) -> ct.ContentionRecord:
+def _nice_prefix(level: int) -> list[str]:
+    """``nice -n LEVEL`` as an argv prefix, or nothing when not asked for.
+
+    An argv prefix rather than ``preexec_fn``: ruff's PLW1509 is right that a
+    ``preexec_fn`` is unsafe in a process that may use threads, and this drive
+    has no business being the exception.
+    """
+    if not level:
+        return []
+    nice = shutil.which("nice")
+    if nice is None:  # pragma: no cover - POSIX hosts all have it
+        return []
+    return [nice, "-n", str(level)]
+
+
+def run_child(
+    n: int, budget_s: float, what: str, *, nice_level: int = 0
+) -> ct.ContentionRecord:
     """Run the child once under a declared budget and return the record.
 
     The span closes AFTER ``subprocess.run`` returns, which is after the child
     has been reaped -- the condition ``os.times()`` needs before it will report
     the child's CPU (``core/contention.py`` residual 4).
+
+    ``nice_level`` exists for the SILENT arm and is disclosed rather than
+    hidden. This drive raises a real load average on a machine where other
+    lanes are measuring, so its load workers run at low priority; the child
+    measured against them is given the SAME low priority, so that it genuinely
+    contends with them instead of walking past them. Load average counts
+    runnable processes regardless of priority, so C4 sees the real number, and
+    the child's wall and CPU are measured, not modelled.
     """
     budget = ct.WallClockBudget(seconds=budget_s, what=what)
     with budget.measure() as span:
         subprocess.run(
-            [sys.executable, "-c", CHILD, str(n)],
+            [*_nice_prefix(nice_level), sys.executable, "-c", CHILD, str(n)],
             check=True,
             capture_output=True,
             text=True,
@@ -128,7 +154,9 @@ def arm(name: str, record: ct.ContentionRecord, required: str | None) -> dict[st
     return row
 
 
-def raise_load(workers: int, hold_s: float) -> tuple[list[int], float, float]:
+def raise_load(
+    workers: int, hold_s: float, *, nice_level: int = 0
+) -> tuple[list[int], float, float]:
     """Start ``workers`` busy children; wait for load1 to cross the threshold.
 
     Returns (pids, load1 reached, seconds waited). Every PID is returned so the
@@ -137,7 +165,7 @@ def raise_load(workers: int, hold_s: float) -> tuple[list[int], float, float]:
     pids: list[int] = []
     for _ in range(workers):
         proc = subprocess.Popen(
-            [sys.executable, "-c", BUSY, str(hold_s)],
+            [*_nice_prefix(nice_level), sys.executable, "-c", BUSY, str(hold_s)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -172,6 +200,16 @@ def kill_recorded(pids: list[int]) -> list[int]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument(
+        "--nice",
+        type=int,
+        default=19,
+        help=(
+            "scheduling priority for the synthetic-load workers AND for the "
+            "child measured against them. Defaults to 19 so this drive does "
+            "not steal CPU from another lane's suite while it runs."
+        ),
+    )
     parser.add_argument(
         "--skip-load",
         action="store_true",
@@ -284,14 +322,22 @@ def main() -> int:
         workers = LOAD_WORKERS_PER_CPU * cpu_count
         hold_s = LOAD_RAMP_CEILING_S + 120.0
         window_start = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        pids, load_reached, waited = raise_load(workers, hold_s)
+        pids, load_reached, waited = raise_load(
+            workers, hold_s, nice_level=args.nice
+        )
         try:
-            loaded = run_child(N_BASELINE, budget_s, "unchanged child, UNDER LOAD")
+            loaded = run_child(
+                N_BASELINE,
+                budget_s,
+                "unchanged child, UNDER LOAD",
+                nice_level=args.nice,
+            )
         finally:
             killed = kill_recorded(pids)
         window_end = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         out["synthetic_load"] = {
             "workers": workers,
+            "nice_level": args.nice,
             "pids": pids,
             "killed": killed,
             "load1_reached": load_reached,
