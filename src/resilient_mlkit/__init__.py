@@ -73,7 +73,17 @@ from .core.result import (
 #: on every repo. It is not a major because no check's verdict moves; the
 #: version rule was fixed in `reports/E_M42_REPORT_HEADER_PREREGISTRATION.md`
 #: §6 before the drive, with the major clause written out in case it did.
-__version__ = "2.1.0"
+#: BUMPED 2.1.0 -> 2.2.0 on 2026-09-07 (E-M43): MINOR. A CLI SURFACE changes and
+#: no check is touched. `mlkit allowlist verify` now exits non-zero on an
+#: UNSIGNED allowlist and on an invocation that matched NO repository -- two
+#: verdicts it already printed and whose exit status was 0, so a CI step gating
+#: on the return code passed an unratified licence position, and passed a run
+#: that had read nothing. `mlkit notice` returns 1 when it REFUSED to write a
+#: NOTICE.md, and `mlkit keys` refuses to describe a portfolio it did not read.
+#: Driven over all EIGHT adopter remote mains, five phases each, before and
+#: after: **272 rows, 0 added, 0 removed, 0 status moved, 0 reasons moved** --
+#: preregistered as zero movement, because an exit code is not a verdict.
+__version__ = "2.2.0"
 
 #: The version is NOT the identity, and E-M24 is the measurement that says so:
 #: fray runs mlkit ``c65b2e7`` and mlkit main is ``6921e9a`` -- 40 commits, 9

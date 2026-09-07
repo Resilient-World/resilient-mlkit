@@ -15,6 +15,7 @@ import socket
 import subprocess
 import sys
 import traceback
+from collections.abc import Collection
 from pathlib import Path
 
 from . import __version__
@@ -66,6 +67,43 @@ def _select_repos(args: argparse.Namespace, root: Path) -> list[Repo]:
             raise SystemExit(f"unknown repo(s): {', '.join(sorted(unknown))}")
         found = [r for r in found if r.name in wanted]
     return found
+
+
+#: Exit code for a command that matched NO repository at all. Distinct from 1
+#: so a caller can tell "an artifact was read and it is bad" from "nothing was
+#: read", which are different problems with different fixes -- and distinct
+#: from 0 so that neither can be mistaken for "read, and fine". Already the
+#: value `check`, `portfolio`, `spine`, `notice` and `env` used at their own copies
+#: of this guard; here it becomes one definition rather than six.
+NOTHING_MATCHED_EXIT = 2
+
+
+def _refuse_empty_selection(
+    repos: Collection[Repo], root: Path, args: argparse.Namespace
+) -> bool:
+    """Say, on stderr, that this invocation measured nothing. True when it did.
+
+    Five commands carried their own copy of this guard and one -- ``allowlist``
+    -- carried none, so it returned 0 having read no allowlist at all. For a
+    command whose entire job is to say whether the licence determinations hold,
+    that made silence and success the same answer, which is the fleet's own
+    "a check that cannot fail measures nothing" living inside the kit that
+    teaches it (E-M43).
+
+    The sentence says what was NOT done, not just what was not found. "no
+    portfolio repos found" reads like an observation about a directory; a CI
+    log needs it to read as a refusal.
+    """
+    if repos:
+        return False
+    wanted = getattr(args, "repo", None)
+    detail = f" matching --repo {wanted}" if wanted else ""
+    print(
+        f"no portfolio repos found under {root}{detail}. Nothing was read, so "
+        "nothing was verified: this is REFUSED, not a pass.",
+        file=sys.stderr,
+    )
+    return True
 
 
 #: What a phase run says when it finished holding fewer results than the phase
@@ -168,9 +206,8 @@ def cmd_check(args: argparse.Namespace) -> int:
     offline = args.offline if args.offline is not None else _detect_offline()
 
     repos = _select_repos(args, root)
-    if not repos:
-        print(f"no portfolio repos found under {root}", file=sys.stderr)
-        return 2
+    if _refuse_empty_selection(repos, root, args):
+        return NOTHING_MATCHED_EXIT
 
     if args.portfolio:
         return _cmd_portfolio(repos, run_nonce, root)
@@ -434,9 +471,8 @@ def cmd_fleet(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve() if args.root else find_root()
     run_nonce = nonce_mod.from_env_or_mint()
     repos = {r.name: r for r in _select_repos(args, root)}
-    if not repos:
-        print(f"no portfolio repos found under {root}", file=sys.stderr)
-        return 2
+    if _refuse_empty_selection(list(repos.values()), root, args):
+        return NOTHING_MATCHED_EXIT
 
     allow_dirty = bool(getattr(args, "allow_dirty", False))
     rows: list[fleet.FleetRow] = []
@@ -703,9 +739,8 @@ def cmd_spine(args: argparse.Namespace) -> int:
         return 2
 
     repos = _select_repos(args, root)
-    if not repos:
-        print(f"no portfolio repos found under {root}", file=sys.stderr)
-        return 2
+    if _refuse_empty_selection(repos, root, args):
+        return NOTHING_MATCHED_EXIT
 
     run_nonce = nonce_mod.from_env_or_mint()
     all_drifts: list[spine_mod.FileDrift] = []
@@ -842,14 +877,25 @@ def _render_spine_markdown(payload: dict, drifts: list, repos: list) -> str:
 
 
 def cmd_notice(args: argparse.Namespace) -> int:
+    """Regenerate NOTICE.md from the allowlist. Exit non-zero if any was NOT.
+
+    E-M43. The REFUSED branch below is a real failure to discharge an
+    attribution obligation, and it used to print and return 0 -- so
+    `mlkit notice && git commit -am "regenerate NOTICE"` committed nothing and
+    reported success. R9's own remedy text sends an agent into this command,
+    which makes its exit status a gate whether or not anyone declared it one.
+    """
     root = Path(args.root).resolve() if args.root else find_root()
     repos = _select_repos(args, root)
-    if not repos:
-        print(f"no portfolio repos found under {root}", file=sys.stderr)
-        return 2
+    if _refuse_empty_selection(repos, root, args):
+        return NOTHING_MATCHED_EXIT
+    rc = 0
     for repo in repos:
         allowlist = policy.load(repo)
         if not allowlist.exists:
+            # Not a failure: a repo with no allowlist has no obligation to
+            # render, and R9 escalates that state to the signatory rather than
+            # failing it. rc is deliberately left alone here.
             print(f"{repo.name}: no {policy.ALLOWLIST_RELPATH}; nothing to generate")
             continue
         target = repo.path / "NOTICE.md"
@@ -869,13 +915,14 @@ def cmd_notice(args: argparse.Namespace) -> int:
                     "attribution. Reconcile it into docs/allowlist.yaml first, or pass "
                     "--force if you have already preserved the content."
                 )
+                rc = 1
                 continue
 
         target.write_text(policy.render_notice(repo, allowlist))
         state = "signed" if allowlist.signed else "UNSIGNED (provisional)"
         print(f"{repo.name}: wrote NOTICE.md from {state} allowlist "
               f"({len(allowlist.attributions())} attribution obligation(s))")
-    return 0
+    return rc
 
 
 def cmd_keys(args: argparse.Namespace) -> int:
@@ -888,6 +935,11 @@ def cmd_keys(args: argparse.Namespace) -> int:
     """
     root = Path(args.root).resolve() if args.root else find_root()
     repos = _select_repos(args, root)
+    # E-M43. Without this, an invocation that found no checkout printed
+    # "Nothing in the portfolio is waiting on a key" and exited 0 -- a
+    # statement about eight repositories made from having read none of them.
+    if _refuse_empty_selection(repos, root, args):
+        return NOTHING_MATCHED_EXIT
     wanted: dict[str, list[str]] = {}
     for repo in repos:
         for result in store.load_all(repo, PHASES).values():
@@ -926,9 +978,8 @@ def cmd_env(args: argparse.Namespace) -> int:
 
     root = Path(args.root).resolve() if args.root else find_root()
     repos = _select_repos(args, root)
-    if not repos:
-        print(f"no portfolio repos found under {root}", file=sys.stderr)
-        return 2
+    if _refuse_empty_selection(repos, root, args):
+        return NOTHING_MATCHED_EXIT
 
     print(f"mlkit {__version__}  environment  interpreter={sys.executable}")
     print(f"python {sys.version.split()[0]}  root={root}")
@@ -1027,9 +1078,42 @@ def cmd_ancestry(args: argparse.Namespace) -> int:
     return 0 if all(r.contained for r in rows) else 1
 
 
+#: What `mlkit allowlist verify` prints for an allowlist whose signature block
+#: is absent or does not hold up. A constant so the command and its control arm
+#: agree on one sentence rather than on two that drift.
+UNSIGNED_LABEL = "UNSIGNED — these determinations have not been ratified"
+
+
 def cmd_allowlist(args: argparse.Namespace) -> int:
+    """Verify every repo's allowlist, and let the EXIT STATUS carry the verdict.
+
+    E-M43. Two of the four things this prints used to be invisible to a caller
+    that gated on the return code:
+
+    * an **UNSIGNED** allowlist printed and returned 0. An unsigned allowlist is
+      not a neutral state -- CLAUDE.md rule 14 makes the signature the
+      determination, and every check built on it reports ESCALATED rather than
+      PASS precisely so an unratified licence position cannot be mistaken for a
+      ratified one. A command that says so and then exits 0 hands that mistake
+      straight back to whatever CI step is reading it.
+    * matching **no repository at all** printed NOTHING and returned 0, so "I
+      read no allowlist" and "every allowlist is fine" were the same answer.
+
+    MISSING, INVALID and a defective entry already returned 1 and still do; the
+    control arms pin all three so they cannot regress into the same shape. The
+    exit codes are three, not two: 0 read-and-fine, 1 read-and-bad,
+    ``NOTHING_MATCHED_EXIT`` nothing-read.
+
+    A note for whoever gates on this in a shell. The status only reaches you if
+    you read it: in a pipeline (``mlkit allowlist verify | tee log``) ``$?`` is
+    the LAST stage's, which is why a corrupted digest was once observed
+    "exiting 0" from a command that exits 1. Gate on the command, or set
+    ``pipefail``.
+    """
     root = Path(args.root).resolve() if args.root else find_root()
     repos = _select_repos(args, root)
+    if _refuse_empty_selection(repos, root, args):
+        return NOTHING_MATCHED_EXIT
     rc = 0
     for repo in repos:
         allowlist = policy.load(repo)
@@ -1042,7 +1126,11 @@ def cmd_allowlist(args: argparse.Namespace) -> int:
             rc = 1
             continue
         defects = allowlist.defective_entries()
-        status = "signed by " + allowlist.signed_by if allowlist.signed else "UNSIGNED"
+        if allowlist.signed:
+            status = "signed by " + allowlist.signed_by
+        else:
+            status = UNSIGNED_LABEL
+            rc = 1
         print(f"{repo.name}: {len(allowlist.entries)} entries, {status}")
         for key, problems in defects.items():
             print(f"    {key}: {', '.join(problems)}")

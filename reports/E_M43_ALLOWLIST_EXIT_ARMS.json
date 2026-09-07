@@ -1,0 +1,173 @@
+{
+ "arms": [
+  {
+   "arm": "C1",
+   "condition": "two repos, both valid and signed",
+   "exit_code": 0,
+   "output_contains": {
+    "signed by": true
+   },
+   "output_names_a_directory": false,
+   "output_redacted": [
+    "arabica: 1 entries, signed by signatory@example.invalid",
+    "fray: 1 entries, signed by signatory@example.invalid"
+   ],
+   "required": "rc 0",
+   "stderr_lines": 0,
+   "stdout_lines": 2,
+   "tree": "live"
+  },
+  {
+   "arm": "C2",
+   "condition": "one hex character of entries_sha256 flipped, mutation verified",
+   "exit_code": 1,
+   "mutation": {
+    "computed_prefix": "fc34b1218f22",
+    "differ": true,
+    "recorded_prefix": "ac34b1218f22"
+   },
+   "output_contains": {
+    "entries_sha256 does not match": true
+   },
+   "output_names_a_directory": false,
+   "output_redacted": [
+    "arabica: INVALID \u2014 signature.entries_sha256 does not match the entries it covers (recorded ac34b1218f22\u2026, computed fc34b1218f22\u2026). The entries changed after signing; the signature is void.",
+    "fray: 1 entries, signed by signatory@example.invalid"
+   ],
+   "required": "rc 1, the reason names the digest",
+   "stderr_lines": 0,
+   "stdout_lines": 2,
+   "tree": "live"
+  },
+  {
+   "arm": "C2P",
+   "condition": "C2's command piped into `head`; the SHELL reports $? of the last stage",
+   "exit_code": 0,
+   "output_contains": {},
+   "output_names_a_directory": false,
+   "output_redacted": [],
+   "required": "0 \u2014 a property of the pipeline, not of the command",
+   "stderr_lines": 0,
+   "stdout_lines": 0,
+   "tree": "live"
+  },
+  {
+   "arm": "C3",
+   "condition": "signature.signed: false",
+   "exit_code": 1,
+   "output_contains": {
+    "UNSIGNED": true
+   },
+   "output_names_a_directory": false,
+   "output_redacted": [
+    "arabica: 1 entries, UNSIGNED \u2014 these determinations have not been ratified",
+    "fray: 1 entries, signed by signatory@example.invalid"
+   ],
+   "required": "rc 1, output says UNSIGNED",
+   "stderr_lines": 0,
+   "stdout_lines": 2,
+   "tree": "live"
+  },
+  {
+   "arm": "C4",
+   "condition": "docs/allowlist.yaml absent",
+   "exit_code": 1,
+   "output_contains": {
+    "MISSING": true
+   },
+   "output_names_a_directory": false,
+   "output_redacted": [
+    "arabica: MISSING docs/allowlist.yaml",
+    "fray: 1 entries, signed by signatory@example.invalid"
+   ],
+   "required": "rc 1, output says MISSING",
+   "stderr_lines": 0,
+   "stdout_lines": 2,
+   "tree": "live"
+  },
+  {
+   "arm": "C5",
+   "condition": "an entry with no retrieval_date, under a valid signature",
+   "exit_code": 1,
+   "output_contains": {
+    "retrieval_date is missing": true
+   },
+   "output_names_a_directory": false,
+   "output_redacted": [
+    "arabica: 1 entries, signed by signatory@example.invalid",
+    "    undated-source: retrieval_date is missing"
+   ],
+   "required": "rc 1, output names the defect",
+   "stderr_lines": 0,
+   "stdout_lines": 2,
+   "tree": "live"
+  },
+  {
+   "arm": "C6",
+   "condition": "--root at a directory holding no resilient-* checkout",
+   "exit_code": 2,
+   "output_contains": {
+    "REFUSED, not a pass": true
+   },
+   "output_names_a_directory": true,
+   "output_redacted": [
+    "no portfolio repos found under <root:77 chars>. Nothing was read, so nothing was verified: this is REFUSED, not a pass."
+   ],
+   "required": "rc 2, and a refusal on stderr naming the root",
+   "root_token_length": 69,
+   "stderr_lines": 1,
+   "stderr_named_the_root": true,
+   "stdout_lines": 0,
+   "tree": "live"
+  },
+  {
+   "arm": "C7",
+   "condition": "--root valid, --repo names a portfolio repo not checked out there",
+   "exit_code": 2,
+   "output_contains": {
+    "REFUSED, not a pass": true
+   },
+   "output_names_a_directory": true,
+   "output_redacted": [
+    "no portfolio repos found under <root:71 chars> matching --repo choco. Nothing was read, so nothing was verified: this is REFUSED, not a pass."
+   ],
+   "required": "rc 2",
+   "stderr_lines": 1,
+   "stdout_lines": 0,
+   "tree": "live"
+  },
+  {
+   "arm": "C8a",
+   "condition": "NOT-DEAD: cli.py reverted to origin/main, C3 re-driven",
+   "exit_code": 0,
+   "output_contains": {
+    "UNSIGNED": true
+   },
+   "output_names_a_directory": false,
+   "output_redacted": [
+    "arabica: 1 entries, UNSIGNED",
+    "fray: 1 entries, signed by signatory@example.invalid"
+   ],
+   "required": "rc 0 \u2014 the defect, on purpose",
+   "stderr_lines": 0,
+   "stdout_lines": 2,
+   "tree": "not-dead"
+  },
+  {
+   "arm": "C8b",
+   "condition": "NOT-DEAD: cli.py reverted to origin/main, C6 re-driven",
+   "exit_code": 0,
+   "output_contains": {},
+   "output_names_a_directory": false,
+   "output_redacted": [],
+   "required": "rc 0 and NO output \u2014 the defect, on purpose",
+   "stderr_lines": 0,
+   "stdout_lines": 0,
+   "tree": "not-dead"
+  }
+ ],
+ "escalation": "E-M43",
+ "not_dead_rev_label": "origin/main",
+ "preregistration": "reports/E_M43_M44_GATE_DEFECT_PREREGISTRATION.md",
+ "subject": "mlkit allowlist verify \u2014 the exit status must carry every verdict it prints"
+}
