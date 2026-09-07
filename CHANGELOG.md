@@ -12,6 +12,96 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v2.0.0 — 2026-09-07
+
+Not yet tagged. Tag cutting is the signatory's (E-M08). **R10 changes verdict on
+unchanged repo code** — measured, not predicted — which this file's scale calls
+*major*, and it is taken as one rather than argued down. Repair campaign;
+**E-M41**.
+
+### R10 — every row says WHAT is fabricated and WHAT to write, and two non-metrics stop being findings
+
+* **The defect.** `resilient-arabica` repaired the four fabricated defaults that
+  reached a gate (`SATISFIES_GATE` 4 → 0) and R10 then read **NA (10)**. NA is
+  the honest answer for a name mlkit has no polarity for, and it was the whole
+  of the answer: the check reported a COUNT. Ten values a gate tool declines to
+  judge, with nothing said about which ten, why, or what would change it, is a
+  check measuring nothing about them.
+* **Re-derived, not recalled.** All ten reproduced at arabica `2a65d9a5`
+  (`files_walked=406`), and the other three fleet mains driven the same way:
+  fray `cc8f4355` 0 findings, torrent `dc6e577a` 8 (7 `UNCLASSIFIED_NAME` + 1
+  `PUBLISHES_UNMEASURED`), chokepoint `5f78fe4c` 1.
+* **Two of the nineteen are not domain metrics, and the cause is mechanical.**
+  arabica's record proposed excluding CLI entry points by name. Reading the
+  derivation instead found two defects that CAUSE the admission:
+  * **D1, nested-scope leakage.** `metric_registry._computes_a_figure` used
+    `ast.walk(fn)`, which descends into nested `def`s and lambdas, so an outer
+    function was credited with an inner one's arithmetic. arabica's
+    `scripts/val_predictions_group_interval.py:52 main(path) -> int` does no
+    arithmetic of its own; the `skill()` it defines does. That is how the NAME
+    `main` entered the registry and how a process exit status at
+    `src/validation/run_validate.py:577` became a finding. torrent had the same
+    row.
+  * **D2, a path join read as division.** `_ARITHMETIC` contains `ast.Div` and
+    `pathlib` spells joining with the same operator. chokepoint's
+    `data/ingest/base.py:69 fetch()` entered entirely through
+    `self.cache_dir / f"{key}.json"`. The predicate is a TYPE FACT, not a
+    spelling rule: dividing a number by a string is a `TypeError`, so a `/`
+    with a string literal or f-string anywhere in its chain is a path join.
+    `REPO_ROOT / path`, both sides plain names, is deliberately NOT caught and
+    is pinned as a stated limit.
+* **Scoping alone would have cost real recall, and did not ship alone.**
+  arabica's `e_value` and `standardized_mean_differences` put their arithmetic
+  in a nested helper. `_delegated_helpers` keeps a function that RETURNS what
+  its helper computed — which is also exactly what separates `e_value` from
+  `main`, since `main` calls its helper and then returns an exit code. The
+  residual (an outer name reachable only through two or more hops of locals) is
+  measured per repo in `reports/E_M41_R10_VOCABULARY_RESULTS.md` and pinned.
+* **`Finding` carries `reason` and `repair`**, filled for EVERY severity, in
+  `to_dict()`, in `evidence.top[*]` and as two columns of
+  `reports/fabricated_defaults.md`. Same intent as E-M38's `SERVE_ARM` repair,
+  and the same trap avoided: there the field was dropped in `scan()`'s rebuild
+  and nine real rows shipped reading `repair: ""`, so here both fields are
+  filled in ONE place and a test holds them at repo scope. R10's NA reason now
+  names each literal and what would let it be judged, instead of counting.
+* **`.mlkit/repo.toml` gains an optional `[metrics]` table** — a name the repo
+  computes mapped to `higher_is_better` / `lower_is_better` / `neutral` — which
+  `satisfies_a_gate` consults for a REGISTRY-sourced name. **This is the exit
+  that lets a repo stop being NA**, and it is monotone toward strictness: a
+  declaration can turn an `UNCLASSIFIED_NAME` row (NA) into a verdict (FAIL);
+  it can never remove a row, never silence a name, and never reach a name the
+  built-in vocabulary already judges. **There is deliberately no fourth value
+  meaning "not a metric"**: a declaration channel that can take a name out of
+  R10's reach is a channel that will be used to take names out of R10's reach.
+  An unrecognised value is refused by name and leaves the row NA.
+* **What was NOT built.** arabica's record also asks for a fourth severity for
+  a "degenerate-input guard" — a value that is the mathematically defined
+  answer for a present-but-degenerate input. Separating that from an
+  absent-value default means deciding whether `if not matched:` tests absence
+  or degeneracy, and that is the same syntax wearing two meanings. A severity
+  mlkit guesses wrong is worse than an NA it declines honestly, so `[metrics]`
+  reaches the same subset from the other side — by asking the repo. No
+  vocabulary word was added; adding words is what E-038 established does not
+  converge.
+* **Controls, all four arms.** FIRES on a planted default at each of the three
+  severity paths; SILENT on the same quantity read from a committed artifact —
+  the arm that matters, because that is the repair every other row is told to
+  make; MONOTONE, driven with and without a declaration on the same tree; and
+  NO ADJUDICATED ROW MOVES across four fleet mains, as a JSON diff, **zero
+  added, zero removed, zero changed**.
+
+### Which checks can render FAIL on repo code that did not change
+
+**R10, newly, in the other direction: it can now render PASS where it rendered
+NA.** chokepoint `5f78fe4c` moves NA → PASS. arabica moves NA(10) → NA(9),
+torrent FAIL(8) → FAIL(7), fray is unmoved at PASS. No `SATISFIES_GATE` or
+`PUBLISHES_UNMEASURED` row moved anywhere. A repo that ADOPTS `[metrics]` will
+see NA rows become FAIL rows; that is the point of adopting it, and it is opt-in.
+Carried forward, not introduced here: **R12** (v1.0.0, nine `SERVE_ARM` rows on
+three `main`s, E-M38) and **D2, E1, T2, R2, D3, E3 and R4** (E-M09, E-M10). A
+consumer whose pin predates those releases inherits their moves on this upgrade.
+
+
 ## v1.4.0 — 2026-09-06
 
 Not yet tagged. Tag cutting is the signatory's (E-M08). **A new module and a
