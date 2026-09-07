@@ -1,10 +1,10 @@
 # Fleet method lessons
 
-**What this is.** Eighteen measurement and process failures that this fleet has
-already paid for, written down so the next engineer does not pay for them again.
-Every one was found by driving something, not by reasoning about it; several
-were found only because a control fired, and two were found only because a
-number that nobody was watching moved.
+**What this is.** Twenty-three measurement and process failures that this fleet
+has already paid for, written down so the next engineer does not pay for them
+again. Every one was found by driving something, not by reasoning about it;
+several were found only because a control fired, and two were found only
+because a number that nobody was watching moved.
 
 **Why they live in `resilient-mlkit`.** These are METHOD lessons, not repo
 facts. They apply to any repo that measures a model behind a gate, and mlkit is
@@ -715,3 +715,31 @@ If you read nothing else:
 5. Regenerate witnesses; re-adjudicate substance; never fold the two together.
 6. Kill recorded PIDs and their process groups, never patterns.
 7. Read facts from `origin/main`, and pin by immutable sha.
+8. A printed failure and an exit status are two claims; assert both, and never
+   read an exit status through a pipe.
+9. Compute every leg a check owns before you report any of them, and name any
+   leg you could not measure rather than collapsing the verdict to NA.
+
+---
+
+**A note on this file's own provenance.** §1-§18 were written and landed on
+2026-09-07 (PR #59 → `912853df`) BEFORE the campaign's final independent
+verification pass had finished driving. That pass re-derived every headline
+figure the fleet's five model repos publish, from a full fresh clone of each
+landed main at that repo's own declared mlkit revision, on a quiet machine — and then
+published every disagreement it found between what it measured and what the
+records claimed: **twelve numbered entries**, of which the eleventh states on
+its face that it is NOT a disagreement and must not be read as one, and the
+twelfth attributes six FAIL rows to the measuring host's missing `geopandas`
+rather than to the repository. Its own characterisation of the rest is the part
+to carry: *“None of those is a fabricated figure — every one is a true statement
+that has gone out of date behind a check that cannot notice.”* Committed gate
+reports that no longer describe their own trees; a shared cross-repo register
+asserting three things that stopped being true when a pull request merged; five
+of eight `NOTICE.md` files stale, four of them missing attribution sections
+outright. **Every one a provenance gap, and not one a fabricated number.**
+
+One of the twelve has since been WITHDRAWN by measurement — the reading that
+`mlkit allowlist verify` exits 0 on an INVALID digest, which was a shell-pipeline
+artefact; §19 is that withdrawal. §20 and §21 close the `NOTICE.md` half. The
+remainder are repo facts and are recorded in the repos they belong to.
