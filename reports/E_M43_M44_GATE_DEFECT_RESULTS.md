@@ -119,3 +119,129 @@ clone and would silently have measured that one.
 A CLI surface changes and no check is touched; the fleet drive moved zero rows.
 **v2.2.0.** The major clause — v3.0.0 had any verdict moved — was written into
 the preregistration §4 before the drive and did not fire.
+
+---
+
+# E-M44 — R9 evaluates and reports both legs
+
+## The defect, measured before the edit
+
+Six `return`s stood between the top of `r9_licence_gate` and its NOTICE block.
+Driven with `policy.render_notice` at the eight adopter remote mains:
+
+| repo | sections on disk | obligations | missing | what R9 stopped at first |
+|---|---|---|---|---|
+| choco | 61 | 61 | 0 | (BLOCKED sources — nothing to hide) |
+| arabica | 34 | 34 | 0, text drift | three BLOCKED sources |
+| fray | 17 | 17 | 0 | nothing; R9 PASSes |
+| torrent | **38** | **48** | **10** | the `manifest` binding |
+| chokepoint | 24 | 24 | 0 | (two unlisted sources — nothing to hide) |
+| surge | **24** | **36** | **12** | `defective_entries`, two `kind: code` |
+| triage | **11** | **21** | **10** | the `manifest` binding |
+| blackout | **6** | **11** | **5** | four unallowlisted sources |
+
+**37 undischarged attribution obligations in four repositories**, none of them
+reported by the check that owns them.
+
+## The control arms, driven
+
+`reports/E_M44_R9_BOTH_LEGS_ARMS.json`, written by
+`scripts/e_m44_r9_both_legs_drive.py`, read back by
+`tests/test_e_m44_r9_both_legs.py`.
+
+| arm | fixture | required | READ |
+|---|---|---|---|
+| **N1** | BLOCKED source + stale NOTICE | FAIL, both clauses | **FAIL** — `NOTICE.md is stale … missing attribution section(s) for 1 source(s): blocked-panel; run \`mlkit notice\` \| BLOCKED source(s) in the manifest: blocked-panel` ✔ |
+| **N2** | BLOCKED source + current NOTICE | FAIL, reason byte-identical to the pre-E-M44 check's | **FAIL**, `BLOCKED source(s) in the manifest: blocked-panel` — **identical to N9-N2** ✔ |
+| **N3** | clean manifest + stale NOTICE | **FAIL**, not a warning, not NA | **FAIL** ✔ |
+| **N4** | clean manifest + current NOTICE | PASS | **PASS** ✔ |
+| **N5** | `kind: code` entry + stale NOTICE (the surge shape) | FAIL, both clauses | **FAIL**, NOTICE clause + `allowlist entries are structurally invalid` ✔ |
+| **N6** | manifest binding raises + stale NOTICE | FAIL, names the gap AND the unmeasured leg | **FAIL**, `… \| the manifest leg was NOT measured: … ModuleNotFoundError` ✔ |
+| **N7** | manifest binding raises + current NOTICE | NA, reason byte-identical | **NA** — **identical to N9-N7** ✔ |
+| **N8** | NOTICE.md absent, obligations exist | FAIL, names them | **FAIL**, `NOTICE.md is absent and the allowlist carries 1 attribution obligation(s): sentinel2-l2a` ✔ |
+| **N9-N1** | **NOT-DEAD**, N1 re-driven | the NOTICE clause is gone | **FAIL**, manifest clause only, `mentions_notice: false` ✔ |
+| **N9-N5** | **NOT-DEAD**, N5 re-driven | the NOTICE clause is gone | **FAIL**, structural clause only ✔ |
+| **N9-N6** | **NOT-DEAD**, N6 re-driven | **NA** — the gap hidden | **NA** ✔ |
+
+N9 reverts `checks/readiness.py` **and** `core/policy.py` to `origin/main`;
+reverting only the check would leave a tree nobody ships, and the drive refuses
+if either file is identical to this branch's.
+
+**A fixture defect caught before it read as a result.** The first drive built
+each repo by writing NOTICE.md and committing everything together, so
+`_verify_signature` saw an uncommitted allowlist, `render_notice` emitted the
+UNSIGNED provisional trailer, and **N2, N4 and N7 all came out stale** — the
+repair appearing to fire on every arm including the ones that pin it not
+firing. The allowlist is committed first now, and the reason is written into
+the builder.
+
+**The truncation arm is real, not notional.** A 40-source BLOCKED manifest with
+a stale NOTICE renders a 397-character reason ending `…[truncated]`, with the
+NOTICE clause and its `40 source(s)` count intact at the head.
+
+## The fleet, before and after — every movement, per repo
+
+Same instrument as E-M43: eight adopter clones at their remote mains, five
+phases each, one interpreter, `PYTHONPATH` switched between `origin/main`'s
+package tree and the branch's, `resilient_mlkit.__file__` asserted inside the
+named tree, arms SEQUENTIAL, clones reset and cleaned before every phase,
+load1 2.1–2.9 against `hw.ncpu` 10.
+
+```
+rows BEFORE 272    rows AFTER 272    added 0    removed 0
+STATUS moved 3     reason-only moved 2
+```
+
+| repo | row | before | after | why, and is it TRUE |
+|---|---|---|---|---|
+| **torrent** | readiness/R9 | **NA** — `importing 'mlkit_bindings' … ModuleNotFoundError: No module named 'pandas'` | **FAIL** | 10 attribution sections its own signed allowlist obliges are absent from its committed NOTICE.md, named in the reason. The manifest leg is still unmeasured and the reason says so. **TRUE.** |
+| **triage** | readiness/R9 | **NA**, same reason | **FAIL** | 10 missing sections, named. **TRUE.** |
+| **blackout** | readiness/R9 | **NA**, same reason | **FAIL** | 5 missing sections, named. **TRUE.** |
+| **surge** | readiness/R9 | FAIL, `allowlist entries are structurally invalid: …` | **FAIL**, NOTICE clause prepended | 12 missing sections behind a structural finding — clause B9, the repo this lane's third design choice exists for. **TRUE.** |
+| **arabica** | readiness/R9 | FAIL, `BLOCKED source(s) in the manifest: …` | **FAIL**, `NOTICE.md is stale relative to the allowlist; run \`mlkit notice\`` prepended | 34 sections and 34 obligations, so no section is missing; the file's TEXT differs from the rendering. Reported as drift, without inventing a missing obligation. **TRUE.** |
+| **choco** | readiness/R9 | FAIL | **FAIL, byte-identical** | 61/61, NOTICE current. |
+| **fray** | readiness/R9 | PASS | **PASS, byte-identical** | 17/17, NOTICE current. |
+| **chokepoint** | readiness/R9 | FAIL | **FAIL, byte-identical** | 24/24, NOTICE current. |
+
+**No other row moved on any repo, in any phase.** In particular **R8** — the
+row that writes `reports/readiness.md`, into which R9's reason is rendered —
+holds its status on all eight. All eight movements were named in the
+preregistration §3 **before** the drive and all eight matched.
+
+**The instrument is stable.** The `origin/main` baseline for this drive is
+row-for-row identical to the `origin/main` AFTER-arm of E-M43's drive, an hour
+earlier, so the five movements are a statement about this change.
+
+**Read the three NA → FAIL moves correctly.** The NA is the drive
+interpreter's missing `pandas`, not the repositories'. Under each repo's own
+environment R9 already reads FAIL on the manifest leg, and there the movement
+is reason-only. The status move is what clause B8 prescribes and it is
+environment-shaped.
+
+## The suite — ONE clone, arms SEQUENTIAL, failure sets by name
+
+```
+arm     ref          tree      result                        elapsed
+MAIN    origin/main  79a3f469  1438 passed, 3 skipped, rc 0    104s
+BRANCH  e-m44        ec4c89ea  1462 passed, 3 skipped, rc 0    107s
+
+failures BY NAME:  MAIN 0   BRANCH 0
+only-on-branch NONE      only-on-main NONE      BOTH sets EMPTY
++24 passing = the 24 tests added by this branch
+
+skips BY NODE ID, identical in both arms, all three for the same reason:
+  tests/test_torrent_model_of_record.py::test_tr3_both_real_rows_report_a_measured_model_of_record
+  tests/test_torrent_model_of_record.py::test_tr3_the_declared_record_is_committed_in_the_real_repo
+  tests/test_torrent_model_of_record.py::test_tr3_the_value_is_the_bar_the_sibling_row_measures_against
+  reason: resilient-torrent is not checked out beside this clone
+
+ruff 0.16.5  src tests scripts   : main 0  ->  branch 0
+mypy 2.3.1   src/resilient_mlkit : main 0  ->  branch 0 (40 files)
+```
+
+## The version — MAJOR, decided by the drive
+
+An existing check changes verdict on unchanged repo code: three status moves.
+The preregistration §4 fixed **v3.0.0** for exactly this outcome and fixed the
+softer alternative — minor, had no status moved — in the same paragraph, before
+the drive.

@@ -12,6 +12,119 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v3.0.0 — 2026-09-07
+
+Not yet tagged. Tag cutting is the signatory's (E-M08). **MAJOR**, by this
+file's own scale and taken as one rather than argued down: **an existing check
+changes verdict on unchanged repo code.** R9 owns two licence obligations and
+could only ever report one of them. **E-M44.**
+
+### R9 returned before the NOTICE leg it also owns
+
+`r9_licence_gate` checks that no source in the manifest is unlisted, BLOCKED or
+EVAL-ONLY **and** that every attribution obligation in the signed allowlist is
+rendered into `NOTICE.md`. It `return`ed on the first, so the second was
+unreachable on any repo that had a manifest finding.
+
+Measured with mlkit's own `policy.render_notice` against the eight adopter
+remote mains on 2026-09-07, comparing the committed file with the rendering:
+
+| repo | sections on disk | obligations | missing | R9 could see it? |
+|---|---|---|---|---|
+| torrent | 38 | 48 | **10** | no — R9 stopped at the manifest binding |
+| surge | 24 | 36 | **12** | no — R9 stopped at `defective_entries` |
+| triage | 11 | 21 | **10** | no — R9 stopped at the manifest binding |
+| blackout | 6 | 11 | **5** | no — R9 stopped at four unallowlisted sources |
+| arabica | 34 | 34 | 0 (text drift) | no — R9 stopped at three BLOCKED sources |
+| choco / fray / chokepoint | current | — | 0 | n/a |
+
+**Thirty-seven undischarged attribution obligations across four repositories,
+none of them visible in the check that owns them.** These are unmet licence
+conditions, not formatting.
+
+### What changed, and the three choices inside it
+
+* **The NOTICE leg is computed FIRST and unconditionally** — for
+  reachability, not precedence. Anything computed after a `return` is one
+  refactor away from being unreachable, and this one already was.
+* **It runs when the manifest leg could not be measured at all.**
+  `policy.notice_gap` needs no binding, no import of the repo's code and no
+  data, so "this interpreter cannot import pandas" does not make an
+  undischarged attribution obligation unknowable. The verdict is **FAIL** and
+  the reason says which leg was not measured and why. NA would erase the half
+  that WAS measured, which is the collapse `core.result.Status` refuses by
+  name.
+* **It runs past a structurally invalid allowlist; the manifest leg does not.**
+  Whether NOTICE.md matches the allowlist on disk is answerable without
+  trusting the determinations. Whether a source is wrongly licensed is not.
+  `resilient-surge` is the repo that distinction is for.
+
+The finding **names the missing source ids** — six, then a count, with the
+whole list in `evidence["notice_missing_attribution"]` — so the repair is
+mechanical. The NOTICE clause goes **first** in a combined reason: reasons are
+truncated at `MAX_REASON`, and putting the newly-visible half last would be the
+same defect a second time, by truncation instead of by `return`.
+
+### Neither leg is weakened
+
+Every input that failed R9 before this release still fails it, and the manifest
+clause is unchanged word for word. Arms **N2** and **N7** assert the reason is
+**byte-identical** to the pre-E-M44 check's on a repo whose NOTICE is current —
+a check that grew a new way to fail has to be shown not failing everything else
+it touches. A NOTICE gap alone is a **FAIL** and not a warning: mlkit has no
+WARN status, on purpose, and this is not the release that invents one.
+
+### Controls
+
+`reports/E_M44_R9_BOTH_LEGS_ARMS.json`, driven by
+`scripts/e_m44_r9_both_legs_drive.py`, read back by
+`tests/test_e_m44_r9_both_legs.py`. Thirteen arms in subprocesses, each
+asserting `resilient_mlkit.__file__` inside the tree it names. **N9 is the
+NOT-DEAD arm**: `checks/readiness.py` AND `core/policy.py` reverted to
+`origin/main`, the same fixtures re-driven — `N9-N1` and `N9-N5` lose the
+NOTICE clause entirely and `N9-N6` reports **NA** on a real, measured,
+undischarged obligation. The gap, hidden again, on purpose.
+
+### Which checks can render FAIL on repo code that did not change
+
+**R9, and this release is why.** Driven over all eight adopter remote mains,
+five phases each, before and after — 272 rows, 0 added, 0 removed:
+
+```
+STATUS moved 3    reason moved 2    everything else identical
+
+torrent    R9  NA -> FAIL   10 missing attribution sections, named
+triage     R9  NA -> FAIL   10 missing attribution sections, named
+blackout   R9  NA -> FAIL    5 missing attribution sections, named
+surge      R9  FAIL -> FAIL  12 named, beside the structural finding it already had
+arabica    R9  FAIL -> FAIL  NOTICE drift named, beside the BLOCKED sources
+choco / fray / chokepoint    unmoved: their NOTICE.md is current
+```
+
+Every one of the five is a TRUE statement about a real unmet obligation. **R8 —
+the row that writes the report R9's reason lands in — did not move on any
+repo**, and no row outside R9 moved anywhere.
+
+**A caveat, so the table is not read as more than it is.** The NA on torrent,
+triage and blackout is the drive interpreter's missing `pandas`, not the
+repositories'. Under each repo's own environment their R9 already reads FAIL on
+the manifest leg, and there the movement is reason-only. The status move is
+real, is what this release prescribes, and is environment-shaped.
+
+Carried forward, not introduced here: **R10** (v2.0.0, NA → PASS on
+chokepoint), **R12** (v1.0.0, nine `SERVE_ARM` rows on three `main`s, E-M38),
+**D2, E1, T2, R2, D3, E3 and R4** (E-M09, E-M10), and v2.1.0's report-write
+refusal on `resilient-fray`'s `readiness.md`.
+
+### What an adopter has to do about it
+
+Nothing is pushed to any consumer repo; all eight rev-pin mlkit, so no
+consumer's verdict moves until someone moves a pin. The repair for each of the
+four repos is one command — `mlkit notice --root <checkouts> --repo <name>` —
+followed by a review of the regenerated `NOTICE.md`. The per-repo list of
+missing obligations, by source id, is written out for the adopters rather than
+performed here.
+
 ## v2.2.0 — 2026-09-07
 
 Not yet tagged. Tag cutting is the signatory's (E-M08). **Minor**, and decided
