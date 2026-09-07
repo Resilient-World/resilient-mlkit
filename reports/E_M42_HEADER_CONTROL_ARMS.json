@@ -1,0 +1,86 @@
+{
+ "artifact_schema": "resilient-mlkit/e-m42-header-control-arms/1",
+ "generated_by": "scripts/e_m42_header_control_drive.py",
+ "subject": "core.identity.header_lines() -- the `mlkit build:` line of every stamped report",
+ "discriminator": "core.artifact.machine_paths_in_text (mlkit's own, not a second opinion)",
+ "arms": [
+  {
+   "arm": "A1a",
+   "condition": "source-tree import",
+   "dir_a_depth": 17,
+   "dir_b_depth": 13,
+   "headers_byte_identical": true,
+   "machine_path_tokens": 0,
+   "machine_path_positions": [],
+   "header_a": [
+    "- measured by mlkit: `2.0.0+src.9aae44e332dd`",
+    "- mlkit build: sha256 `9aae44e332dd0ad055e46e28723c664767adc6e82e68dc3bbabe2463bca87365` over 41 shipped file(s) in `resilient_mlkit` (checkout); vcs commit NA \u2014 no installed resilient-mlkit distribution was found; the running tree `resilient_mlkit` (checkout) is on the import path without being an installed dist"
+   ],
+   "header_b": [
+    "- measured by mlkit: `2.0.0+src.9aae44e332dd`",
+    "- mlkit build: sha256 `9aae44e332dd0ad055e46e28723c664767adc6e82e68dc3bbabe2463bca87365` over 41 shipped file(s) in `resilient_mlkit` (checkout); vcs commit NA \u2014 no installed resilient-mlkit distribution was found; the running tree `resilient_mlkit` (checkout) is on the import path without being an installed dist"
+   ],
+   "stamp": "2.0.0+src.9aae44e332dd",
+   "required": "headers byte-identical AND 0 machine path tokens",
+   "agrees": true
+  },
+  {
+   "arm": "A1b",
+   "condition": "sourceless/bytecode-only install",
+   "dir_a_depth": 17,
+   "dir_b_depth": 13,
+   "headers_byte_identical": true,
+   "machine_path_tokens": 0,
+   "machine_path_positions": [],
+   "header_a": [
+    "- measured by mlkit: `2.0.0+src.unknown`",
+    "- mlkit build: tree `resilient_mlkit` (checkout) was NOT hashed \u2014 the file this module was loaded from is `core/identity.pyc` and it is not among the 1 file(s) the digest would cover in `resilient_mlkit` (checkout); the running code is excluded from its own identity (a sourceless/bytecode-only install), so the digest would name an identity while describing none of the code that ran; vcs commit NA \u2014 no installed resilient-mlkit distribution was found; the running tree `resilient_mlkit` (checkout) is on the import path without being an installed dist"
+   ],
+   "header_b": [
+    "- measured by mlkit: `2.0.0+src.unknown`",
+    "- mlkit build: tree `resilient_mlkit` (checkout) was NOT hashed \u2014 the file this module was loaded from is `core/identity.pyc` and it is not among the 1 file(s) the digest would cover in `resilient_mlkit` (checkout); the running code is excluded from its own identity (a sourceless/bytecode-only install), so the digest would name an identity while describing none of the code that ran; vcs commit NA \u2014 no installed resilient-mlkit distribution was found; the running tree `resilient_mlkit` (checkout) is on the import path without being an installed dist"
+   ],
+   "stamp": "2.0.0+src.unknown",
+   "required": "headers byte-identical AND 0 machine path tokens",
+   "agrees": true
+  },
+  {
+   "arm": "A2",
+   "condition": "two mlkit revisions: working tree vs origin/main",
+   "headers_byte_identical": false,
+   "stamp_here": "2.0.0+src.9aae44e332dd",
+   "stamp_there": "2.0.0+src.047617173ece",
+   "machine_path_tokens": 0,
+   "required": "headers DIFFER (the stamp still identifies its build)",
+   "agrees": true
+  },
+  {
+   "arm": "A3",
+   "condition": "CHECK-NOT-DEAD: core/identity.py reverted to origin/main, sourceless install, two directories",
+   "dir_a_depth": 17,
+   "dir_b_depth": 13,
+   "headers_byte_identical": false,
+   "machine_path_tokens": 4,
+   "machine_path_positions": [
+    "2:106",
+    "2:106",
+    "2:106",
+    "2:106"
+   ],
+   "header_a": [
+    "- measured by mlkit: `2.0.0+src.unknown`",
+    "- mlkit build: tree `resilient_mlkit` (checkout) was NOT hashed \u2014 the file this module was loaded from (`<machine path redacted, 195 chars>`) is not among the 1 file(s) the digest would cover under <machine path redacted, 177 chars>; the running code is excluded from its own identity (a sourceless/bytecode-only install), so the digest would name an identity while describing none of the code that ran; vcs commit NA \u2014 no installed resilient-mlkit distribution was found; the running tree `resilient_mlkit` (checkout) is on the import path without being an installed dist"
+   ],
+   "header_b": [
+    "- measured by mlkit: `2.0.0+src.unknown`",
+    "- mlkit build: tree `resilient_mlkit` (checkout) was NOT hashed \u2014 the file this module was loaded from (`<machine path redacted, 188 chars>`) is not among the 1 file(s) the digest would cover under <machine path redacted, 170 chars>; the running code is excluded from its own identity (a sourceless/bytecode-only install), so the digest would name an identity while describing none of the code that ran; vcs commit NA \u2014 no installed resilient-mlkit distribution was found; the running tree `resilient_mlkit` (checkout) is on the import path without being an installed dist"
+   ],
+   "stamp": "2.0.0+src.unknown",
+   "required": "MUST FAIL arm A1b's assertion (headers differ or machine paths > 0)",
+   "agrees": true
+  }
+ ],
+ "digest_of_working_tree_package": "9aae44e332dd0ad055e46e28723c664767adc6e82e68dc3bbabe2463bca87365",
+ "digest_files": 41,
+ "all_required_arms_agree": true
+}
