@@ -73,6 +73,30 @@ gap to patch, and it is pinned by
 -- which fails the day it closes, so the disclosure gets updated instead of the
 silence being re-pinned.
 
+A callable whose only parameter is ``self``/``cls`` is excluded too, by
+:func:`_computes_a_figure`: a ``@property`` or a zero-argument method deriving
+a figure from instance state computes from nothing this walk can name. That
+exclusion was found in the E-038 verification, whose commit was later lost from
+``main`` and is restored by E-M42; **its price is re-measured here rather than
+carried over, because the derivation itself has changed since** (E-M41's D1 and
+D2 moved every registry size). Driven 2026-09-07 against the eight adopter
+remote mains, admitting self-only callables would add
+
+    fray +2, torrent +19, chokepoint +8, choco +9,
+    arabica +20, surge +9, blackout +4, triage +17   (88 names)
+
+and move R10's finding count on five of the eight: torrent 7 -> 19,
+chokepoint 0 -> 1, arabica 9 -> 10, blackout 15 -> 16, triage 14 -> 15.
+
+**The old disclosure's conclusion no longer holds and is withdrawn rather than
+repeated.** It said no repo's verdict was bought by the exclusion. Today
+**chokepoint's R10 moves PASS -> NA** under the widened universe
+(``training/data_module.py:176 minority_fraction=0.0``, ``UNCLASSIFIED_NAME``),
+and triage's derived-name set gains a name the built-in vocabulary already
+classifies (``known`` 2 -> 3), which is the precision cost that keeps the
+exclusion. Pinned by
+``tests/test_r10_e038_verification.py::test_residual_a_self_only_callable_is_outside_the_registry``.
+
 THE ANCHOR
 ----------
 Blind flattening that silently returns nothing is the failure the tick-11
@@ -186,6 +210,10 @@ class MetricRegistry:
     unclassified: frozenset[str] = frozenset()
     #: Python files the derivation parsed.
     files: int = 0
+    #: Files under a declared tree the derivation could not READ, as
+    #: ``"path: OSErrorSubclass"``. Disclosed rather than raised -- see
+    #: :func:`derive`. Never empty silently: the count is in the evidence.
+    unreadable: tuple[str, ...] = ()
     #: Set when the derivation cannot be trusted. NA, never silence.
     refusal: str | None = None
 
@@ -201,6 +229,7 @@ class MetricRegistry:
             "vocabulary_known": sorted(self.known),
             "unclassified": sorted(self.unclassified),
             "files_parsed": self.files,
+            "unreadable": list(self.unreadable),
             "refusal": self.refusal,
         }
 
@@ -432,15 +461,35 @@ def derive(roots: Iterable[Path], base: Path | None = None) -> MetricRegistry:
     """
     roots = list(roots)
     origins: dict[str, str] = {}
+    unreadable: list[str] = []
     files = 0
     for path in fabrication.iter_python_files(roots):
         files += 1
         display = str(path)
         if base is not None and path.is_relative_to(base):
             display = str(path.relative_to(base))
-        for key, origin in _names_in(
-            path.read_text(encoding="utf-8", errors="replace"), display
-        ).items():
+        try:
+            source = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            # E-038 VERIFICATION, restored (E-M42 §7): this read was unguarded,
+            # and R10 therefore RAISED on any file it could not open under a
+            # DECLARED tree. Measured on a dangling `*.py` symlink inside the
+            # declared tree of a fixture repo: `fabrication.scan_file` beside
+            # it catches OSError and skips, this module raised
+            # FileNotFoundError, and the harness turned the crash into a FAIL
+            # with four frames of traceback.
+            #
+            # Skipping, not refusing, and the reason is adversarial rather than
+            # cosmetic: `derive`'s refusal short-circuits R10 into NA, so making
+            # an unreadable file a refusal would hand an adopter a one-symlink
+            # lever for turning a MEASURED FAIL into "could not measure".
+            # Skipping matches what the scanner itself does with the same file,
+            # so the registry and the scan cannot disagree about which files
+            # this repo has. The skip is disclosed in the evidence and in the
+            # R10 report; it is never silent.
+            unreadable.append(f"{display}: {type(exc).__name__}")
+            continue
+        for key, origin in _names_in(source, display).items():
             origins.setdefault(key, origin)
 
     names = frozenset(origins)
@@ -452,6 +501,7 @@ def derive(roots: Iterable[Path], base: Path | None = None) -> MetricRegistry:
         known=known,
         unclassified=names - known,
         files=files,
+        unreadable=tuple(unreadable),
         refusal=refusal,
     )
 
