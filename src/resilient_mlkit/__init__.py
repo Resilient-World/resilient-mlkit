@@ -61,7 +61,19 @@ from .core.result import (
 #: -> FAIL(7), both by the same class of repair; `resilient-fray` `cc8f4355` is
 #: unmoved at PASS. NO row that mlkit's own vocabulary adjudicates moved
 #: anywhere: zero added, zero removed, zero changed across all four.
-__version__ = "2.0.0"
+#: BUMPED 2.0.0 -> 2.1.0 on 2026-09-07 (E-M42): MINOR, decided by measurement
+#: and not by preference. The identity repair on its own is a patch -- a defect
+#: fixed, no verdict moved -- but two REPORT SURFACES change, which this file's
+#: scale calls minor: `core.report.guarded_write` gains a machine-path refusal
+#: (`<report>.NAMES_A_MACHINE.md`), and R10's report gains the line `files under
+#: a declared tree the derivation could not READ: N` that E-038's lost verify
+#: commit added. Driven over all EIGHT adopter remote mains, five phases each,
+#: before and after: **272 adjudicated rows, 0 added, 0 removed, 0 status
+#: moved**, and the only text that moved anywhere is that one line, reading `0`
+#: on every repo. It is not a major because no check's verdict moves; the
+#: version rule was fixed in `reports/E_M42_REPORT_HEADER_PREREGISTRATION.md`
+#: §6 before the drive, with the major clause written out in case it did.
+__version__ = "2.1.0"
 
 #: The version is NOT the identity, and E-M24 is the measurement that says so:
 #: fray runs mlkit ``c65b2e7`` and mlkit main is ``6921e9a`` -- 40 commits, 9

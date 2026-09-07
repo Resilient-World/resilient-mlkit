@@ -12,6 +12,131 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v2.1.0 — 2026-09-07
+
+Not yet tagged. Tag cutting is the signatory's (E-M08). **Minor**, and decided
+by the drive rather than by preference: the instrument repair on its own is a
+patch, and two REPORT SURFACES change, which this file's scale calls minor.
+**Nothing in this release moves a check's verdict on unchanged repo code** —
+measured over all eight adopter remote mains, five phases each, before and
+after: **272 adjudicated rows, 0 added, 0 removed, 0 status moved**. What a
+consumer inherits on upgrading is listed below and is carried forward, not
+introduced here. The version rule,
+including the major clause had a verdict moved, was fixed in
+`reports/E_M42_REPORT_HEADER_PREREGISTRATION.md` §6 before any of it was
+driven. **E-M42.**
+
+### The `mlkit build:` line named a machine, and the writer that stamps it never refused one
+
+* **The defect as handed over, corrected by measurement first.**
+  `resilient-arabica`'s four stamped reports each carry
+  `/private/tmp/claude-501/…/mlkit-inst/resilient_mlkit` in their `mlkit build:`
+  line. That is written by mlkit's `core/identity.py`, so the premise was that
+  every stamped repo carries it. Half true: **M-5 removed the directory from
+  `context_line()` on 2026-09-04**, and arabica's reports carry it because
+  arabica pins `3bf16dd0`, which predates that. Rendered from two different
+  absolute directories, `main`'s ordinary header is already byte-identical.
+* **The site M-5 missed, still live.**
+  `identity.running_code_is_covered_or_reason()` interpolated **two raw
+  absolute paths** — the file this module was loaded from, and the package
+  root. Its return value is `BuildIdentity.unavailable`, which `context_line()`
+  renders into the header, so the **sourceless / bytecode-only install** branch
+  wrote a machine into a committed report — in exactly the case where the
+  digest could not be taken and the header's words are all a reader has. M-5
+  read `context_line` and not what feeds it, and
+  `test_p10_no_identity_field_names_a_directory_on_any_branch`, whose name
+  claims *any* branch, enumerates the other three producers and stops. Both
+  paths now name the CONDITION: the loaded file by its path WITHIN the tree
+  (`core/identity.pyc`, the same string on every machine), the tree by
+  `root_as_kind`, a file genuinely outside it in words.
+* **The producer, which is why this is a fleet fix and not a one-line one.**
+  mlkit has owned `core.artifact.machine_paths_in_text` and a refusing writer
+  since M-5, and **the four reports it stamps into eight repositories went
+  through neither**: `core.report.guarded_write` wrote them with a bare
+  `path.write_text`. The guard is now at the write. A rendering that names a
+  machine is REFUSED, the prior report is preserved byte for byte, and the
+  refusal is recorded in `<report>.NAMES_A_MACHINE.md` — which names
+  POSITIONS, never the tokens, because a file objecting to a directory must not
+  contain one. **Refusal, not scrubbing**: rewriting the text of a measurement
+  so a check passes is what the fleet's rule 6 forbids, and it is no better for
+  being done by the tool.
+* **It fires on a live fleet tree.** Driven over the eight mains, the new guard
+  refuses exactly one report — `resilient-fray`'s `readiness.md`, whose R5
+  binding reason ends `Path: /private/tmp/…`. That is fray's string, not
+  mlkit's, and it is left for fray: **no consumer repository was touched**.
+* **Four control arms, driven and committed**
+  (`reports/E_M42_HEADER_CONTROL_ARMS.json`, read back by a test): **A1a**
+  source-tree import from two directories → byte-identical, 0 machine paths;
+  **A1b** the same on a sourceless install → byte-identical, 0 machine paths;
+  **A2** two mlkit revisions → headers DIFFER (`2.0.0+src.9aae44e332dd` vs
+  `2.0.0+src.047617173ece`), so the fix did not buy A1 by making the stamp
+  uninformative; **A3 CHECK-NOT-DEAD** with `identity.py` reverted to `main` →
+  A1b fails, headers differ and carry 4 machine-path tokens. The artifact
+  redacts every token to its length, because A3's headers ARE machine paths and
+  this file is committed.
+
+### E-038's verify commit was lost from `main`, and is restored
+
+PR #20 is recorded MERGED (2026-08-31, merge commit `1170a7ed`) and
+`git merge-base --is-ancestor 1170a7e origin/main` says **NO**. Exactly one
+commit of it, `63682f4`, is missing — `+341/-7` across four files — while its
+two predecessors are ancestors of `main`. Read on the tree, all three of its
+repairs are genuinely gone, and all three are restored, adapted to today's code
+rather than cherry-picked:
+
+* **R10's ORDER.** The derivation refusal was adjudicated BEFORE the defect
+  lane, so a repo with a measured `SATISFIES_GATE` default and a broken
+  derivation read **NA** with `satisfies_gate: 1` unmentioned in the evidence.
+  The defect lane is first now; the refusal rides in the FAIL reason, first in
+  the trailer so a truncated reason keeps it, and still produces NA alone.
+* **`metric_registry.derive`'s unguarded read.** One unreadable file under a
+  DECLARED tree — a dangling symlink suffices — took **R10** out with a
+  `FileNotFoundError`, where `fabrication.scan_file` beside it skips the same
+  file. Skipped and disclosed now, never refused: `derive`'s refusal
+  short-circuits R10 into NA, so refusing here would be a one-symlink lever
+  from a measured FAIL to "could not measure".
+* **The disclosure line** `files under a declared tree the derivation could not
+  READ: N` in `reports/fabricated_defaults.md`, and the `unreadable` field
+  behind it. **This is the only text that moves in any adopter report**, and it
+  reads `0` on all eight.
+
+The self-only-callable disclosure is **re-measured** at today's mains rather
+than carried over, because E-M41's D1/D2 moved every registry size — and its
+old conclusion ("no repo's verdict is bought by the exclusion") **no longer
+holds** and is withdrawn: today chokepoint's R10 would move PASS → NA under the
+widened universe.
+
+### Also
+
+* mlkit's own `ruff` job was **RED on `main`** (run `34088101903`: pytest and
+  mypy pass, ruff fails in 6 s with 3 findings at the pinned `ruff==0.16.5`).
+  Repaired here, semantics-preserving, because a gate that is red before a
+  branch starts cannot tell that branch's findings from the ones already there.
+* **Adopting this release moves no verdict and changes one line of one report.**
+  Every repo's committed reports were written by the revision that repo pins and
+  none of them changes because of this release; a repo that moves its pin and
+  regenerates gets the new R10 line, so its freshness stamp and any digest
+  pinning that report move with it. That is each repo's own pin-moving PR, with
+  an A/B on every gate row.
+
+### Which checks can render FAIL on repo code that did not change
+
+**None newly in this release**, and that is measured rather than asserted: 272
+rows over eight mains and five phases, before and after, with zero added, zero
+removed and zero moved. The one text change anywhere is R10's new
+`could not READ: 0` line, which is a disclosure and not a finding.
+
+Carried forward, not introduced here: **R10** (v2.0.0, NA → PASS on
+chokepoint), **R12** (v1.0.0, nine `SERVE_ARM` rows on three `main`s, E-M38)
+and **D2, E1, T2, R2, D3, E3 and R4** (E-M09, E-M10). A consumer whose pin
+predates those releases inherits their moves on this upgrade.
+
+There is one thing an upgrading repo can newly find itself unable to do: if the
+text of one of its reports names a directory on the machine generating it, that
+report is now REFUSED rather than written. Measured across the fleet, that is
+**one repo, one report** — `resilient-fray`'s `readiness.md` — and the cause is
+a string in fray's own binding, not in mlkit.
+
 ## v2.0.0 — 2026-09-07
 
 Not yet tagged. Tag cutting is the signatory's (E-M08). **R10 changes verdict on
