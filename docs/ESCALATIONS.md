@@ -3535,3 +3535,92 @@ written out separately rather than applied. No test threshold, no
 lane — changing a timeout METHOD is a reporting-mechanism change and is allowed
 identically on every arm; changing a committed 120/180 s THRESHOLD is a rule-6
 edit and was not made.
+
+---
+
+## E-M41 — R10 answered "I cannot tell" about ten values and said nothing else; two of the ten were never metrics, and the other eight now say why
+
+**Raised and resolved 2026-09-07 on `feat/e-m41-r10-vocabulary-judge-and-say-why`.
+Preregistration `reports/E_M41_R10_VOCABULARY_PREREGISTRATION.md` (the branch's
+first commit); results `reports/E_M41_R10_VOCABULARY_RESULTS.md`. Shipped as
+v2.0.0 — MAJOR, measured, not argued down.**
+
+### The defect
+
+`resilient-arabica` repaired the four fabricated defaults that reached a gate
+(PR #169, `SATISFIES_GATE` 4 → 0) and R10 then read **NA (10)**. NA is the
+right answer for a name mlkit has no polarity for. It was also the *whole* of
+the answer: the check reported a count. Ten values a gate tool declines to
+judge, with the number as the entire content, measures nothing about any of
+them — and a consumer cannot act on it, which is exactly the shape E-M38 fixed
+for R12's `SERVE_ARM` rows.
+
+Re-derived here rather than taken from arabica's record: all ten reproduced at
+arabica `2a65d9a5`, plus fray `cc8f4355` 0, torrent `dc6e577a` 8, chokepoint
+`5f78fe4c` 1.
+
+### What was found by reading the derivation instead of the names
+
+arabica's record proposed excluding CLI entry points from the metric-name
+derivation. That would have worked, and it would have been a spelling rule.
+Reading `metric_registry` found two **mechanical** defects that cause the
+admission:
+
+* **D1, nested-scope leakage.** `_computes_a_figure` used `ast.walk(fn)`, which
+  descends into nested `def`s and lambdas, so an outer function was credited
+  with an inner one's arithmetic. arabica's `main(path) -> int` does no
+  arithmetic of its own; the `skill()` it defines does.
+* **D2, a path join read as division.** `_ARITHMETIC` contains `ast.Div` and
+  `pathlib` spells joining with the same operator. chokepoint's `fetch()`
+  entered the registry entirely through `self.cache_dir / f"{key}.json"`. The
+  predicate is a type fact, not a heuristic: dividing a number by a string is a
+  `TypeError`.
+
+Three rows stop being findings, all three argparse exit statuses or an I/O
+accessor's `except`-branch return, each named with the defect that removed it.
+**chokepoint's R10 moves NA → PASS on unchanged code**, which is the major.
+
+### What every row now says
+
+`Finding` carries `reason` and `repair` at every severity, in `to_dict()`, in
+`evidence.top[*]` and as two columns of `reports/fabricated_defaults.md`, filled
+in ONE place and held by a test at repo scope — because E-M38's own control
+caught a field dropped in a rebuild with nine real rows shipping `repair: ""`.
+
+### The exit from NA, and why it cannot be used to go green
+
+`.mlkit/repo.toml` gains an optional `[metrics]` table mapping a name the repo
+computes to `higher_is_better` / `lower_is_better` / `neutral`. It is
+**monotone toward strictness**: a declaration can turn an NA row into a FAIL
+row, and can never remove a row, silence a name, or reach a name mlkit's own
+vocabulary already judges. **There is deliberately no fourth value meaning "not
+a metric."** A declaration channel that can take a name out of R10's reach is a
+channel that will be used to take names out of R10's reach.
+
+Driven end to end on a throwaway copy of arabica (never pushed): the nine
+residual rows become 4 `SATISFIES_GATE` + 5 `PUBLISHES_UNMEASURED`, and **the
+four are exactly the four arabica's own analysis identified by hand as
+returning the best-case value**.
+
+### FOR THE SIGNATORY / FOR THE ADOPTERS — what is NOT decided here
+
+1. **Whether any repo adopts `[metrics]`, and in which directions.** Adopting
+   it turns that repo's NA rows into FAIL rows. That is the point of adopting
+   it and it is that repo's decision, not mlkit's. arabica's nine are the
+   obvious first case and the directions its own record argues for are written
+   out in the results file.
+2. **The v2.0.0 tag is not cut.** E-M08: cutting a tag is the signatory's.
+3. **No fourth severity for a degenerate-input guard.** arabica asked for one.
+   Separating "present but degenerate" from "absent" means deciding whether
+   `if not matched:` tests absence or degeneracy — the same syntax wearing two
+   meanings. A severity mlkit guesses wrong is worse than an NA it declines
+   honestly. Reopen it only with a predicate that is a fact about the AST, the
+   way D2 is.
+4. **`REPO_ROOT / path` is still read as division** when both operands are
+   plain names, and the recall D1 costs (13 names across four repos, 11 of them
+   real, 0 findings today) is disclosed per repo and pinned by a test rather
+   than closed by a name heuristic.
+
+**No consumer repository was edited and nothing was pushed to one.** The four
+fleet copies were read-only clones; the `[metrics]` demonstration was a
+throwaway copy that was deleted.

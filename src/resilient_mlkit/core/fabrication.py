@@ -78,7 +78,7 @@ import itertools
 import math
 import re
 from collections.abc import Iterable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
@@ -279,7 +279,34 @@ _LOWER_IS_BETTER = frozenset(
 )
 
 
-def satisfies_a_gate(symbol: str, literal: str) -> bool:
+#: The three polarities a repo may DECLARE for a name it computes, in
+#: ``.mlkit/repo.toml`` under ``[metrics]``. E-M41.
+#:
+#: There is deliberately no fourth value meaning "this is not a metric". A
+#: declaration channel that can take a name OUT of R10's reach is a channel
+#: that will be used to take names out of R10's reach, and a check with a
+#: silencing channel is a check that gets silenced. Declaring a polarity is
+#: MONOTONE TOWARD STRICTNESS: it can turn an ``UNCLASSIFIED_NAME`` row (which
+#: R10 renders NA) into ``SATISFIES_GATE`` or ``PUBLISHES_UNMEASURED`` (which
+#: R10 renders FAIL). It can never remove a row, and it can never turn a FAIL
+#: into a PASS.
+DECLARED_POLARITIES: frozenset[str] = frozenset(
+    {"higher_is_better", "lower_is_better", "neutral"}
+)
+
+
+class _Polarities(Protocol):
+    """The only thing this module needs from a repo's ``[metrics]`` table.
+
+    Structural for the same reason :class:`_Registry` is: the concrete reader
+    lives in :mod:`metric_registry`, which already owns identifier folding, and
+    that module imports THIS one.
+    """
+
+    def polarity(self, name: str) -> str | None: ...
+
+
+def satisfies_a_gate(symbol: str, literal: str, *, polarity: str | None = None) -> bool:
     """True when this default is the value that would PASS the gate.
 
     The defect is not "a measured name has a default". It is "a measured name
@@ -292,6 +319,14 @@ def satisfies_a_gate(symbol: str, literal: str) -> bool:
     Polarity is read off the name. Unknown polarity is treated as dangerous,
     because ``se = 0.0`` yields a zero-width confidence interval that excludes
     zero -- the exact shape of a hard-stop gate, manufactured from nothing.
+
+    ``polarity``, when given, is the direction the ADOPTER declared for this
+    name in ``.mlkit/repo.toml`` ``[metrics]`` (E-M41). It is consulted only
+    for a name the built-in vocabulary has no opinion on: a declaration must
+    not be able to overrule the word list, or a repo could re-aim ``rmse``.
+    ``"neutral"`` means no direction makes a value "better", so no literal
+    there can manufacture a pass -- the row is a real finding, reported as
+    ``PUBLISHES_UNMEASURED``.
     """
     if literal == "True":
         return True
@@ -302,6 +337,13 @@ def satisfies_a_gate(symbol: str, literal: str) -> bool:
     except ValueError:
         return True  # non-numeric shapes (RNG draws) are always suspect
     tokens = set(tokenise(symbol))
+    if polarity is not None and not (tokens & (_HIGHER_IS_BETTER | _LOWER_IS_BETTER)):
+        if polarity == "higher_is_better":
+            return value >= 0.5
+        if polarity == "lower_is_better":
+            return abs(value) < 1.0
+        if polarity == "neutral":
+            return False
     if tokens & {"auc", "auroc", "auprc", "aupr"}:
         return value > 0.5  # 0.5 IS the no-skill point; it passes nothing
     if tokens & _HIGHER_IS_BETTER:
@@ -482,6 +524,15 @@ class Finding:
     #: renders these NA, quoting the name. Before E-038 they were SILENCE.
     severity: str = "SATISFIES_GATE"
 
+    #: WHAT is fabricated here, and -- for UNCLASSIFIED_NAME -- why no verdict
+    #: can be asserted about it. Filled for EVERY finding at EVERY severity, in
+    #: one place (:meth:`_ModuleScanner.scan`), so a new emission site cannot
+    #: forget it. E-M41.
+    reason: str = ""
+    #: WHAT to write instead. Same intent as E-M38's ``SERVE_ARM`` repair: a
+    #: red row with no instruction on it is a row its owner cannot act on.
+    repair: str = ""
+
     def render(self) -> str:
         return (
             f"{self.path}:{self.line}  {self.symbol} <- {self.literal} "
@@ -498,6 +549,8 @@ class Finding:
             "sink": self.sink,
             "snippet": self.snippet,
             "severity": self.severity,
+            "reason": self.reason,
+            "repair": self.repair,
         }
 
 
@@ -844,6 +897,7 @@ class _ModuleScanner:
         source: str,
         tree: ast.Module,
         registry: _Registry | None = None,
+        polarities: _Polarities | None = None,
     ) -> None:
         self.path = path
         self.lines = source.splitlines()
@@ -852,6 +906,9 @@ class _ModuleScanner:
         #: passed none. Every name question in this scanner goes through
         #: :meth:`_measured`, so there is exactly one place the two legs meet.
         self.registry = registry
+        #: The ADOPTER's declared polarities, or None. Consulted only for a
+        #: name the vocabulary has no opinion on. E-M41.
+        self.polarities = polarities
         self.parents: dict[int, ast.AST] = {}
         for parent in ast.walk(tree):
             for child in ast.iter_child_nodes(parent):
@@ -1105,10 +1162,90 @@ class _ModuleScanner:
         quotes the name. See :mod:`resilient_mlkit.core.metric_registry`.
         """
         if not from_vocabulary:
-            return UNCLASSIFIED_NAME
+            declared = self._declared_polarity(symbol)
+            if declared is None:
+                return UNCLASSIFIED_NAME
+            # E-M41: the adopter supplied the direction mlkit lacked, so the
+            # row can be adjudicated. This is the ONE way an UNCLASSIFIED_NAME
+            # row becomes a verdict, and it only ever makes R10 stricter.
+            return (
+                "SATISFIES_GATE"
+                if satisfies_a_gate(symbol, literal, polarity=declared)
+                else "PUBLISHES_UNMEASURED"
+            )
         return (
             "SATISFIES_GATE" if satisfies_a_gate(symbol, literal)
             else "PUBLISHES_UNMEASURED"
+        )
+
+    def _declared_polarity(self, symbol: str) -> str | None:
+        if self.polarities is None:
+            return None
+        declared = self.polarities.polarity(symbol)
+        return declared if declared in DECLARED_POLARITIES else None
+
+    def _registry_origin(self, symbol: str) -> str:
+        origin = getattr(self.registry, "origin", None)
+        if origin is None:
+            return "this repo's own figure-producing callables"
+        try:
+            return origin(symbol) or "this repo's own figure-producing callables"
+        except Exception:  # pragma: no cover - a registry that cannot answer
+            return "this repo's own figure-producing callables"
+
+    # -- what every row has to say for itself (E-M41) ----------------------
+
+    def _reason_for(self, finding: Finding) -> str:
+        """WHAT is fabricated, or why no verdict can be asserted about it."""
+        if finding.severity == UNCLASSIFIED_NAME:
+            return (
+                f"`{finding.symbol}` is not in mlkit's metric vocabulary. It reached "
+                f"R10 only because this repo computes a figure under that name "
+                f"({self._registry_origin(finding.symbol)}), and no polarity is "
+                f"declared for it — so mlkit cannot say whether {finding.literal} is "
+                f"the value that would PASS the gate consuming it or one that would "
+                f"fail it, and it asserts neither. This row is NA: not a pass, and "
+                f"not, on this evidence, a finding against the code."
+            )
+        passes = finding.severity == "SATISFIES_GATE"
+        return (
+            f"`{finding.symbol}` is a measured quantity, and this {finding.shape} "
+            f"gives it the literal {finding.literal} without measuring it. "
+            + (
+                f"{finding.literal} is the value that would PASS the gate consuming "
+                f"it ({finding.sink}), so a gate can report success having measured "
+                f"nothing."
+                if passes
+                else f"{finding.literal} would FAIL the gate consuming it, so it "
+                f"cannot manufacture a pass — but it is still emitted as though it "
+                f"were a measurement ({finding.sink}), which misreports."
+            )
+        )
+
+    def _repair_for(self, finding: Finding) -> str:
+        """WHAT to write instead. Never a diagnosis without an instruction."""
+        refuse = (
+            f"refuse on this branch — raise, or return float('nan') (or None) — "
+            f"with a named reason instead of {finding.literal}. NaN and None fail "
+            f"every comparison, so neither can satisfy a gate"
+        )
+        artifact = (
+            f"read `{finding.symbol}` from a committed artifact that carries its "
+            f"provenance"
+        )
+        if finding.severity == UNCLASSIFIED_NAME:
+            return (
+                f"Pick one. (1) Declare the direction in `.mlkit/repo.toml` under "
+                f"`[metrics]` as `{finding.symbol} = \"higher_is_better\"` (or "
+                f"`\"lower_is_better\"`, or `\"neutral\"`); R10 will then adjudicate "
+                f"this row instead of abstaining, and declaring can only make it "
+                f"stricter. (2) {artifact[0].upper()}{artifact[1:]}. (3) Or "
+                f"{refuse}."
+            )
+        return (
+            f"{artifact[0].upper()}{artifact[1:]}, or {refuse}. Do not keep "
+            f"{finding.literal} because it is convenient: a plausible number is "
+            f"more dangerous than a missing one, because it does not get checked."
         )
 
     def _emit(self, cand: _Candidate) -> None:
@@ -1191,6 +1328,15 @@ class _ModuleScanner:
                 if isinstance(node, ast.Return) and node.value is not None:
                     self._scan_gate_pass_literal(node)
         self._findings.sort(key=lambda f: (f.path, f.line, f.symbol))
+        # E-M41. Filled HERE, once, rather than at each of the four emission
+        # sites: E-M38's own control caught a field dropped in a rebuild and
+        # nine real rows reading `repair: ""`. One place cannot be forgotten in
+        # four, and `tests/test_r10_reason_and_repair.py` holds it at repo
+        # scope as well as on a fixture.
+        self._findings = [
+            replace(f, reason=self._reason_for(f), repair=self._repair_for(f))
+            for f in self._findings
+        ]
         return self._findings
 
     # -- shapes ------------------------------------------------------------
@@ -1768,30 +1914,37 @@ def iter_python_files(
 
 
 def scan_source(
-    source: str, display: str, registry: _Registry | None = None
+    source: str,
+    display: str,
+    registry: _Registry | None = None,
+    polarities: _Polarities | None = None,
 ) -> list[Finding]:
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return []
-    return _ModuleScanner(display, source, tree, registry).scan()
+    return _ModuleScanner(display, source, tree, registry, polarities).scan()
 
 
 def scan_file(
-    path: Path, display: str | None = None, registry: _Registry | None = None
+    path: Path,
+    display: str | None = None,
+    registry: _Registry | None = None,
+    polarities: _Polarities | None = None,
 ) -> list[Finding]:
     """Findings for one Python file. Unreadable or unparseable files yield none."""
     try:
         source = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return []
-    return scan_source(source, display or str(path), registry)
+    return scan_source(source, display or str(path), registry, polarities)
 
 
 def scan_tree(
     roots: Iterable[Path],
     base: Path | None = None,
     registry: _Registry | None = None,
+    polarities: _Polarities | None = None,
 ) -> list[Finding]:
     """Findings across every Python file under ``roots``.
 
@@ -1799,12 +1952,17 @@ def scan_tree(
     :func:`resilient_mlkit.core.metric_registry.derive` from the same trees.
     Passing None keeps the pre-E-038 behaviour -- the built-in vocabulary and
     nothing else -- which is what every caller outside R10 wants and gets.
+
+    ``polarities`` is the ADOPTER's ``[metrics]`` declaration, read by
+    :func:`resilient_mlkit.core.metric_registry.polarities_from`. It can only
+    make a REGISTRY-sourced row stricter (NA -> a verdict); see
+    :data:`DECLARED_POLARITIES`.
     """
     findings: list[Finding] = []
     for path in iter_python_files(roots):
         display = str(path)
         if base is not None and path.is_relative_to(base):
             display = str(path.relative_to(base))
-        findings.extend(scan_file(path, display, registry))
+        findings.extend(scan_file(path, display, registry, polarities))
     findings.sort(key=lambda f: (f.path, f.line, f.symbol))
     return findings

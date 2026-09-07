@@ -51,7 +51,17 @@ from .core.result import (
 #: file's own scale. No existing check's predicate moved, and the plugin is
 #: opt-in (no `pytest11` entry point), so a consumer that upgrades the pin and
 #: changes nothing else sees no verdict move at all.
-__version__ = "1.4.0"
+#: BUMPED 1.4.0 -> 2.0.0 on 2026-09-07 (E-M41): R10 changes verdict on
+#: UNCHANGED repo code, which this file's scale calls MAJOR and which is taken
+#: as one rather than argued down. Measured, not predicted:
+#: `resilient-chokepoint` `5f78fe4c` moves **R10 NA -> PASS**, because its one
+#: finding stood at `fetch`, a name that entered the metric registry only
+#: because `self.cache_dir / f"{key}.json"` is a `BinOp(Div)`. `resilient-arabica`
+#: `2a65d9a5` moves NA(10) -> NA(9) and `resilient-torrent` `dc6e577a` FAIL(8)
+#: -> FAIL(7), both by the same class of repair; `resilient-fray` `cc8f4355` is
+#: unmoved at PASS. NO row that mlkit's own vocabulary adjudicates moved
+#: anywhere: zero added, zero removed, zero changed across all four.
+__version__ = "2.0.0"
 
 #: The version is NOT the identity, and E-M24 is the measurement that says so:
 #: fray runs mlkit ``c65b2e7`` and mlkit main is ``6921e9a`` -- 40 commits, 9

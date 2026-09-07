@@ -805,7 +805,14 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
         )
 
     registry = metric_registry.derive(roots, base=repo.path)
-    findings = fabrication.scan_tree(roots, base=repo.path, registry=registry)
+    # E-M41: the adopter's OWN declaration of which direction is better, for
+    # names mlkit's vocabulary has no opinion on. Absent table -> empty
+    # declaration -> nothing changes. Declaring can only make a row stricter;
+    # see metric_registry.PolarityDeclaration for why it has no "not a metric".
+    polarities = metric_registry.polarities_from(repo.config())
+    findings = fabrication.scan_tree(
+        roots, base=repo.path, registry=registry, polarities=polarities
+    )
     files = sum(1 for _ in fabrication.iter_python_files(roots))
 
     unclassified = [
@@ -819,7 +826,9 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
     defects = satisfying + publishing
 
     report_path = repo.path / R10_REPORT_RELPATH
-    _write_r10_report(report_path, repo, ctx, findings, files, declared, registry)
+    _write_r10_report(
+        report_path, repo, ctx, findings, files, declared, registry, polarities
+    )
 
     evidence = {
         "trees": declared,
@@ -834,6 +843,7 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
             for f in (satisfying or publishing or unclassified)[:R10_REASON_FINDINGS]
         ],
         "metric_registry": registry.to_dict(),
+        "declared_polarities": polarities.to_dict(),
     }
     if absent:
         evidence["declared_but_absent"] = [str(a) for a in absent]
@@ -870,8 +880,13 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
 
     if unclassified:
         head = unclassified[:R10_REASON_FINDINGS]
+        # E-M41: the reason names the literals AND what would let each of them
+        # be judged. A count is not a reason; "I cannot tell" about N values,
+        # with N as the whole content, measures nothing about any of them.
         detail = "; ".join(
-            f"{f.path}:{f.line} {f.symbol}={f.literal} ({f.shape} → {f.sink})" for f in head
+            f"{f.path}:{f.line} {f.symbol}={f.literal} ({f.shape} → {f.sink}; "
+            f"declared at {f.symbol!r} in .mlkit/repo.toml [metrics] to be judged)"
+            for f in head
         )
         more = len(unclassified) - len(head)
         return CheckResult.na(
@@ -879,10 +894,23 @@ def r10_fabricated_defaults(repo: Repo, ctx: RunContext) -> CheckResult:
             f"{len(unclassified)} plausible literal(s) stand at metric name(s) THIS REPO "
             f"declares by computing them, which mlkit's own vocabulary cannot classify, "
             f"so no polarity can be read and neither PASS nor FAIL is earned: {detail}"
-            + (f"; +{more} more in {R10_REPORT_RELPATH}" if more > 0 else ""),
+            + (f"; +{more} more in {R10_REPORT_RELPATH}" if more > 0 else "")
+            + f". Every one of them carries its own reason and repair in "
+              f"{R10_REPORT_RELPATH}: declare the direction under [metrics], read the "
+              f"value from a committed artifact, or refuse on that branch",
             evidence,
         )
     return CheckResult.passed("R10", PHASE, evidence)
+
+
+def _cell(text: str) -> str:
+    """One markdown table cell: pipes escaped, newlines folded.
+
+    A reason or a repair that carries a `|` would silently split the row and
+    move every column right of it, which is a report that lies about which
+    finding said what.
+    """
+    return (text or "").replace("|", "\\|").replace("\n", " ").strip()
 
 
 def _write_r10_report(
@@ -893,9 +921,11 @@ def _write_r10_report(
     files: int,
     trees: list[str],
     registry: metric_registry.MetricRegistry | None = None,
+    polarities: metric_registry.PolarityDeclaration | None = None,
 ) -> None:
     """Write every finding out, because a truncated reason is not evidence."""
     registry = registry or metric_registry.MetricRegistry()
+    polarities = polarities or metric_registry.PolarityDeclaration()
     lines = [
         f"# Fabricated defaults (R10) — resilient-{repo.name}",
         "",
@@ -914,16 +944,20 @@ def _write_r10_report(
         "declares by computing it, mlkit's own vocabulary has no opinion on it, so",
         "no polarity can be read and no verdict is asserted. R10 renders NA.",
         "",
-        "| severity | file:line | symbol | value | shape | sink |",
-        "|---|---|---|---|---|---|",
+        "Every row carries WHAT is fabricated (`reason`) and WHAT to write",
+        "instead (`repair`). A red row with no instruction on it is a row its",
+        "owner cannot act on, and an NA row with no reason on it is a count.",
+        "",
+        "| severity | file:line | symbol | value | shape | sink | reason | repair |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for f in findings:
         lines.append(
             f"| {f.severity} | `{f.path}:{f.line}` | `{f.symbol}` | `{f.literal}` | "
-            f"{f.shape} | {f.sink} |"
+            f"{f.shape} | {f.sink} | {_cell(f.reason)} | {_cell(f.repair)} |"
         )
     if not findings:
-        lines.append("| — | — | — | — | — | (none) |")
+        lines.append("| — | — | — | — | — | (none) | — | — |")
     lines.append("")
     # The derivation is disclosed in full, because a name universe nobody can
     # read is the same problem as a name universe nobody can extend (E-038).
