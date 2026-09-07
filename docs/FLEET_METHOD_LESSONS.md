@@ -630,6 +630,76 @@ FAIL. No check was made green that should not be green.
 * A repair that discharges one obligation must leave every other finding at full
   strength, and you should be able to say so by name.
 
+## Part 8 — The harness is an instrument too
+
+### 22. A harness that reports success having measured nothing
+
+**Lesson.** Two portability traps, hit in one verification pass, both the same
+shape: the harness completed, printed its marker, and had measured nothing. A
+driver's exit is not evidence that its work happened.
+
+**What it cost.**
+* **BSD `sed` does not support `\?` in a basic regular expression.** A control
+  arm whose job was to CORRUPT a signature digest corrupted nothing. The gate
+  under test then read exactly what it reads on a clean tree, and the gate looked
+  LIVE when it had never been tested — the §1 liveness arm, defeated by the tool
+  that was supposed to drive it. Redone in Python.
+* **`zsh` does not word-split an unquoted parameter.** A driver loop of the form
+  `for spec in "surge 8517341d"; set -- $spec` passed `repo="surge 8517341d"` —
+  the whole string — as the repository name. Every drive in the loop failed on a
+  name no repo has, and the loop still printed its `ALLDONE` marker at the end.
+  Moved into `#!/bin/bash` scripts.
+
+Both were caught inside the fleet's own tooling rather than in a repo, which is
+the only reason they are recoverable at all: a corrupted-digest arm that
+corrupts nothing produces a PASS, and a pass is what everybody wanted to see.
+
+**Practice.**
+* **A mutation control asserts that the bytes CHANGED, and refuses to proceed if
+  they did not.** "I ran a `sed`" is not evidence that anything moved. Every
+  fixture mutation in the two gate-defect lanes that followed is applied in
+  Python and refuses a no-op, for this reason.
+* **A driver's success marker must be the CONJUNCTION of its items' successes,
+  not the end of its loop body.** Count what you drove, require the count, and
+  make the loop exit non-zero when any item did. The same lanes replaced shell
+  loops with a Python `for` over a dict.
+* Do not write measurement drivers in an interactive shell's dialect. Put them in
+  `#!/bin/bash` or Python and pin the interpreter in the shebang: the difference
+  between shells here is a silent semantic, not a syntax error, and the machine
+  you develop on is not necessarily the machine that runs the arm.
+* Prefer the language that lets you ASSERT over the language that gives you the
+  one-liner, anywhere a control's own correctness is load-bearing.
+
+### 23. A contention classifier is only worth having if a clean run can show it staying silent
+
+**Lesson.** §9 gives UNMEASURABLE the power to void a reading. A rule that has
+only ever been observed FIRING is indistinguishable from a rule that fires on
+everything; what completes it is a full, clean pass in which it stays silent and
+every reading survives, recorded with the same care as the readings that voided.
+
+**What it cost.** Nothing — and that is the entry. The 2026-09-07 independent
+verification pass drove nine repositories from full fresh clones, every arm
+SEQUENTIALLY, recording `load1` at BOTH ENDS of every span against `hw.ncpu` =
+**10**. Every reading fell between **1.62 and 4.12**, i.e. **0.16–0.41 ×
+cpu_count**, against a predicate that voids a reading at
+`load1 >= 1.0 × cpu_count`. **No reading in that pass was void and none needed
+re-measuring.** The two gate-defect lanes that followed read 2.1–3.1 (0.21–0.31 ×
+cpu_count) at both ends of every span, and the five-repo licence lane 0.18–0.33 ×
+cpu_count. In that last one, two readings were RE-MEASURED rather than explained:
+a staging artefact of the lane's own making, and a live-network test that flips on
+both trees — driven eight times, four per tree, and settled by running a fourth
+main arm so the landing pair was exactly equal rather than argued equal.
+
+**Practice.**
+* Record the contention record on the PASSING arms too, not only on the ones you
+  suspect. A load figure that is never taken when the answer is "quiet" cannot
+  establish that the classifier discriminates.
+* State the PREDICATE and the measured MARGIN in the same sentence, so a reader
+  can see how far from void a reading was rather than being told it was fine.
+* Keep §9's rule intact when it costs you something: re-measure, never
+  re-explain. Running one more arm is cheaper than a paragraph arguing that a
+  reading was probably clean, and it is the only one of the two that is evidence.
+
 ---
 
 ## The short form
