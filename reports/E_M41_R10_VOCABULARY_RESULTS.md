@@ -176,11 +176,15 @@ Full target, one clone per arm with its own venv, run **sequentially**, no
 `-k`, identical flags:
 
 ```
-MAIN   a1037a4d / tree ae566680   1364 passed, 3 skipped, 0 FAILED   212.92s   load1 ~16.0
-BRANCH 4e60e5a8 / tree a91bafff  1389 passed, 3 skipped, 0 FAILED   186.26s   load1 ~16.7
+MAIN    a1037a4d / tree ae566680  1364 passed, 3 skipped, 0 FAILED  212.92s  load1 16.02 after
+BRANCH  4e60e5a8 / tree a91bafff  1389 passed, 3 skipped, 0 FAILED  186.26s  load1 16.65 after
+BRANCH' 5d3eb8dc / tree c7fb08db  1389 passed, 3 skipped, 0 FAILED  168.54s  load1 12.92 -> 14.77
 only-on-branch NONE   only-on-main NONE   BOTH failure sets EMPTY
 ```
 
+BRANCH' is the arm re-driven on the FINAL tree, because the results and
+escalation documents landed after the first branch arm and this repo's suite
+reads its own docs. A tree that was not tested does not land.
 `+25 passing` = the 25 tests added (15 in `test_r10_reason_and_repair.py`, 10
 in `test_r10_derivation_defects.py`). Each arm asserted
 `resilient_mlkit.__file__` inside its own clone before running — the shared venv
