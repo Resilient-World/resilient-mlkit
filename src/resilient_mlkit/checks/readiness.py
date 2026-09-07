@@ -75,6 +75,43 @@ _FOREIGN_REGIONS = (
 
 @check("R9", PHASE, "LICENCE_GATE — no unlisted source or checkpoint, NOTICE.md current")
 def r9_licence_gate(repo: Repo, ctx: RunContext) -> CheckResult:
+    """R9 owns TWO obligations, and reports BOTH of them, always (E-M44).
+
+    Leg one: no source in the manifest is unlisted, BLOCKED or EVAL-ONLY.
+    Leg two: every attribution obligation in the signed allowlist is rendered
+    into ``NOTICE.md``. Both are licence conditions; neither is cosmetic.
+
+    Until E-M44 this function ``return``ed on leg one, so leg two was invisible
+    on any repo that had a manifest finding. Measured across the fleet on
+    2026-09-07: five of eight ``NOTICE.md`` files were stale and four were
+    missing attribution sections outright, and **three of those four were
+    hidden behind an unrelated manifest failure**. The gap was not new and
+    nothing was concealing it on purpose -- the check simply could not see past
+    its own first ``return``.
+
+    Three deliberate choices in what follows.
+
+    * **The NOTICE leg is computed FIRST and unconditionally.** Not for
+      precedence -- for reachability. Anything computed after a ``return`` is
+      one refactor away from being unreachable again, and this one already was.
+    * **It also runs when the manifest leg could not be measured at all.**
+      ``policy.notice_gap`` needs no binding, no import of the repo's code and
+      no data, so "this interpreter cannot import pandas" does not make an
+      undischarged attribution obligation unknowable. A measured failure beside
+      an unmeasured leg is a FAIL whose reason says which leg was not measured
+      -- NA would erase the half that WAS measured, which is the collapse
+      ``core.result.Status`` exists to refuse.
+    * **It runs past a structurally invalid allowlist, and the manifest leg
+      does not.** Whether NOTICE.md matches the allowlist on disk is answerable
+      without trusting the determinations; whether a source is wrongly licensed
+      is not. `resilient-surge` is the repo that distinction is for: its R9
+      fails at ``defective_entries`` and its twelve missing attribution
+      sections were behind that.
+
+    Nothing here weakens either leg. Every input that failed R9 before E-M44
+    still fails it, with the manifest clause unchanged word for word; the only
+    thing that moves for a repo whose NOTICE is current is nothing at all.
+    """
     allowlist = policy.load(repo)
     if not allowlist.exists:
         return CheckResult.escalated(
@@ -82,70 +119,92 @@ def r9_licence_gate(repo: Repo, ctx: RunContext) -> CheckResult:
             f"{policy.ALLOWLIST_RELPATH} does not exist; only a human signatory "
             "may create it",
         )
+
+    evidence: dict[str, Any] = {"allowlist_signed": allowlist.signed}
+
+    # LEG TWO, first and unconditionally. Skipped only when the document did
+    # not parse at all, because a rendering built from zero entries would
+    # report a gap that is an artefact of the parse failure rather than an
+    # unmet obligation.
+    gap = policy.notice_gap(repo, allowlist) if allowlist.document_parsed else None
+    if gap is not None:
+        evidence.update(gap.evidence())
+
+    findings: list[str] = []
+
+    # LEG ONE (a): is the allowlist usable as evidence at all?
+    allowlist_unusable = False
     if allowlist.parse_error:
-        return CheckResult.failed("R9", PHASE, allowlist.parse_error)
+        findings.append(allowlist.parse_error)
+        allowlist_unusable = True
+    else:
+        defects = allowlist.defective_entries()
+        if defects:
+            first = list(defects.items())[:3]
+            findings.append(
+                "allowlist entries are structurally invalid: "
+                + "; ".join(f"{k}: {', '.join(v)}" for k, v in first)
+            )
+            evidence["defective"] = defects
+            allowlist_unusable = True
 
-    defects = allowlist.defective_entries()
-    if defects:
-        first = list(defects.items())[:3]
-        return CheckResult.failed(
-            "R9", PHASE,
-            "allowlist entries are structurally invalid: "
-            + "; ".join(f"{k}: {', '.join(v)}" for k, v in first),
-            {"defective": defects},
+    # LEG ONE (b): the manifest, judged against those determinations.
+    unmeasured = ""
+    if allowlist_unusable:
+        unmeasured = (
+            "not evaluated: the allowlist it would be judged against is "
+            "structurally invalid"
         )
+    else:
+        sources, err = policy.manifest_sources(repo)
+        if err:
+            unmeasured = err
+        elif not sources:
+            # An empty manifest satisfies every "no unlisted source" test
+            # vacuously. Passing the licence gate by declaring no data is the
+            # one way to make R9 meaningless, so it is explicitly not a pass.
+            unmeasured = (
+                "manifest resolved to zero sources; a licence gate over an "
+                "empty manifest measures nothing"
+            )
+        else:
+            unlisted = [s for s in sources if allowlist.verdict(s) is None]
+            eval_only = [s for s in sources if allowlist.verdict(s) == "EVAL-ONLY"]
+            blocked = [s for s in sources if allowlist.verdict(s) == "BLOCKED"]
+            evidence.update({
+                "sources": len(sources),
+                "unlisted": unlisted,
+                "eval_only_in_manifest": eval_only,
+                "blocked_in_manifest": blocked,
+            })
+            if unlisted:
+                findings.append(
+                    f"{len(unlisted)} source(s) not on the allowlist: "
+                    + ", ".join(sorted(unlisted)[:5])
+                )
+            elif blocked:
+                findings.append(
+                    "BLOCKED source(s) in the manifest: " + ", ".join(sorted(blocked))
+                )
+            elif eval_only:
+                findings.append(
+                    "EVAL-ONLY source(s) present in a training manifest: "
+                    + ", ".join(sorted(eval_only))
+                )
+    evidence["manifest_leg"] = unmeasured or "evaluated"
 
-    sources, err = policy.manifest_sources(repo)
-    if err:
-        return CheckResult.na("R9", PHASE, err)
-    if not sources:
-        # An empty manifest satisfies every "no unlisted source" test
-        # vacuously. Passing the licence gate by declaring no data is the one
-        # way to make R9 meaningless, so it is explicitly not a pass.
-        return CheckResult.na(
-            "R9", PHASE,
-            "manifest resolved to zero sources; a licence gate over an empty "
-            "manifest measures nothing",
-        )
+    # The NOTICE clause goes FIRST in a combined reason. Reasons are truncated
+    # at `result.MAX_REASON`, and putting the newly-visible half last is how it
+    # would go on being invisible -- by truncation this time instead of by
+    # `return`. A repo whose NOTICE is current sees no clause and no reordering.
+    reasons = ([gap.reason()] if gap is not None and gap.failed else []) + findings
+    if reasons:
+        if unmeasured and not allowlist_unusable:
+            reasons.append(f"the manifest leg was NOT measured: {unmeasured}")
+        return CheckResult.failed("R9", PHASE, " | ".join(reasons), evidence)
 
-    unlisted = [s for s in sources if allowlist.verdict(s) is None]
-    eval_only = [s for s in sources if allowlist.verdict(s) == "EVAL-ONLY"]
-    blocked = [s for s in sources if allowlist.verdict(s) == "BLOCKED"]
-
-    evidence = {
-        "sources": len(sources),
-        "unlisted": unlisted,
-        "eval_only_in_manifest": eval_only,
-        "blocked_in_manifest": blocked,
-        "allowlist_signed": allowlist.signed,
-    }
-
-    if unlisted:
-        return CheckResult.failed(
-            "R9", PHASE,
-            f"{len(unlisted)} source(s) not on the allowlist: " + ", ".join(sorted(unlisted)[:5]),
-            evidence,
-        )
-    if blocked:
-        return CheckResult.failed(
-            "R9", PHASE, "BLOCKED source(s) in the manifest: " + ", ".join(sorted(blocked)), evidence
-        )
-    if eval_only:
-        return CheckResult.failed(
-            "R9", PHASE,
-            "EVAL-ONLY source(s) present in a training manifest: " + ", ".join(sorted(eval_only)),
-            evidence,
-        )
-
-    # NOTICE.md must be regenerable to exactly what is on disk, or it has drifted.
-    notice_path = repo.path / "NOTICE.md"
-    expected = policy.render_notice(repo, allowlist)
-    if not notice_path.is_file():
-        return CheckResult.failed("R9", PHASE, "NOTICE.md is absent; run `mlkit notice`", evidence)
-    if notice_path.read_text() != expected:
-        return CheckResult.failed(
-            "R9", PHASE, "NOTICE.md is stale relative to the allowlist; run `mlkit notice`", evidence
-        )
+    if unmeasured:
+        return CheckResult.na("R9", PHASE, unmeasured, evidence)
 
     if not allowlist.signed:
         return CheckResult.escalated(
