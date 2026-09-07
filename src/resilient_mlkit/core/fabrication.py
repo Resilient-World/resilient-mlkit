@@ -1190,7 +1190,7 @@ class _ModuleScanner:
             return "this repo's own figure-producing callables"
         try:
             return origin(symbol) or "this repo's own figure-producing callables"
-        except Exception:  # pragma: no cover - a registry that cannot answer
+        except Exception:  # noqa: BLE001 - a registry that cannot answer is not a crash here
             return "this repo's own figure-producing callables"
 
     # -- what every row has to say for itself (E-M41) ----------------------

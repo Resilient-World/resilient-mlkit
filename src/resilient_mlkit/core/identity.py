@@ -436,6 +436,24 @@ def root_as_kind(root: Path) -> str:
     return f"`{root.name}` ({kind})"
 
 
+def _within(path: Path, root: Path) -> str:
+    """``path`` named RELATIVE to the tree being described, or said in words.
+
+    E-M42. The companion to :func:`root_as_kind` for the other operand. A file
+    inside the hashed tree is named by its path within it —
+    ``core/identity.pyc`` — which is the same string on every machine and is
+    exactly what a reader needs in order to go and look. A file that is NOT
+    inside it cannot be named that way, and the answer is then a SENTENCE about
+    the condition rather than a directory: "outside the tree" is the whole of
+    the fact, and pasting where it was would add nothing a reader could resolve
+    and would put a machine into a committed report.
+    """
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return f"a file named `{path.name}` from OUTSIDE the tree being described"
+
+
 def _vcs_of_installed_dist(root: Path) -> tuple[str | None, str | None, str]:
     """``(commit, url, reason)`` from the installed dist's ``direct_url.json``.
 
@@ -561,20 +579,30 @@ def running_code_is_covered_or_reason(root: Path) -> str:
     a REFUSAL — the stamp becomes ``+src.unknown`` and every comparison over it
     is INDETERMINATE, which is the honest answer to "which build is this?" when
     the digest covers none of the code that is running.
+
+    E-M42: this reason is rendered INTO the ``mlkit build:`` header line of
+    every stamped report (via ``BuildIdentity.unavailable`` and
+    :meth:`BuildIdentity.context_line`), so it obeys the same rule the rest of
+    this module obeys — **name the condition, never the directory**. Two of its
+    branches interpolated the absolute package root and the absolute path of
+    this file, which M-5 missed because M-5 read ``context_line`` and not what
+    feeds it. A header rendered on one machine then differed from the same
+    build's header on another, in the one case where the header is all a reader
+    has: the digest could not be taken.
     """
     me = Path(__file__).resolve()
     try:
         files = shipped_files(root)
     except OSError as exc:
-        return f"could not walk {root}: {exc}"
+        return f"could not walk the package root {root_as_kind(root)}: {exc}"
     if any(p.resolve() == me for p in files):
         return ""
     return (
-        f"the file this module was loaded from (`{me}`) is not among the "
-        f"{len(files)} file(s) the digest would cover under {root}; the running "
-        "code is excluded from its own identity (a sourceless/bytecode-only "
-        "install), so the digest would name an identity while describing none "
-        "of the code that ran"
+        f"the file this module was loaded from is `{_within(me, root)}` and it "
+        f"is not among the {len(files)} file(s) the digest would cover in "
+        f"{root_as_kind(root)}; the running code is excluded from its own "
+        "identity (a sourceless/bytecode-only install), so the digest would "
+        "name an identity while describing none of the code that ran"
     )
 
 

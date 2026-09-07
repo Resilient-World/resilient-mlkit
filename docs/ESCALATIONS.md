@@ -3624,3 +3624,97 @@ returning the best-case value**.
 **No consumer repository was edited and nothing was pushed to one.** The four
 fleet copies were read-only clones; the `[metrics]` demonstration was a
 throwaway copy that was deleted.
+
+## E-M42 — a report header named a machine, the writer that stamps it refused nothing, and a merged verify commit had fallen off `main`
+
+**Repo:** `Resilient-World/resilient-mlkit` (public). **Opened** 2026-09-07 on
+`main` `7522e454` (v2.0.0). **Preregistration:**
+`reports/E_M42_REPORT_HEADER_PREREGISTRATION.md`, this branch's first commit.
+**Readings:** `reports/E_M42_REPORT_HEADER_RESULTS.md`. **Driven arms:**
+`reports/E_M42_HEADER_CONTROL_ARMS.json`.
+
+### The finding, and the correction to it made before any edit
+
+`resilient-arabica`'s four stamped gate reports each carry
+`/private/tmp/claude-501/…/land2/arabica-unlock/mlkit-inst/resilient_mlkit` in
+their `mlkit build:` line. That line is mlkit's, so the finding arrived as
+"every repo whose reports mlkit stamps carries this". Measured first:
+
+* **M-5 already removed the directory from `context_line()`** on 2026-09-04
+  (`6ca1691`, PRs #49/#50). arabica's reports carry it because arabica pins
+  `3bf16dd0`, mlkit `0.6.0`, which is an ancestor of that repair. Rendered from
+  two different absolute directories, `main`'s ordinary header is already
+  byte-identical.
+* **The defect is still live at the same function on the branch M-5 missed.**
+  `identity.running_code_is_covered_or_reason()` interpolated the absolute path
+  of the file this module was loaded from AND the absolute package root. That
+  string becomes `BuildIdentity.unavailable` and `context_line()` renders it
+  into the header, so a **sourceless / bytecode-only install** wrote two
+  machines into a committed report — in the one case where the digest could not
+  be taken and the header's words are all a reader has. M-5 read `context_line`
+  and not what feeds it, and `test_p10_..._on_any_branch`, whose name claims
+  *any* branch, enumerates the other three reason producers and stops.
+* **And the producer refused nothing.** `core.report.guarded_write` — the one
+  funnel for the four stamped reports — wrote them with a bare
+  `path.write_text`. mlkit has shipped `core.artifact.machine_paths_in_text`
+  and a refusing writer since M-5, and the artifact mlkit puts into eight
+  repositories went through neither.
+
+### What shipped
+
+The three identity sites name the CONDITION instead of the location, and the
+guard moved to the write: a rendering that names a machine is REFUSED, the
+prior report is preserved byte for byte, and the refusal is recorded in
+`<report>.NAMES_A_MACHINE.md`, which names POSITIONS and never the tokens.
+Refusal and not scrubbing — a writer that edited the text of a measurement so a
+check passed would be the defect wearing the fix's clothes.
+
+Four arms driven both ways, plus the two producer arms. **A3 (CHECK-NOT-DEAD),
+with `identity.py` reverted to `main`: the two headers differ and carry 4
+machine-path tokens.** The committed artifact redacts every token to its
+length, because A3's headers are machine paths by construction and the first
+drive wrote them out — the control was, for one run, the defect it controls
+for, and `machine_paths_in_text` over its own record is what caught it.
+
+### The fleet reading
+
+Eight repos at their remote mains, five phases each, `origin/main`'s mlkit
+against this branch's, sequentially, one clone set restored between arms:
+**272 adjudicated rows, 0 added, 0 removed, 0 status moved.** One reason string
+moved, on the report-write row `fray/readiness/R8`, because the new guard fires
+on a live tree: **fray's own R5 binding reason ends `Path: /private/tmp/…`**.
+That is fray's string and it is left for fray.
+
+### Second subject: `main` had lost PR #20's verify commit
+
+`1170a7e` is recorded MERGED and is **not** an ancestor of `origin/main`;
+`63682f4` (the verify commit, `+341/-7`) is missing while its two predecessors
+are present. All three of its repairs were genuinely absent from the tree and
+are restored: R10's defect lane is adjudicated before the derivation refusal
+again; `metric_registry.derive` guards its read and DISCLOSES what it skipped
+instead of raising; and `files under a declared tree the derivation could not
+READ: N` is back in the R10 report. The self-only-callable disclosure was
+re-measured at today's mains rather than carried over, and its old conclusion
+is **withdrawn**: chokepoint's R10 would move PASS → NA under the widened
+universe today.
+
+### RESERVED, and left for the signatory or for each repo
+
+1. **The v2.1.0 tag is not cut.** E-M08: cutting a tag is the signatory's.
+2. **arabica's four committed reports still carry the path.** They were written
+   by the revision arabica pins. Removing it means arabica moving its pin and
+   regenerating, with an A/B on every gate row — arabica's PR, not mlkit's.
+3. **fray's R5 binding reason is not repaired**, and after this release fray's
+   `readiness.md` will REFUSE to regenerate until it is. Named, not touched.
+   One line of fray's own source.
+4. **Every repo's freshness stamp moves when it next regenerates** under a pin
+   at or after this release, because R10's report gains one line. Per-repo
+   consequences are written out for the adopters; adopting is each repo's own
+   pin-moving PR.
+5. **The refusal record names positions, not tokens.** A reader who needs the
+   offending string reads it from `MachinePathRefused` on the terminal. That is
+   a deliberate cost, not an oversight.
+
+**No consumer repository was edited and nothing was pushed to one.** The eight
+fleet copies were throwaway shallow clones, read for measurement and left
+unpushed. **#45 untouched.**
