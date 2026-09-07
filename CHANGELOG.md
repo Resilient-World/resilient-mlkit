@@ -12,6 +12,74 @@ Versions follow the shape of the risk to consumers, not the size of the diff:
 * **minor** — a new check exists, or a report or CLI surface changes.
 * **patch** — a defect in the instrument is fixed with no verdict change.
 
+## v1.4.0 — 2026-09-06
+
+Not yet tagged. Tag cutting is the signatory's (E-M08). **A new module and a
+new (opt-in) pytest plugin exist; no check's predicate moves** — this file's
+scale calls that *minor*. **E-M40**.
+
+### Verdicts that depended on machine load, and the status that ends that
+
+* **The defect.** Four measurements were lost on 2026-09-06 on one 10-CPU host.
+  In THIS repo, `test_positive_control_a_sleeping_test_fails_on_timeout` gives a
+  child pytest **10 s of wall time**; under three concurrent suites the arm took
+  **1196.12 s** against a normal **635.75 s** and read **rc 1**, which would have
+  blocked landing PR #54. Quiet, the same tree: **1307 passed, rc 0, 101.02 s**.
+  What dated the cause to the host was the same file's **negative** control
+  failing in a neighbouring arm — a fast test cannot be made slow by a source
+  change. In choco the **same tree run twice** gave failure sets **five names
+  apart**, all `pytest-timeout` at the 120/180 s boundary, against a
+  landing-relevant difference of three. In torrent a 79-minute "stall" and a
+  "hung" regeneration both vanished at low load. In arabica a three-stream plan
+  produced a phantom timeout.
+* **`core.contention`.** A `ContentionRecord` captured at the moment of a
+  timing-sensitive measurement — 1/5/15-minute load at both ends of the span,
+  CPU count, this process's CPU **and its reaped children's**, wall, and the
+  elapsed-vs-budget ratio. Standard library only; no dependency is added to the
+  eight repos, nothing is written and nothing is fetched.
+* **`classify` returns `UNMEASURABLE`**, the status M-1 already added for
+  "armed, declaration resolved, the environment cannot supply the input". The
+  predicate requires **all four** of: the assertion IS a wall-clock budget
+  (structural — the status is unreachable except through `WallClockBudget`); the
+  budget was missed; `cpu_ratio ≤ 0.5`; `load1 ≥ 1.0 × cpu_count`. Both
+  constants were fixed in `reports/CONTENTION_PREREGISTRATION.md` before the
+  module existed. It is **never a PASS**, carries no `halt` key, and **never
+  downgrades a FAIL**: a missed budget on a quiet machine, or missed while
+  burning CPU, is a real FAIL.
+* **The thresholds move only toward strictness.** `WallClockBudget` refuses a
+  lowered `load_per_cpu` or a raised `max_cpu_ratio` by name, and every record
+  carries the thresholds it was judged against.
+* **`resilient_mlkit.pytest_contention`** — a `wall_clock_budget` marker and
+  fixture, and a session hook that prints the run's contention line at the top
+  and the bottom of the log so any arm can be dated afterwards. **It never
+  changes pytest's verdict** — no pass, no skip, no xfail — proved by running
+  one file with and without the plugin under identical configuration and
+  requiring identical exit codes. **Opt-in: there is no `pytest11` entry point**,
+  because one would register this in all eight repos on the next lock, which is
+  the ambient-drift problem at the top of this file.
+* **The protocol** (`docs/CONTENDED_MEASUREMENT.md`): arms run **sequentially**;
+  each records its contention record; a by-name comparison between arms at
+  materially different load is **VOID** and is re-measured, not explained. It
+  also records two facts that cost a day: a test file's own
+  `@pytest.mark.timeout` **beats** `--timeout` on the command line, and
+  `timeout_method = "thread"` cannot bound a GIL-holding hang.
+* **Driven both ways, artifact committed** (`reports/CONTENTION_CONTROL_ARMS.json`):
+  a real `O(n²)` regression on the quiet machine reads **FAIL** (cpu ratio 0.99);
+  the **same unchanged code** under load 13.23 reads **UNMEASURABLE** (ratio
+  0.28, wall 0.39 s → 1.94 s); with the facility removed, or the load condition
+  destroyed entirely, the regression **still reads FAIL**.
+* **The declared residual.** A *sleeping* regression on a loaded machine is not
+  distinguishable by this record and reads UNMEASURABLE — which is not a pass,
+  and obliges a re-measurement on a quiet machine where the same code reads
+  FAIL. Declared in the preregistration before measuring, not discovered after.
+
+### Which checks can render FAIL on repo code that did not change
+
+None newly, and nothing in this release changes any predicate. The pytest plugin
+is opt-in and adds no check. Carried forward, not introduced here: **R12**
+(v1.0.0, E-M38) and **D2, E1, T2, R2, D3, E3 and R4** (E-M09, E-M10). A consumer
+whose pin predates those releases inherits their moves on this upgrade.
+
 ## v1.3.0 — 2026-09-06
 
 Not yet tagged. Tag cutting is the signatory's (E-M08). **A CLI surface grows
