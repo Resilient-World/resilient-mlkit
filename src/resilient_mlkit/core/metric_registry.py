@@ -120,7 +120,13 @@ from pathlib import Path
 
 from . import fabrication
 
-__all__ = ["MetricRegistry", "derive", "normalise"]
+__all__ = [
+    "MetricRegistry",
+    "PolarityDeclaration",
+    "derive",
+    "normalise",
+    "polarities_from",
+]
 
 #: Arithmetic that turns inputs into a figure. Bit operations and comparisons
 #: are deliberately absent: they produce masks and verdicts, not measurements.
@@ -222,11 +228,115 @@ def _value_expressions(expr: ast.AST) -> Iterable[ast.AST]:
     yield expr
 
 
+def _is_path_join(expr: ast.BinOp) -> bool:
+    """True when this ``/`` cannot be numeric division (E-M41, defect D2).
+
+    ``pathlib`` spells path joining with the same operator arithmetic uses, so
+    ``self.cache_dir / f"{key}.json"`` parses as a ``BinOp(Div)`` and admitted
+    ``resilient-chokepoint``'s ``data/ingest/base.py:69 fetch()`` to the metric
+    registry -- a cache-file accessor reported as a figure-producing callable.
+
+    The predicate is a TYPE FACT rather than a heuristic about names: dividing
+    a number by a string raises ``TypeError``, so a ``/`` with a string literal
+    or an f-string on either side is not division. If the line runs at all, it
+    is ``Path.__truediv__``.
+
+    Deliberately narrow. ``REPO_ROOT / path``, both sides plain names, is NOT
+    caught here and stays a stated limit -- widening it to "an operand whose
+    name looks path-ish" would be the spelling rule this whole line of work
+    exists to avoid.
+    """
+    if not isinstance(expr.op, ast.Div):
+        return False
+    for side in (expr.left, expr.right):
+        if isinstance(side, ast.JoinedStr):
+            return True
+        if isinstance(side, ast.Constant) and isinstance(side.value, str):
+            return True
+        # ``root / "reports" / name`` parses as ``(root / "reports") / name``:
+        # the OUTER node has a Name on both visible sides and only the inner
+        # one carries the string. A ``/`` chain rooted in a path join is a path
+        # join for its whole length.
+        if isinstance(side, ast.BinOp) and _is_path_join(side):
+            return True
+    return False
+
+
 def _is_arithmetic(expr: ast.AST) -> bool:
     return any(
-        isinstance(e, ast.BinOp) and isinstance(e.op, _ARITHMETIC)
+        isinstance(e, ast.BinOp)
+        and isinstance(e.op, _ARITHMETIC)
+        and not _is_path_join(e)
         for e in _value_expressions(expr)
     )
+
+
+def _own_body(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> Iterable[ast.AST]:
+    """Every node belonging to ``fn`` ITSELF, not to a function it defines.
+
+    E-M41, defect D1. ``_computes_a_figure`` used ``ast.walk(fn)``, which
+    descends into nested ``def``s and lambdas, so an outer function was
+    credited with arithmetic that belongs to an inner one.
+    ``resilient-arabica``'s ``scripts/val_predictions_group_interval.py:52
+    main(path) -> int`` does no arithmetic in its own body; the ``skill()`` it
+    defines does (``1.0 - rm / rq``). That is how the NAME ``main`` entered the
+    registry, and how a process exit status at
+    ``src/validation/run_validate.py:577`` became an R10 finding.
+
+    Nested functions are still visited as candidates in their OWN right --
+    :func:`_names_in` walks every ``FunctionDef`` in the module, nested or not
+    -- so scoping here removes the false attribution and not the coverage.
+
+    Scoping ALONE would have cost real recall, and that was measured before it
+    was accepted: ``standardized_mean_differences`` (arabica
+    ``src/analysis/psm_matching.py:260``) and ``e_value``
+    (``src/analysis/sensitivity.py:174``) both put their arithmetic in a nested
+    ``_smd`` / ``_e_from_effect`` and RETURN a value built from it. They are
+    exactly the domain names E-038 exists to admit. :func:`_delegated_helpers`
+    keeps them by looking at the RETURN, which is also what separates them from
+    ``main``: ``main`` calls its helper and then returns ``0`` or ``1``.
+    """
+    stack: list[ast.AST] = list(fn.body)
+    while stack:
+        node = stack.pop()
+        yield node
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            # Its own body is its own; do not descend.
+            continue
+        stack.extend(ast.iter_child_nodes(node))
+
+
+def _delegated_helpers(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    """Names of nested functions ``fn`` defines that compute a figure themselves.
+
+    The one-hop delegation rule, symmetric with the existing one-hop through a
+    local. ``def e_value(...): def _e_from_effect(effect): return rr + ...;
+    return EValueResult(point_e_value=_e_from_effect(estimate), ...)`` is the
+    same function as one with the arithmetic inline, and the fleet writes it
+    both ways.
+
+    Being CALLED is not enough; the caller has to RETURN what the helper
+    produced. That is the whole difference between ``e_value`` and an argparse
+    ``main`` that calls a scoring helper and then returns an exit status.
+    """
+    helpers: set[str] = set()
+    for node in fn.body:
+        for sub in ast.walk(node):
+            if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if _computes_a_figure(sub):
+                    helpers.add(sub.name)
+    return helpers
+
+
+def _mentions(expr: ast.AST, helpers: set[str]) -> bool:
+    """True when ``expr`` calls one of ``helpers`` anywhere inside itself."""
+    if not helpers:
+        return False
+    for node in ast.walk(expr):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id in helpers:
+                return True
+    return False
 
 
 def _computes_a_figure(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
@@ -246,22 +356,29 @@ def _computes_a_figure(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
         # A no-argument callable returns a constant or reads state; either way
         # it is not computing a figure FROM anything this walk can see.
         return False
+    helpers = _delegated_helpers(fn)
     derived_locals: set[str] = set()
-    for node in ast.walk(fn):
+    for node in _own_body(fn):
         value = getattr(node, "value", None)
         if not isinstance(node, (ast.Assign, ast.AnnAssign)) or value is None:
             continue
-        if not _is_arithmetic(value):
+        if not (_is_arithmetic(value) or _mentions(value, helpers)):
             continue
         targets = node.targets if isinstance(node, ast.Assign) else [node.target]
         for target in targets:
             if isinstance(target, ast.Name):
                 derived_locals.add(target.id)
-    for node in ast.walk(fn):
+    for node in _own_body(fn):
         if not isinstance(node, ast.Return) or node.value is None:
             continue
+        if _mentions(node.value, helpers):
+            return True
         for expr in _value_expressions(node.value):
-            if isinstance(expr, ast.BinOp) and isinstance(expr.op, _ARITHMETIC):
+            if (
+                isinstance(expr, ast.BinOp)
+                and isinstance(expr.op, _ARITHMETIC)
+                and not _is_path_join(expr)
+            ):
                 return True
             if isinstance(expr, ast.Name) and expr.id in derived_locals:
                 return True
@@ -337,3 +454,82 @@ def derive(roots: Iterable[Path], base: Path | None = None) -> MetricRegistry:
         files=files,
         refusal=refusal,
     )
+
+
+# ---------------------------------------------------------------------------
+# The adopter's declared polarities (E-M41)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PolarityDeclaration:
+    """What one adopter declares under ``[metrics]`` in ``.mlkit/repo.toml``.
+
+    THE PROBLEM IT SOLVES. ``satisfies_a_gate`` reads polarity off mlkit's
+    built-in word list, so for a domain name the repo defines by computing it,
+    R10 cannot say whether a literal is the value that PASSES the gate or one
+    that would fail it. It asserts neither, the row is ``UNCLASSIFIED_NAME``,
+    and R10 renders NA. Measured on ``resilient-arabica`` ``2a65d9a5``, five of
+    the 163 names it computes figures under are in mlkit's vocabulary; the
+    other 158 are not, and every residual R10 finding there sits at one of
+    them. NA is the honest answer and it is not a good resting place.
+
+    WHY A DECLARATION AND NOT A GUESS. The alternative was a fourth severity
+    for "a degenerate-input guard whose value is the mathematically defined
+    answer" — and separating that from an absent-value default means deciding
+    whether ``if not matched:`` tests absence or degeneracy, which is the same
+    syntax wearing two meanings. A severity mlkit guesses wrong is worse than
+    an NA it declines honestly. Asking the repo reaches the subset that matters
+    from the other side, and the answer is a line a reviewer reads in a diff.
+
+    WHY IT CANNOT BE USED TO GO GREEN. There are exactly three values and none
+    of them is "not a metric". A declaration can only turn an
+    ``UNCLASSIFIED_NAME`` row (NA) into ``SATISFIES_GATE`` or
+    ``PUBLISHES_UNMEASURED`` (FAIL). It cannot remove a row, it cannot silence
+    a name, and it cannot reach a name mlkit's own vocabulary already judges —
+    so no repo can re-aim ``rmse``. Declaring is monotone toward strictness,
+    which is why it does not need the committed-bytes treatment a
+    verdict-loosening declaration would.
+
+    An unrecognised value is IGNORED rather than accepted, and named in
+    :attr:`refused`, so a typo leaves the row NA instead of quietly adjudicating
+    it in whichever direction the typo happened to fall near.
+    """
+
+    #: Normalised name -> one of ``fabrication.DECLARED_POLARITIES``.
+    directions: Mapping[str, str] = field(default_factory=dict)
+    #: ``"name = value"`` for every entry that was not one of the three.
+    refused: tuple[str, ...] = ()
+
+    def polarity(self, name: str) -> str | None:
+        return self.directions.get(normalise(name))
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "declared": len(self.directions),
+            "names": sorted(self.directions),
+            "refused": list(self.refused),
+        }
+
+
+def polarities_from(config: Mapping[str, object]) -> PolarityDeclaration:
+    """Read ``[metrics]`` out of one repo's parsed ``.mlkit/repo.toml``.
+
+    An absent table gives an empty declaration, which changes nothing: every
+    row that was ``UNCLASSIFIED_NAME`` stays ``UNCLASSIFIED_NAME``.
+    """
+    table = config.get("metrics")
+    if not isinstance(table, Mapping):
+        return PolarityDeclaration()
+    directions: dict[str, str] = {}
+    refused: list[str] = []
+    for name, value in table.items():
+        key = normalise(str(name))
+        text = str(value).strip().lower()
+        if not key:
+            continue
+        if text in fabrication.DECLARED_POLARITIES:
+            directions[key] = text
+        else:
+            refused.append(f"{name} = {value!r}")
+    return PolarityDeclaration(directions=directions, refused=tuple(sorted(refused)))
