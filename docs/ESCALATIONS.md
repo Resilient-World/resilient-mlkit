@@ -3482,14 +3482,23 @@ correct landing.
 baseline (`0.5783 s` = 1.5 × `0.3855 s`), all on this 10-CPU host:
 
 ```
-NEGATIVE  unchanged child, quiet (load 6.11)   0.40s  cpu 0.38s ratio 0.95  PASS
-FIRES     REGRESSED O(n^2), quiet (load 6.11)  6.46s  cpu 6.39s ratio 0.99  FAIL
-SILENT    unchanged child, LOADED (load 13.23) 1.94s  cpu 0.54s ratio 0.28  UNMEASURABLE
+NEGATIVE  unchanged child, quiet (load  7.49)  0.28s  cpu 0.27s ratio 0.98  PASS
+FIRES     REGRESSED O(n^2), quiet (load 7.49)  3.95s  cpu 3.94s ratio 1.00  FAIL
+SILENT    unchanged child, LOADED (load 11.70) 2.37s  cpu 0.51s ratio 0.21  UNMEASURABLE
 NOT-DEAD  N1 facility removed                                               FAIL
           N2 C4 destroyed (load_per_cpu 0.0)                                FAIL
-          N3 C3 destroyed (max_cpu_ratio 1.0)                               FAIL
+          N3 C3 destroyed (max_cpu_ratio 1.0)                               FAIL (quiet)
           N4 BOTH destroyed                                                 UNMEASURABLE
 ```
+
+An earlier drive of these arms ran while the host sat at **load 14.34** and is
+the reason the drive now polices itself: every arm row carries `machine_quiet`
+computed from its record, and a FIRES arm measured on a loaded host makes the
+whole run disagree, so the protocol's own answer — re-measure, do not explain —
+applies to the protocol's own controls. That drive also flipped **N3** to
+UNMEASURABLE, which is the cleanest available demonstration that C3 and C4 are
+each load-bearing: with the CPU condition destroyed, the load condition is all
+that remains.
 
 The same unchanged code reads PASS quiet and UNMEASURABLE loaded; the regressed
 code reads FAIL on the *quiet* machine. **N2 is the load-bearing control**:

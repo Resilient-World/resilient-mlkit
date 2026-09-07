@@ -148,6 +148,10 @@ def arm(name: str, record: ct.ContentionRecord, required: str | None) -> dict[st
         "classified": status.value,
         "required": required,
         "agrees": None if required is None else status.value == required,
+        # Measured, not assumed from the arm's name. The FIRES arm is only the
+        # FIRES arm if the machine really was below the declared threshold
+        # while it ran, and a label saying "quiet" is not a measurement.
+        "machine_quiet": not record.loaded,
         "record": record.to_dict(),
         "one_line": record.one_line(),
     }
@@ -224,6 +228,11 @@ def main() -> int:
         "driven_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "mlkit_file": resilient_mlkit.__file__,
         "mlkit_version": resilient_mlkit.__version__,
+        # The build, beside the version, because the version cannot identify a
+        # build: E-M24 measured two mlkit trees 40 commits apart both declaring
+        # one version string. tests/test_build_identity.py enforces the pairing
+        # and caught this payload before it landed.
+        "mlkit_build": resilient_mlkit.__build__,
         "cpu_count": max(1, os.cpu_count() or 1),
         "thresholds": {
             "MAX_CPU_RATIO": ct.MAX_CPU_RATIO,
@@ -242,7 +251,7 @@ def main() -> int:
     # Measured, not chosen. A budget picked out of the air is the fabricated
     # expected range rule 2 forbids.
     warm = run_child(N_BASELINE, 3600.0, "baseline warm-up (budget not read)")
-    quiet = run_child(N_BASELINE, 3600.0, "unchanged child, quiet baseline")
+    quiet = run_child(N_BASELINE, 3600.0, "unchanged child, baseline")
     budget_s = quiet.wall_s * BUDGET_MULTIPLE
     out["baseline"] = {
         "warm_up_wall_s": round(warm.wall_s, 6),
@@ -254,13 +263,13 @@ def main() -> int:
     # -- CONTROL: the unchanged child under the derived budget, quiet ------
     # Not one of the three arms, and it is here because without it the FIRES
     # arm is equally consistent with "this harness fails everything".
-    unchanged_quiet = run_child(N_BASELINE, budget_s, "unchanged child, quiet")
+    unchanged_quiet = run_child(N_BASELINE, budget_s, "unchanged child")
     out["arms"].append(
-        arm("NEGATIVE (unchanged child, quiet)", unchanged_quiet, Status.PASS.value)
+        arm("NEGATIVE (unchanged child)", unchanged_quiet, Status.PASS.value)
     )
 
     # -- ARM 1: FIRES ------------------------------------------------------
-    fires = run_child(N_REGRESSED, budget_s, "REGRESSED child (real O(n^2)), quiet")
+    fires = run_child(N_REGRESSED, budget_s, "REGRESSED child (real O(n^2))")
     out["arms"].append(arm("FIRES", fires, Status.FAIL.value))
 
     # -- ARM 3: NOT-DEAD, driven on the FIRES record -----------------------
@@ -273,6 +282,7 @@ def main() -> int:
             "classified": "FAIL" if bare else "PASS",
             "required": "FAIL",
             "agrees": bare,
+            "machine_quiet": not fires.loaded,
             "record": fires.to_dict(),
             "one_line": fires.one_line(),
         }
@@ -313,6 +323,7 @@ def main() -> int:
                 "classified": "NOT DRIVEN",
                 "required": Status.UNMEASURABLE.value,
                 "agrees": None,
+                "machine_quiet": None,
                 "record": {},
                 "one_line": "--skip-load was passed; no synthetic load was raised",
             }
@@ -352,11 +363,23 @@ def main() -> int:
         }
         out["arms"].append(arm("SILENT", loaded, Status.UNMEASURABLE.value))
 
+    # The FIRES arm's whole claim is "a genuine regression FAILS on a QUIET
+    # machine". Driven on a loaded one it may still read FAIL -- it did, at
+    # load 14.34 on 2026-09-06 -- but that is a different and weaker statement,
+    # and an artifact that did not say so would let a label stand in for a
+    # measurement. So this is computed from the record and it GATES the drive:
+    # a FIRES arm measured on a loaded host makes the run disagree, and the
+    # protocol's own answer applies to the protocol's own controls -- re-measure.
+    fires_row = next(row for row in out["arms"] if row["arm"] == "FIRES")
+    out["fires_measured_on_a_quiet_machine"] = bool(fires_row["machine_quiet"])
+
     disagreements = [
         row["arm"]
         for row in out["arms"]
         if row.get("required") is not None and not row.get("agrees")
     ]
+    if not out["fires_measured_on_a_quiet_machine"]:
+        disagreements.append("FIRES was not measured on a quiet machine")
     out["all_required_arms_agree"] = not disagreements
     out["disagreements"] = disagreements
 

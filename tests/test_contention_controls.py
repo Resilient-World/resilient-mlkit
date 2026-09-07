@@ -255,6 +255,13 @@ def test_the_committed_control_artifact_exists_and_every_required_arm_agrees() -
     by_name = {row["arm"]: row for row in driven["arms"]}
     assert by_name["FIRES"]["classified"] == Status.FAIL.value
     assert by_name["SILENT"]["classified"] == Status.UNMEASURABLE.value
+    # And the FIRES arm's own claim -- a genuine regression FAILS on a QUIET
+    # machine -- is held against the record rather than against its label. A
+    # committed artifact whose FIRES arm ran on a loaded host does not license
+    # the claim, whatever verdict it happened to produce.
+    assert driven["fires_measured_on_a_quiet_machine"] is True
+    assert by_name["FIRES"]["machine_quiet"] is True
+    assert by_name["SILENT"]["machine_quiet"] is False
 
 
 def test_the_committed_artifact_was_driven_at_the_thresholds_this_code_declares() -> None:

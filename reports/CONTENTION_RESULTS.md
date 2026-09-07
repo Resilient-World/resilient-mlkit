@@ -15,22 +15,45 @@ shape of mlkit's own positive control and of arabica's phantom failure. The
 child is an honest `O(n²)` triangular sum; the "genuine regression" is the same
 code with `n` raised from 3,000 to 12,000.
 
-The budget is **not invented**. It is `1.5 ×` the child's measured quiet wall
-time: quiet run `0.3855 s`, so **budget `0.5783 s`**.
+The budget is **not invented**. It is `1.5 ×` the child's measured baseline wall
+time: baseline run `0.3062 s`, so **budget `0.4594 s`**. Build that produced the
+artifact: `1.4.0+src.bc9a258ee6ea`.
 
 | arm | code | machine (load1 / 10 cpu) | wall | cpu (ratio) | verdict | required |
 |---|---|---|---|---|---|---|
-| NEGATIVE | unchanged | 6.11 (0.61/cpu) | 0.40 s | 0.38 s (0.95) | **PASS** | PASS ✔ |
-| **FIRES** | **regressed O(n²)** | 6.11→6.33 (0.63/cpu) | 6.46 s (×11.18) | 6.39 s (**0.99**) | **FAIL** | FAIL ✔ |
-| **SILENT** | **unchanged** | **13.23 (1.32/cpu)** | 1.94 s (×3.36) | 0.54 s (**0.28**) | **UNMEASURABLE** | UNMEASURABLE ✔ |
+| NEGATIVE | unchanged | 7.49 (0.75/cpu) — quiet | 0.28 s (×0.60) | 0.27 s (0.98) | **PASS** | PASS ✔ |
+| **FIRES** | **regressed O(n²)** | 7.49 (0.75/cpu) — **quiet** | 3.95 s (×8.61) | 3.94 s (**1.00**) | **FAIL** | FAIL ✔ |
+| **SILENT** | **unchanged** | **11.70 (1.17/cpu) — loaded** | 2.37 s (×5.17) | 0.51 s (**0.21**) | **UNMEASURABLE** | UNMEASURABLE ✔ |
 
 **That is the discrimination, in three rows.** The same unchanged child reads
 PASS on the quiet machine and UNMEASURABLE on the loaded one — its wall time
-went from 0.39 s to 1.94 s while it did the same work. The regressed child reads
-FAIL on the *quiet* machine, because it burned 6.39 s of CPU for its 6.46 s of
-wall and a process that is working is not a process that is waiting.
+went from 0.28 s to 2.37 s while it did the same work, and its CPU did not.
+The regressed child reads FAIL on the *quiet* machine, because it burned 3.94 s
+of CPU for its 3.95 s of wall, and a process that is working is not a process
+that is waiting.
 
-`all_required_arms_agree: true`, `disagreements: []`.
+`fires_measured_on_a_quiet_machine: true`, `all_required_arms_agree: true`,
+`disagreements: []`.
+
+### The drive polices its own quietness, because a label is not a measurement
+
+An earlier drive of these arms was made while the host sat at **load 14.34** —
+two other lanes were running suites. FIRES still read FAIL (its CPU ratio was
+0.91), but "a genuine regression FAILS on a QUIET machine" was then not what had
+been measured, and the arm's own label said "quiet". Two things came out of it
+and both are kept:
+
+* every arm row now carries **`machine_quiet`, computed from its record**, and
+  the drive publishes `fires_measured_on_a_quiet_machine`; a FIRES arm measured
+  on a loaded host makes the whole run **disagree**, so the protocol's answer
+  (re-measure, do not explain) applies to the protocol's own controls. The
+  committed artifact is the re-measurement, taken at load 7.49.
+* **N3 flipped**, exactly as the facility predicts. With C3 destroyed
+  (`max_cpu_ratio → 1.0`) the arm read UNMEASURABLE at load 14.34 and reads FAIL
+  at load 7.49 — because with the CPU condition gone, the load condition is all
+  that is left. That is the clearest possible demonstration that C3 and C4 are
+  each load-bearing, and it was produced by an accident of scheduling rather
+  than by design.
 
 ### CHECK-NOT-DEAD, four sub-arms on the FIRES record
 
@@ -38,11 +61,12 @@ wall and a process that is working is not a process that is waiting.
 |---|---|---|
 | **N1** | the facility **removed** — the bare `wall > budget` assertion | **FAIL** ✔ |
 | **N2** | **C4 destroyed** (`load_per_cpu → 0.0`: every machine counts as loaded) | **FAIL** ✔ |
-| **N3** | **C3 destroyed** (`max_cpu_ratio → 1.0`: every process counts as waiting) | **FAIL** ✔ |
+| **N3** | **C3 destroyed** (`max_cpu_ratio → 1.0`: every process counts as waiting) | **FAIL** ✔ (quiet host; UNMEASURABLE at load 14.34 — see above) |
 | **N4** | **both destroyed** | **UNMEASURABLE** — reported, not hidden |
 
 N2 is the one that matters most: **removing the entire load condition does not
-save a CPU-burning regression**, because C3 decides it on its own. N4 is what a
+save a CPU-burning regression**, because C3 decides it on its own — and it holds
+whatever the host is doing, which N3's flip shows is not true of the other half. N4 is what a
 dead check looks like, and it is why both mutations are refused at construction:
 
 ```
@@ -55,17 +79,18 @@ Both refusals are recorded in the artifact
 it was judged against, so a fork that forced them by editing
 `core/contention.py` shows the forced values in its own output.
 
-**Found by driving N3 rather than by reasoning about it:** a span that saturates
-a core records `cpu_ratio` slightly **above** 1.0 (`os.times` resolution against
-`time.monotonic`), so even the largest value the type permits often cannot make
-it count as waiting at all. The subprocess subject reads 0.99 and the in-process
-burn in `tests/test_contention_controls.py` reads above 1.0; both are pinned.
+**Found by driving rather than by reasoning about it:** a span that saturates a
+core records `cpu_ratio` at or slightly **above** 1.0 (`os.times` resolution
+against `time.monotonic`), so even the largest value the type permits sometimes
+cannot make it count as waiting at all. The subprocess subject reads 1.00 here
+and 0.91 on the loaded drive; the in-process burn in
+`tests/test_contention_controls.py` reads above 1.0. Both are pinned by tests.
 
 ### The synthetic load, disclosed
 
 20 workers at `nice -n 19`, PIDs recorded at launch and **all 20 killed by those
-recorded PIDs**; window `2026-09-06T23:58:20Z → 23:58:32Z` (12 s), load1 reached
-**13.23**. Low priority, and the measured child was given the **same** low
+recorded PIDs**; window `2026-09-07T00:15:20Z → 00:15:27Z` (7 s), load1 reached
+**11.70**. Low priority, and the measured child was given the **same** low
 priority so that it genuinely contended with the workers rather than walking
 past them — load average counts runnable processes regardless of priority, so C4
 saw the real number and the child's wall and CPU are measured, not modelled.
