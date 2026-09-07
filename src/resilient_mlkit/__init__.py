@@ -83,7 +83,21 @@ from .core.result import (
 #: Driven over all EIGHT adopter remote mains, five phases each, before and
 #: after: **272 rows, 0 added, 0 removed, 0 status moved, 0 reasons moved** --
 #: preregistered as zero movement, because an exit code is not a verdict.
-__version__ = "2.2.0"
+#: BUMPED 2.2.0 -> 3.0.0 on 2026-09-07 (E-M44): MAJOR, by this file's own scale
+#: and taken as one rather than argued down -- an existing check changes verdict
+#: on UNCHANGED repo code. R9 owns two licence obligations and returned on the
+#: first, so the NOTICE.md attribution leg was unreachable on any repo with a
+#: manifest finding. Measured over all eight adopter remote mains, five phases
+#: each, before and after: **272 rows, 0 added, 0 removed, 3 STATUS moved,
+#: 2 reason moved**, and every one of the five is a repo whose committed
+#: NOTICE.md does not discharge obligations its own signed allowlist records.
+#: `resilient-torrent` NA -> FAIL (10 missing attribution sections),
+#: `resilient-triage` NA -> FAIL (10), `resilient-blackout` NA -> FAIL (5);
+#: `resilient-surge` FAIL -> FAIL with 12 named, `resilient-arabica`
+#: FAIL -> FAIL with the drift named. choco, fray and chokepoint do not move:
+#: their NOTICE.md is current. No row moved anywhere else, and R8 -- the row
+#: that writes the report R9's reason lands in -- did not move on any repo.
+__version__ = "3.0.0"
 
 #: The version is NOT the identity, and E-M24 is the measurement that says so:
 #: fray runs mlkit ``c65b2e7`` and mlkit main is ``6921e9a`` -- 40 commits, 9

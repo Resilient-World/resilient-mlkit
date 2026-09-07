@@ -18,6 +18,7 @@ from __future__ import annotations
 import datetime as _dt
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,6 +28,10 @@ from .repo import Repo
 
 #: Relative to the repo root. Identical across all 8 repos.
 ALLOWLIST_RELPATH = "docs/allowlist.yaml"
+
+#: Where the rendered attribution obligations live. One definition, so the
+#: check that reads it and the command that writes it cannot disagree.
+NOTICE_RELPATH = "NOTICE.md"
 
 VALID_STATUSES = {"ALLOWED", "BLOCKED", "EVAL-ONLY"}
 
@@ -83,6 +88,14 @@ class Allowlist:
     last_commit: str = ""
     entries: dict[str, Entry] = field(default_factory=dict)
     parse_error: str = ""
+    #: True once the YAML parsed to a mapping and the entries were read.
+    #: ``parse_error`` covers two different things -- a document that could not
+    #: be read at all, and a document that read fine but whose SIGNATURE does
+    #: not hold up -- and only the second leaves usable entries behind. R9's
+    #: NOTICE leg needs to know which it has: comparing NOTICE.md against a
+    #: rendering built from zero entries would report a gap that is an artefact
+    #: of the parse failure (E-M44).
+    document_parsed: bool = False
 
     @property
     def exists(self) -> bool:
@@ -147,6 +160,7 @@ def read(path: Path) -> Allowlist:
         allowlist.entries[entry.id] = entry
 
     allowlist.claims_signed = claimed
+    allowlist.document_parsed = True
     return allowlist
 
 
@@ -317,3 +331,124 @@ def render_notice(repo: Repo, allowlist: Allowlist) -> str:
             "",
         ]
     return "\n".join(lines)
+
+
+#: How many source ids a NOTICE finding names before it says "and N more". The
+#: whole list is always in the evidence; this bounds the REASON, which lands in
+#: a 400-character field and in a markdown table cell.
+NOTICE_IDS_IN_REASON = 6
+
+#: `render_notice` writes one `## <source id>` heading per obligation, so this
+#: is how the sections actually on disk are read back. Section-level, not
+#: text-level, because "which obligations are undischarged" is the question a
+#: repo has to answer and "the bytes differ somewhere" is not.
+_NOTICE_SECTION = re.compile(r"(?m)^## (.+?)\s*$")
+
+
+@dataclass
+class NoticeGap:
+    """What ``NOTICE.md`` does not say that the signed allowlist obliges it to.
+
+    R9 owns two obligations -- no unlisted or wrongly-licensed source in the
+    manifest, AND the attribution obligations rendered into ``NOTICE.md`` --
+    and until E-M44 it returned on the first and never reached the second. So
+    the state this class describes was invisible on any repo that had a
+    manifest finding, which on 2026-09-07 was four of the five repos whose
+    NOTICE.md was stale.
+
+    Named obligations, not a byte comparison, because the repair has to be
+    mechanical: "missing attribution section(s) for `sen1floods11`,
+    `worldfloods-v2`" tells a repo what it owes. "NOTICE.md is stale" does not.
+    """
+
+    #: Is there a NOTICE.md at all?
+    present: bool
+    #: Obligated source ids with no section of their own in the committed file.
+    missing: list[str]
+    #: Sections in the committed file that answer to no allowlist obligation.
+    extra: list[str]
+    #: The file differs from what `render_notice` produces, section sets aside
+    #: (wording, licence URL, retrieval date, or the provisional trailer).
+    text_differs: bool
+    #: Every id the signed allowlist carries an attribution obligation for.
+    obligations: list[str]
+
+    @property
+    def failed(self) -> bool:
+        return (not self.present) or bool(self.missing or self.extra) or self.text_differs
+
+    def evidence(self) -> dict[str, object]:
+        return {
+            "notice_present": self.present,
+            "notice_obligations": self.obligations,
+            "notice_missing_attribution": self.missing,
+            "notice_extra_attribution": self.extra,
+            "notice_current": not self.failed,
+        }
+
+    def reason(self) -> str:
+        """One sentence, naming the undischarged obligations and the remedy."""
+        if not self.present:
+            if self.obligations:
+                return (
+                    f"NOTICE.md is absent and the allowlist carries "
+                    f"{len(self.obligations)} attribution obligation(s): "
+                    f"{_name_ids(self.obligations)}; run `mlkit notice`"
+                )
+            return "NOTICE.md is absent; run `mlkit notice`"
+        parts = []
+        if self.missing:
+            parts.append(
+                f"missing attribution section(s) for {len(self.missing)} source(s): "
+                f"{_name_ids(self.missing)}"
+            )
+        if self.extra:
+            parts.append(
+                f"{len(self.extra)} attribution section(s) with no allowlist "
+                f"obligation: {_name_ids(self.extra)}"
+            )
+        if not parts:
+            # Wording drifted without any obligation going missing. The
+            # sentence is unchanged from before E-M44 on purpose: this is the
+            # one shape R9 could already see, and a repo reading its own row
+            # should not have to work out whether the check changed or its
+            # NOTICE did.
+            return "NOTICE.md is stale relative to the allowlist; run `mlkit notice`"
+        return (
+            "NOTICE.md is stale relative to the allowlist: "
+            + "; ".join(parts)
+            + "; run `mlkit notice`"
+        )
+
+
+def _name_ids(ids: list[str]) -> str:
+    head = sorted(ids)[:NOTICE_IDS_IN_REASON]
+    rest = len(ids) - len(head)
+    return ", ".join(head) + (f" (and {rest} more)" if rest else "")
+
+
+def notice_gap(repo: Repo, allowlist: Allowlist) -> NoticeGap:
+    """Compare the committed ``NOTICE.md`` with what the allowlist obliges.
+
+    Deliberately needs no binding, no import of the repo's code and no data:
+    an attribution obligation is undischarged or it is not, and that must stay
+    answerable in an environment that cannot measure anything else about the
+    repository. It is what lets R9 report the NOTICE leg on a repo whose
+    manifest leg raised.
+    """
+    obligations = [e.id for e in sorted(allowlist.attributions(), key=lambda e: e.id)]
+    path = repo.path / NOTICE_RELPATH
+    if not path.is_file():
+        return NoticeGap(
+            present=False, missing=list(obligations), extra=[],
+            text_differs=True, obligations=obligations,
+        )
+    on_disk = path.read_text()
+    sections = [m.group(1).strip() for m in _NOTICE_SECTION.finditer(on_disk)]
+    return NoticeGap(
+        present=True,
+        missing=[i for i in obligations if i not in sections],
+        extra=[s for s in sections if s not in obligations],
+        text_differs=on_disk != render_notice(repo, allowlist),
+        obligations=obligations,
+    )

@@ -1,0 +1,116 @@
+{
+ "arms": [
+  {
+   "arm": "N1",
+   "names_the_missing_ids": true,
+   "reason": "NOTICE.md is stale relative to the allowlist: missing attribution section(s) for 1 source(s): blocked-panel; run `mlkit notice` | BLOCKED source(s) in the manifest: blocked-panel",
+   "required": "FAIL, and the reason carries BOTH legs",
+   "status": "FAIL",
+   "tree": "live"
+  },
+  {
+   "arm": "N2",
+   "names_the_missing_ids": true,
+   "reason": "BLOCKED source(s) in the manifest: blocked-panel",
+   "required": "FAIL, reason byte-identical to the not-dead tree's",
+   "status": "FAIL",
+   "tree": "live"
+  },
+  {
+   "arm": "N3",
+   "names_the_missing_ids": true,
+   "reason": "NOTICE.md is stale relative to the allowlist: missing attribution section(s) for 1 source(s): sentinel2-l2a; run `mlkit notice`",
+   "required": "FAIL \u2014 not a warning, and not NA",
+   "status": "FAIL",
+   "tree": "live"
+  },
+  {
+   "arm": "N4",
+   "names_the_missing_ids": false,
+   "reason": "",
+   "required": "PASS",
+   "status": "PASS",
+   "tree": "live"
+  },
+  {
+   "arm": "N5",
+   "names_the_missing_ids": true,
+   "reason": "NOTICE.md is stale relative to the allowlist: missing attribution section(s) for 1 source(s): code-not-data; run `mlkit notice` | allowlist entries are structurally invalid: code-not-data: kind 'code' is not 'data' or 'weights'",
+   "required": "FAIL, both legs, past a structurally invalid allowlist",
+   "status": "FAIL",
+   "tree": "live"
+  },
+  {
+   "arm": "N6",
+   "names_the_missing_ids": true,
+   "reason": "NOTICE.md is stale relative to the allowlist: missing attribution section(s) for 1 source(s): sentinel2-l2a; run `mlkit notice` | the manifest leg was NOT measured: fixturerepo: importing 'no_module_by_this_name_for_the_arm' for binding 'manifest' raised ModuleNotFoundError: No module named 'no_module_by_this_name_for_the_arm'",
+   "required": "FAIL, naming the NOTICE gap and saying the manifest leg was not measured",
+   "status": "FAIL",
+   "tree": "live"
+  },
+  {
+   "arm": "N7",
+   "names_the_missing_ids": false,
+   "reason": "fixturerepo: importing 'no_module_by_this_name_for_the_arm' for binding 'manifest' raised ModuleNotFoundError: No module named 'no_module_by_this_name_for_the_arm'",
+   "required": "NA, reason byte-identical to the not-dead tree's",
+   "status": "NA",
+   "tree": "live"
+  },
+  {
+   "arm": "N8",
+   "names_the_missing_ids": true,
+   "reason": "NOTICE.md is absent and the allowlist carries 1 attribution obligation(s): sentinel2-l2a; run `mlkit notice`",
+   "required": "FAIL, NOTICE.md absent, obligations named",
+   "status": "FAIL",
+   "tree": "live"
+  },
+  {
+   "arm": "N9-N1",
+   "mentions_notice": false,
+   "reason": "BLOCKED source(s) in the manifest: blocked-panel",
+   "required": "the NOTICE leg is invisible; N6 is NA",
+   "status": "FAIL",
+   "tree": "not-dead"
+  },
+  {
+   "arm": "N9-N2",
+   "mentions_notice": false,
+   "reason": "BLOCKED source(s) in the manifest: blocked-panel",
+   "required": "the NOTICE leg is invisible; N6 is NA",
+   "status": "FAIL",
+   "tree": "not-dead"
+  },
+  {
+   "arm": "N9-N5",
+   "mentions_notice": false,
+   "reason": "allowlist entries are structurally invalid: code-not-data: kind 'code' is not 'data' or 'weights'",
+   "required": "the NOTICE leg is invisible; N6 is NA",
+   "status": "FAIL",
+   "tree": "not-dead"
+  },
+  {
+   "arm": "N9-N6",
+   "mentions_notice": false,
+   "reason": "fixturerepo: importing 'no_module_by_this_name_for_the_arm' for binding 'manifest' raised ModuleNotFoundError: No module named 'no_module_by_this_name_for_the_arm'",
+   "required": "the NOTICE leg is invisible; N6 is NA",
+   "status": "NA",
+   "tree": "not-dead"
+  },
+  {
+   "arm": "N9-N7",
+   "mentions_notice": false,
+   "reason": "fixturerepo: importing 'no_module_by_this_name_for_the_arm' for binding 'manifest' raised ModuleNotFoundError: No module named 'no_module_by_this_name_for_the_arm'",
+   "required": "the NOTICE leg is invisible; N6 is NA",
+   "status": "NA",
+   "tree": "not-dead"
+  }
+ ],
+ "escalation": "E-M44",
+ "not_dead_modules": [
+  "checks/readiness.py",
+  "core/policy.py"
+ ],
+ "not_dead_rev_label": "origin/main",
+ "preregistration": "reports/E_M43_M44_GATE_DEFECT_PREREGISTRATION.md",
+ "subject": "r9_licence_gate returned before the NOTICE leg it also owns"
+}

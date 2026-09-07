@@ -3814,3 +3814,110 @@ drives of `origin/main` agree on all 272 rows.
 
 **No gate file, threshold, range or holdout was edited. No credential was read,
 printed, logged or written. `#45` untouched.**
+
+---
+
+## E-M44 — R9 returned before the NOTICE leg it also owns, and four repos' unmet attribution obligations were behind that return
+
+**Repo:** `Resilient-World/resilient-mlkit` (public). **Opened** 2026-09-07 on
+`main` `b15cba8b` (v2.2.0). **Preregistration:**
+`reports/E_M43_M44_GATE_DEFECT_PREREGISTRATION.md` §2, committed with E-M43.
+**Readings:** `reports/E_M43_M44_GATE_DEFECT_RESULTS.md`. **Driven arms:**
+`reports/E_M44_R9_BOTH_LEGS_ARMS.json`. **Adoption:** written out per repo and
+NOT performed.
+
+### The finding, measured
+
+`r9_licence_gate` holds two licence obligations: no source in the manifest is
+unlisted, BLOCKED or EVAL-ONLY, and every attribution obligation in the signed
+allowlist is rendered into `NOTICE.md`. It returned on the first. Six returns
+stood between the top of the function and the NOTICE block — `parse_error`,
+`defective_entries`, the manifest resolution error, an empty manifest, and the
+three manifest verdicts — and any of them made the second obligation
+unreachable.
+
+Driven with mlkit's own `policy.render_notice` at the eight adopter remote
+mains, comparing the committed file against the rendering:
+
+| repo | sections on disk | obligations | missing | what R9 stopped at |
+|---|---|---|---|---|
+| torrent | 38 | 48 | **10** | the `manifest` binding |
+| surge | 24 | 36 | **12** | `defective_entries` (two `kind: code`) |
+| triage | 11 | 21 | **10** | the `manifest` binding |
+| blackout | 6 | 11 | **5** | four unallowlisted sources |
+| arabica | 34 | 34 | 0, text drift | three BLOCKED sources |
+
+**Thirty-seven undischarged attribution obligations across four repositories**,
+invisible in the check that owns them. Only triage's R9 reached the NOTICE leg
+under an environment that could resolve its manifest, and only fray's passed
+both legs honestly.
+
+### The repair
+
+The NOTICE leg is computed FIRST and unconditionally — for reachability, not
+precedence — and folded into a combined verdict with the manifest leg. Three
+choices, each recorded in the function:
+
+1. **It runs when the manifest leg could not be measured.** `policy.notice_gap`
+   needs no binding, no import of the repo's code and no data. A measured unmet
+   obligation beside an unmeasured leg is a FAIL whose reason names the leg
+   that was not measured; NA would erase the half that WAS measured.
+2. **It runs past a structurally invalid allowlist; the manifest leg does not.**
+   Whether NOTICE.md matches the file on disk needs no determinations. Whether
+   a source is wrongly licensed does. `resilient-surge` is why this clause
+   exists.
+3. **The NOTICE clause goes first in a combined reason.** `MAX_REASON`
+   truncates at 400, and putting the newly-visible half last would be the same
+   defect a second time — invisible by truncation instead of by `return`.
+   Driven: a 40-source manifest finding truncates and the NOTICE clause
+   survives at the head.
+
+The finding names the missing source ids — six, then a count, the whole list in
+`evidence` — so a repo's repair is mechanical rather than a diff hunt.
+
+### Neither leg was weakened
+
+Every input that failed R9 before still fails it, with the manifest clause
+unchanged word for word. Arms **N2** and **N7** assert a byte-identical reason
+against the pre-E-M44 check for a repo whose NOTICE is current. A NOTICE gap
+alone is a FAIL, not a warning: mlkit has no WARN status and this is not the
+release that invents one.
+
+### The fleet, before and after
+
+```
+rows BEFORE 272   rows AFTER 272   added 0   removed 0
+STATUS moved 3    reason moved 2
+
+torrent  R9 NA -> FAIL      triage R9 NA -> FAIL     blackout R9 NA -> FAIL
+surge    R9 FAIL -> FAIL (12 ids named)
+arabica  R9 FAIL -> FAIL (NOTICE drift named)
+choco / fray / chokepoint: unmoved
+```
+
+Every movement was written down in the preregistration §3 before the drive, and
+all eight repos matched. **R8 did not move on any repo**, and nothing outside R9
+moved anywhere. Two independent drives of the base `main` agree on all 272 rows,
+so the movement is a statement about the change.
+
+**The NA on torrent, triage and blackout is the drive interpreter's missing
+`pandas`, not the repositories'.** Under each repo's own environment their R9
+already reads FAIL on the manifest leg, and there the movement is reason-only.
+The status move is real and is what clause B8 prescribes; it is
+environment-shaped and is named as such rather than reported as three repos
+newly failing.
+
+### RESERVED, and left for each repo
+
+1. **The v3.0.0 tag is not cut.** E-M08: cutting a tag is the signatory's.
+2. **Nothing was pushed to a consumer repo.** All eight rev-pin mlkit, so no
+   consumer verdict moves until someone moves a pin. Each repo's repair is one
+   `mlkit notice` run plus a review of the regenerated file, written out per
+   repo with the missing obligations by source id, and NOT performed here.
+3. **No allowlist was read as an input to a change and none was edited.** The
+   attribution text a NOTICE.md renders comes from the signed allowlist; the
+   gap is that it was not rendered, not that the determinations are wrong.
+
+**No gate file, threshold, range or holdout was edited to make a check pass —
+this change makes checks fail, at their cause. No credential was read, printed,
+logged or written. `#45` untouched.**
