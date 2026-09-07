@@ -351,9 +351,10 @@ def _delegated_helpers(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
     helpers: set[str] = set()
     for node in fn.body:
         for sub in ast.walk(node):
-            if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if _computes_a_figure(sub):
-                    helpers.add(sub.name)
+            if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)) and _computes_a_figure(
+                sub
+            ):
+                helpers.add(sub.name)
     return helpers
 
 
@@ -362,9 +363,12 @@ def _mentions(expr: ast.AST, helpers: set[str]) -> bool:
     if not helpers:
         return False
     for node in ast.walk(expr):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if node.func.id in helpers:
-                return True
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in helpers
+        ):
+            return True
     return False
 
 
