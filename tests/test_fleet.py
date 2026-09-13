@@ -702,12 +702,11 @@ def test_the_reader_follows_the_artifact_when_the_recorded_figure_changes(
 # evidence is on `main`.
 
 #: repo -> the branch its declared artifacts are committed on, for the repos
-#: whose artifacts are NOT on that repo's `main`. Corroborated below against
-#: the branch `portfolio/FLEET_VERDICTS.md` records reading each repo from.
-BRANCH_ONLY_EVIDENCE = {
-    "blackout": "e021-decision",
-    "triage": "e028-decision",
-}
+#: whose artifacts are NOT on that repo's `main`. Empty as of 2026-09-07:
+#: surge, blackout, and triage artifacts the 2026-08-29 fleet table treated as
+#: branch-only are on each repo's `main`. `portfolio/FLEET_VERDICTS.md` remains
+#: a 2026-08-29 snapshot and is not rewritten here.
+BRANCH_ONLY_EVIDENCE: dict[str, str] = {}
 
 FLEET_VERDICTS_MD = Path(__file__).resolve().parent.parent / "portfolio" / "FLEET_VERDICTS.md"
 
@@ -766,19 +765,17 @@ def test_the_declared_branches_match_the_committed_provenance_table() -> None:
 
 
 def test_positive_control_a_deleted_branch_note_is_caught() -> None:
-    """FIRES: the blackout/triage entries exactly as `main` carried them."""
+    """FIRES when a required repo's note is stripped."""
     import dataclasses
 
     from resilient_mlkit.fleet_adapters import ADAPTERS
 
+    required = {"blackout": "e021-decision", "triage": "e028-decision"}
     stripped = tuple(
-        dataclasses.replace(a, note="") if a.repo in BRANCH_ONLY_EVIDENCE else a
-        for a in ADAPTERS
+        dataclasses.replace(a, note="") if a.repo in required else a for a in ADAPTERS
     )
-    missing = entries_missing_branch_note(stripped, BRANCH_ONLY_EVIDENCE)
-    assert sorted(missing) == sorted(
-        a.key for a in ADAPTERS if a.repo in BRANCH_ONLY_EVIDENCE
-    )
+    missing = entries_missing_branch_note(stripped, required)
+    assert sorted(missing) == sorted(a.key for a in ADAPTERS if a.repo in required)
 
 
 def test_positive_control_a_note_naming_the_wrong_branch_is_caught() -> None:
@@ -787,35 +784,18 @@ def test_positive_control_a_note_naming_the_wrong_branch_is_caught() -> None:
 
     from resilient_mlkit.fleet_adapters import ADAPTERS
 
+    required = {"triage": "e028-decision"}
     wrong = tuple(
         dataclasses.replace(a, note="committed on some-other-branch, not on main")
         if a.repo == "triage"
         else a
         for a in ADAPTERS
     )
-    assert entries_missing_branch_note(wrong, BRANCH_ONLY_EVIDENCE) == ["triage"]
+    assert entries_missing_branch_note(wrong, required) == ["triage"]
 
 
 def test_negative_control_a_repo_whose_evidence_is_on_main_needs_no_note() -> None:
-    """SILENT: an adapter outside ``BRANCH_ONLY_EVIDENCE`` is never flagged.
-
-    Without this pair the rule above is indistinguishable from "every adapter
-    must carry a note", which would make the note meaningless.
-
-    Strengthened during adversarial verification. The earlier shape passed a
-    pre-filtered slice (the non-required adapters, notes as committed) and
-    asserted the result was empty. That did catch the break its docstring
-    names -- dropping ``entries_missing_branch_note``'s ``a.repo in required``
-    guard makes it fail -- but its silence and the rule's firing were measured
-    on DIFFERENT inputs, so "silent" could still have meant "given nothing to
-    object to": blanking the notes of those same adapters does not change its
-    result either way.
-
-    This shape fixes that by using one input for both halves. Every note on the
-    WHOLE adapter tuple is blanked; the rule must fire (the three
-    branch-dependent entries are flagged) and, on that same input, must stay
-    silent for every adapter whose evidence is on its own ``main``.
-    """
+    """SILENT: with BRANCH_ONLY_EVIDENCE empty, blanking notes flags nobody."""
     import dataclasses
 
     from resilient_mlkit.fleet_adapters import ADAPTERS
@@ -826,8 +806,5 @@ def test_negative_control_a_repo_whose_evidence_is_on_main_needs_no_note() -> No
     blanked = tuple(dataclasses.replace(a, note="") for a in ADAPTERS)
     flagged = entries_missing_branch_note(blanked, BRANCH_ONLY_EVIDENCE)
 
-    assert flagged, "same-input positive: a blanked note must fire for the required repos"
-    assert not (set(flagged) & set(on_main)), (
-        "an adapter whose evidence is on its repo's own main was flagged for "
-        f"missing a branch note: {sorted(set(flagged) & set(on_main))}"
-    )
+    assert flagged == []
+    assert not (set(flagged) & set(on_main))

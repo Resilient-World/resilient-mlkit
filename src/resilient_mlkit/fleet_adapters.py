@@ -29,16 +29,12 @@ pre-registered in ``reports/MEASUREMENT_EXPORT_PREREGISTRATION.md``.
 WHERE THE EVIDENCE LIVES
 ------------------------
 An adapter names a path, not a branch, and a reader of this file alone would
-assume the path is on the repo's ``main``. For three entries it is not, and each
-says so in its note: surge's artifacts sit in a linked worktree rather than on
-the branch that repo has checked out, and blackout's two entries and triage's
-read artifacts committed only on ``e021-decision`` and ``e028-decision``.
-Measured read-only on 2026-08-29 with ``git cat-file -e <ref>:<path>`` in each
-repo's own clone -- no checkout, no fetch, nothing written: present on those
-branches, absent on each repo's ``main``. ``portfolio/FLEET_VERDICTS.md``
-records the same fact in its provenance table;
-``tests/test_fleet.py::test_every_branch_only_adapter_says_its_evidence_is_not_on_main``
-holds the two in agreement.
+assume the path is on the repo's ``main``. On 2026-08-29 three entries were
+branch-only (surge worktree, blackout ``e021-decision``, triage ``e028-decision``).
+Re-measured against each repo's ``main`` on 2026-09-07: those artifacts **are**
+on ``main``. ``BRANCH_ONLY_EVIDENCE`` is therefore empty. ``portfolio/FLEET_VERDICTS.md``
+was generated 2026-08-29 and is a snapshot, not a live description of current
+mains.
 
 One correction to an earlier reading of that probe, which claimed the other six
 repos' artifacts were "all present on their own ``main``". Re-measured the same
@@ -189,6 +185,30 @@ ADAPTERS: tuple[Adapter, ...] = (
         # Keyed by track name, so this is this row's count and not the repo's.
         test_arm_spent=Field("test_artifact:test_reads_spent.forecast_available"),
     ),
+    Adapter(
+        repo="fray",
+        entry="unseen_year",
+        artifacts={"main": "reports/validation/unseen_year_record.json"},
+        metric=Declared("mae"),
+        lower_is_better=True,
+        model_of_record=Absent(
+            "tracks.unseen_year.model_of_record is null: nothing has been fitted "
+            "on this split, so there is no model of record. The bar in force is "
+            "the floor, not a champion"
+        ),
+        candidate=Field("main:tracks.unseen_year.bar_in_force"),
+        score=Field("main:tracks.unseen_year.test.mae_lb_ac"),
+        split=Declared("test"),
+        baseline_name=Field("main:tracks.unseen_year.bar_in_force"),
+        baseline_score=Field("main:tracks.unseen_year.test.mae_lb_ac"),
+        beats=Compare(),
+        test_arm_spent=Field("main:tracks.unseen_year.test.n_scored"),
+        note=(
+            "the floor is persistence_t_minus_1 on the unseen-year TEST split; a "
+            "floor is not a record. The spatial-infill winners are not this track's "
+            "record and must never be entered here"
+        ),
+    ),
     # ---------------------------------------------------------------- torrent
     Adapter(
         repo="torrent",
@@ -304,6 +324,44 @@ ADAPTERS: tuple[Adapter, ...] = (
             "artifact says so in `frame` and the split column carries it verbatim"
         ),
     ),
+    Adapter(
+        repo="chokepoint",
+        entry="daily-flow-h7",
+        artifacts={"main": "models/daily_flow/champion.json"},
+        metric=Declared("mae"),
+        lower_is_better=True,
+        model_of_record=Field("main:model_id"),
+        candidate=Field("main:recipe.candidate"),
+        score=Field("main:measurements.test_read.model_mae_mtpd"),
+        split=Declared("test"),
+        baseline_name=Field("main:measurements.test_read.tightest_margin_reference"),
+        baseline_score=Field("main:measurements.test_read.all_comparisons.2.reference_mae"),
+        beats=Field("main:measurements.test_read.all_comparisons.2.model_beats_reference"),
+        test_arm_spent=Field("main:measurements.test_read.n_rows"),
+        note=(
+            "h=7 HGB d3 champion on the single TEST read; tightest margin is versus "
+            "trailing_mean_h, which is comparisons[2] in the committed artifact"
+        ),
+    ),
+    Adapter(
+        repo="chokepoint",
+        entry="daily-flow-h14",
+        artifacts={"main": "models/daily_flow/champion_h14.json"},
+        metric=Declared("mae"),
+        lower_is_better=True,
+        model_of_record=Field("main:model_id"),
+        candidate=Field("main:model_id"),
+        score=Field("main:measurements.test_read.model_mae_mtpd"),
+        split=Declared("test"),
+        baseline_name=Declared("trailing_mean_h"),
+        baseline_score=Field("main:measurements.test_read.all_comparisons.2.reference_mae"),
+        beats=Field("main:measurements.test_read.all_comparisons.2.model_beats_reference"),
+        test_arm_spent=Field("main:measurements.test_read.n_rows"),
+        note=(
+            "h=14 zeroshot Chronos-2 champion (daily_flow_zeroshot_chronos2_h14); "
+            "comparisons[2] is trailing_mean_h on the committed TEST read"
+        ),
+    ),
     # ------------------------------------------------------------------ surge
     Adapter(
         repo="surge",
@@ -327,9 +385,10 @@ ADAPTERS: tuple[Adapter, ...] = (
         beats=Field("main:test_evidence.strongest_baseline_on_test.model_beats_it"),
         test_arm_spent=Field("main:test_evidence.holdout_reads_so_far"),
         note=(
-            "these artifacts are NOT on the branch resilient-surge has checked out; "
-            "they live on feat/surgeistm-lora-finetune in a linked worktree, which "
-            "the artifact block records"
+            "on main as of 2026-09-07: data/model_registry/per_lead_anchor_ols/ "
+            "and reports/holdout_reads.jsonl. The 2026-08-29 fleet table recorded "
+            "these on feat/surgeistm-lora-finetune in a linked worktree; that "
+            "note is stale"
         ),
     ),
     # ----------------------------------------------------------------- triage
@@ -348,11 +407,8 @@ ADAPTERS: tuple[Adapter, ...] = (
         beats=Compare(),
         test_arm_spent=Field("main:measurements.test.reads_of_this_arm"),
         note=(
-            "BRANCH-DEPENDENT: this artifact is committed on `e028-decision`, the "
-            "branch resilient-triage had checked out when the fleet table was "
-            "generated, and it is NOT on that repo's `main` -- do not read this "
-            "row as main-committed evidence. The provenance table in "
-            "portfolio/FLEET_VERDICTS.md records the branch and the sha256"
+            "on main as of 2026-09-07: models/weekly_mortality/champion.json. The "
+            "2026-08-29 fleet table recorded this on e028-decision; that note is stale"
         ),
     ),
     # --------------------------------------------------------------- blackout
@@ -385,10 +441,8 @@ ADAPTERS: tuple[Adapter, ...] = (
             "model of record is SERVED but not REGISTERED: the same gate artifact "
             "records `registry_state.n_versions: 0` with the note that nothing has "
             "ever been registered for this model, so a promotion would have nothing "
-            "to move. BRANCH-DEPENDENT: both artifacts are committed on "
-            "`e021-decision`, the branch resilient-blackout had checked out when "
-            "the fleet table was generated, and neither is on that repo's `main` -- "
-            "do not read this row as main-committed evidence"
+            "to move. On main as of 2026-09-07; the 2026-08-29 fleet table recorded "
+            "these on e021-decision and that note is stale"
         ),
     ),
     Adapter(
@@ -423,11 +477,9 @@ ADAPTERS: tuple[Adapter, ...] = (
         test_arm_spent=Field("main:read_at"),
         note=(
             "like-for-like: both sides on the 89,774-row persistence subset, which "
-            "is the only frame in which the two are comparable. BRANCH-DEPENDENT: "
-            "both artifacts are committed on `e021-decision`, the branch "
-            "resilient-blackout had checked out when the fleet table was generated, "
-            "and neither is on that repo's `main` -- do not read this row as "
-            "main-committed evidence"
+            "is the only frame in which the two are comparable. On main as of "
+            "2026-09-07; the 2026-08-29 fleet table recorded these on e021-decision "
+            "and that note is stale"
         ),
     ),
 )

@@ -254,7 +254,7 @@ def test_b6_the_undeclared_refusal_masks_a_merge_defect_and_names_the_remedy(tmp
     it. This is the price of never rendering an absent input as a verdict, and
     it is one line per binding.
     """
-    from tests import test_merged_tree_drive as t1
+    import test_merged_tree_drive as t1
 
     root, repo, shas = t1._e069_shaped_repo(tmp_path)
     config = repo / ".mlkit" / "repo.toml"
